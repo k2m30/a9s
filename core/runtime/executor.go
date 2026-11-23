@@ -173,7 +173,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			HasResources: r.HasResources,
 			Count:        r.Count,
 			Truncated:    r.Truncated,
-			Issues:       r.Issues,
 			Resources:    r.Resources,
 			Err:          r.Err,
 			Gen:          gen,
@@ -194,7 +193,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		r := c.ProbeEnrichment(ctx, snap.Clients, shortName)
 		return messages.EnrichmentChecked{
 			ResourceType:     shortName,
-			Truncated:        r.Truncated,
 			Findings:         r.Findings,
 			AttentionDetails: r.AttentionDetails,
 			FieldUpdates:     r.FieldUpdates,
@@ -297,8 +295,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		return messages.AvailabilityPrefetched{
 			Entries:         r.Entries,
 			Truncated:       r.Truncated,
-			IssueCounts:     r.IssueCounts,
-			IssueTruncated:  r.IssueTruncated,
 			Resources:       r.Resources,
 			Pagination:      r.Pagination,
 			Errs:            r.Errs,
@@ -697,7 +693,7 @@ func (c *Core) availabilityFromResourceCache() (
 
 // typeIssueBadge is the one derivation of a type's persisted issue badge
 // from its rows, for the live badge and the on-disk one alike
-// (unifiedIssueCount: a Wave-2 warning never counts, so a restart cannot
+// (IssueCount: a Wave-2 warning never counts, so a restart cannot
 // load a badge the previous screen never showed).
 //
 // "Known" is "probed", not "has rows": the sweep answered this session
@@ -713,12 +709,12 @@ func (c *Core) availabilityFromResourceCache() (
 // nothing of the session's that the handler loop writes bare.
 func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated, wave2Answered bool) (issues int, known, lower bool) {
 	td := resource.FindResourceType(rt)
-	if td == nil || td.ExcludeFromIssueBadge {
+	if td == nil {
 		return 0, false, pageTruncated
 	}
 	known = wave2Answered || c.session.EnrichmentRanGet(rt) || !c.HasIssueEnricher(rt)
 	if known {
-		issues = unifiedIssueCount(rows, *td)
+		issues = IssueCount(*td, rows)
 	}
 	return issues, known, pageTruncated
 }

@@ -207,7 +207,7 @@ func TestEnrichCodeArtifactRepository_NilClientReturnsEmptyFindingsNoError(t *te
 
 // TestEnrichCodeArtifactRepository_APIErrorSetsTruncatedNoError verifies that when the
 // API call for repo-1 returns a generic error (not ResourceNotFoundException), the
-// enricher sets Truncated=true, produces 0 findings for that repo, and does not
+// enricher marks repo-1 not inspected, produces 0 findings for that repo, and does not
 // propagate the error.
 func TestEnrichCodeArtifactRepository_APIErrorSetsTruncatedNoError(t *testing.T) {
 	apiErr := errors.New("codeartifact: GetRepositoryPermissionsPolicy throttled")
@@ -231,7 +231,7 @@ func TestEnrichCodeArtifactRepository_APIErrorSetsTruncatedNoError(t *testing.T)
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a generic API call fails")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

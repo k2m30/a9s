@@ -49,7 +49,6 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		HasResources: true,
 		Count:        len(partialResources),
 		Resources:    partialResources,
-		Issues:       0,
 		Truncated:    false,
 		Gen:          m.Core().Session().AvailabilityGen,
 	})
@@ -164,7 +163,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	m, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Err:          partialErr,
-		Truncated:    true,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
 		TruncatedIDs: map[string]string{"i-partial-002": ""},

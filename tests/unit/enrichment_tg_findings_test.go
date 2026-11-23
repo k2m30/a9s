@@ -263,7 +263,7 @@ func TestEnrichTargetGroupHealth_AllHealthyExcluded(t *testing.T) {
 	}
 }
 
-// TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap verifies Truncated=true.
+// TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap verifies the rows past the cap are marked not inspected.
 func TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	count := awsclient.EnrichmentCap + 1
 	resources := make([]resource.Resource, count)
@@ -288,9 +288,8 @@ func TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Errorf("Truncated must be true when len(resources)=%d > EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

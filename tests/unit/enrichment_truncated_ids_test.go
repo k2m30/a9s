@@ -2,16 +2,12 @@ package unit
 
 // enrichment_truncated_ids_test.go — Contract tests for EnricherResult.TruncatedIDs.
 //
-// TruncatedIDs is a per-resource truncation map (map[string]bool) signalling a
-// per-row "?" coverage gap (API error or cap hit) independent of the aggregate
-// Truncated bool. When an enricher bails on a specific resource, it MUST set
-// result.TruncatedIDs[resourceID] = true. The aggregate result.Truncated only
-// follows when the coverage gap could hide a severity "!" (SevBroken) finding
-// — i.e. the enricher's IssueCount is a lower bound. Enrichers that emit only
-// "~" (informational) findings, like iam-group, MUST leave Truncated false
-// regardless of TruncatedIDs: a coverage gap in informational-only data never
-// lower-bounds the issue badge (see core/aws/issue_enrichment.go
-// IssueEnricherResult.Truncated godoc).
+// TruncatedIDs is a per-resource map signalling a per-row "?" coverage gap
+// (API error or cap hit). When an enricher bails on a specific resource, it
+// MUST mark result.TruncatedIDs[resourceID]. The marks are the only record of
+// the gap: the issue badge reads them against the type's catalog severities,
+// so a gap lower-bounds the count only on a type that declares a "!"
+// (SevBroken) Wave-2 finding.
 
 import (
 	"context"
@@ -98,9 +94,8 @@ var _ awsclient.IAMAPI = (*iamGroupErrorOnSecondFake)(nil)
 // TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge verifies
 // that when GetGroup returns an error for a specific group,
 // TruncatedIDs[groupID] is true for that group, TruncatedIDs[otherGroupID]
-// is false (succeeded), and the global Truncated flag stays false — iam-group
-// is a "~"-only enricher (IssueCount always 0), so a per-resource coverage
-// gap must never lower-bound the aggregate issue badge.
+// is false (succeeded). iam-group is a "~"-only enricher (IssueCount always
+// 0), so the mark never lower-bounds the issue badge.
 func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testing.T) {
 	const firstGroup = "dev-team"
 	const secondGroup = "ops-team"
@@ -119,18 +114,9 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 	resources := iamGroupResources(firstGroup, secondGroup)
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	// A refused GetGroup reaches the operator through the composite error. The
-	// composite error and the Truncated flag are two answers; only the flag is
-	// governed by the "~"-only rule.
+	// A refused GetGroup reaches the operator through the composite error.
 	if err == nil {
 		t.Fatal("the simulated GetGroup failure must reach the operator through the composite error")
-	}
-
-	// Global Truncated must stay false: iam-group is a "~"-only enricher, so
-	// a per-resource API error marks the row via TruncatedIDs, never the
-	// aggregate issue badge.
-	if result.Truncated {
-		t.Error("Truncated must stay false when a per-resource API call errors — the gap is signalled via TruncatedIDs, not the badge")
 	}
 
 	if result.TruncatedIDs == nil {
@@ -147,9 +133,9 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 }
 
 // TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected verifies what
-// a page cap on a per-parent COUNTING walk records: the aggregate Truncated
-// flag (the issue badge is a lower bound) and a "+" on the count, but NOT a
-// per-row coverage gap.
+// a page cap on a per-parent COUNTING walk records: a "+" on the count, but
+// NOT a per-row coverage gap. A capped walk saw pages of targets, so the
+// no-targets finding it skips cannot be hiding.
 //
 // The row is NOT marked in TruncatedIDs: FoldWave2Rows skips every id in
 // TruncatedIDs, so marking the row would drop the dead-letter rows the walk
@@ -187,10 +173,6 @@ func TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected(t *testing.T
 		t.Errorf("ListTargetsByRule called %d times, want %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}
 
-	if !result.Truncated {
-		t.Error("Truncated must be true when pagination cap is hit")
-	}
-
 	// TruncatedIDs must NOT carry the capped rule — see this test's own doc.
 	if result.TruncatedIDs == nil {
 		t.Fatal("TruncatedIDs must not be nil")
@@ -224,9 +206,7 @@ func TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs(t *testing.T) {
 	resources := iamGroupResources(firstGroup, secondGroup)
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	// A refused GetGroup reaches the operator through the composite error. The
-	// composite error and the Truncated flag are two answers; only the flag is
-	// governed by the "~"-only rule.
+	// A refused GetGroup reaches the operator through the composite error.
 	if err == nil {
 		t.Fatal("the simulated GetGroup failure must reach the operator through the composite error")
 	}

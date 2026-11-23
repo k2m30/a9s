@@ -700,12 +700,12 @@ func TestW6ACF_CapBoundary(t *testing.T) {
 	}
 
 	atCap := w6aEnrichCF(t, &w6aCFFake{configs: configs}, w6aS3NameCache(false, "acme-live-origin"), ids[:awsclient.EnrichmentCap]...)
-	if atCap.Truncated {
-		t.Error("exactly EnrichmentCap distributions reported Truncated")
+	if len(atCap.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", atCap.TruncatedIDs)
 	}
 	overCap := w6aEnrichCF(t, &w6aCFFake{configs: configs}, w6aS3NameCache(false, "acme-live-origin"), ids...)
-	if !overCap.Truncated {
-		t.Error("EnrichmentCap+1 distributions did not report Truncated")
+	if len(overCap.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

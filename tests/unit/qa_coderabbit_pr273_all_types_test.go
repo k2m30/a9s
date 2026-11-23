@@ -302,7 +302,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalseNegatives(t *testing.T) {
 //
 // "Authoritatively" means: issueCounts=0, issueKnown=true,
 // issueTruncated=false, and (for enricher-backed types) Wave 2 also
-// returned Issues=0 with Truncated=false and empty Findings. Every
+// returned Issues=0 with no marked row and empty Findings. Every
 // registered type must be hidden under these conditions.
 func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 	for _, c := range typeContracts {
@@ -332,7 +332,6 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 				}
 				m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 					ResourceType: c.shortName,
-					Truncated:    false,
 					Findings:     map[string][]domain.Finding{},
 					Err:          nil,
 					Gen:          0,
@@ -350,14 +349,16 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 	}
 }
 
-// TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives
-// asserts the partial-error contract for enricher-backed types: if one
-// sub-call errored (Wave 2 sets Truncated=true) but no actual issues were
-// found (Issues=0, Findings empty), the type must NOT appear under
-// ctrl+z. Truncation is about count completeness, not hidden issues.
+// TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_ListedOnlyAsALowerBound
+// asserts the partial-error contract for enricher-backed types: one sub-call
+// errored (Wave 2 marks a row not inspected) and no issue was found (Issues=0,
+// Findings empty). The type appears under ctrl+z exactly when it can raise a
+// "!" Wave-2 finding, and then with the badge "issues:0+": the unread row may
+// hold an issue and the count is a lower bound. A "~"-only type's count is
+// exact.
 //
 // Non-enricher types skip this subtest.
-func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testing.T) {
+func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_ListedOnlyAsALowerBound(t *testing.T) {
 	for _, c := range typeContracts {
 		t.Run(c.shortName, func(t *testing.T) {
 			td := resource.FindResourceType(c.shortName)
@@ -379,10 +380,10 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 				IssueTruncated: map[string]bool{c.shortName: false},
 				IssueKnown:     map[string]bool{c.shortName: true},
 			})
-			// Wave 2: one sub-call errored → Truncated=true, but Findings={}.
+			// Wave 2: one sub-call errored → a row marked not inspected, but Findings={}.
 			m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: c.shortName,
-				Truncated:    true,
+				TruncatedIDs: map[string]string{"unread-1": "GetResourcePolicy"},
 				Findings:     map[string][]domain.Finding{},
 				Err:          nil,
 				Gen:          0,
@@ -390,11 +391,14 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 			})
 			m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
 			plain := stripANSI(rootViewContent(m))
-			if strings.Contains(plain, td.Name) {
-				t.Errorf("%s Wave 2 errored on one sub-call (Truncated=true, Issues=0, Findings={}) "+
-					"but appears under ctrl+z — false positive. Truncation signals count completeness, "+
-					"not hidden issues.\n\nAWS API: %s\nReasoning: %s",
-					c.shortName, c.apiDoc, c.reasoning)
+			want := declaresBrokenWave2(t, c.shortName)
+			got := strings.Contains(plain, td.Name+" (")
+			if got != want {
+				t.Errorf("%s Wave 2 errored on one sub-call (a row marked not inspected, Issues=0, Findings={}): "+
+					"listed under ctrl+z = %v, declares a \"!\" Wave-2 finding = %v",
+					c.shortName, got, want)
+			} else if got && !strings.Contains(t6DevLineWith(t, plain, td.Name+" ("), "issues:0+") {
+				t.Errorf("%s is listed under ctrl+z without the lower-bound badge \"issues:0+\"", c.shortName)
 			}
 		})
 	}

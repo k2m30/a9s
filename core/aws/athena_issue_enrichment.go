@@ -36,7 +36,7 @@ const (
 //     athenaCodeResultsUnencrypted, carrying the result location so the row
 //     names where the unencrypted output lands.
 //
-// Per-WG errors mark Truncated=true and are skipped.
+// A workgroup whose read fails is marked not inspected and skipped.
 // Skip when clients.Athena == nil.
 func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -96,7 +96,6 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 
 		}
 	})
-	MarkInformationalOnly(&result)
 	return result, errors.Join(loopErr, AggregateFailures("GetWorkGroup", failures, n))
 }
 

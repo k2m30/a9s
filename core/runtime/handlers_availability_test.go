@@ -68,7 +68,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
-		Truncated:    false,
 		Findings:     nil,
 	})
 
@@ -89,7 +88,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFa
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
-		Truncated:    true, // Wave-2 thinks it's truncated, but no issues observed
 		Findings:     nil,
 	})
 
@@ -99,29 +97,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFa
 	}
 	if pm.Truncated {
 		t.Fatalf("expected Truncated=false (no Wave-1 trunc, no issues observed); got true. PatchMenu=%+v", pm)
-	}
-}
-
-func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTruthy(t *testing.T) {
-	rt := pickKnownShortName(t)
-
-	sess := session.New()
-	c := New(sess, catalog.All())
-
-	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
-		ResourceType: rt,
-		Truncated:    true,
-		Findings: map[string][]domain.Finding{
-			"id-1": {{Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt}},
-		},
-	})
-
-	pm := findPatchMenu(intents, rt)
-	if pm == nil {
-		t.Fatalf("no PatchMenu intent emitted for %q", rt)
-	}
-	if !pm.Truncated {
-		t.Fatalf("expected Truncated=true (Wave-2 reports truncation + findings); got false. PatchMenu=%+v", pm)
 	}
 }
 

@@ -40,7 +40,6 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 	if clients.ELBv2 == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -68,7 +67,6 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
 			return
 		}
 		targetCount := len(out.TargetHealthDescriptions)
@@ -141,6 +139,5 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		}
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeTargetHealth", failures, total))
 }

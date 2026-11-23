@@ -40,7 +40,6 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
@@ -101,11 +100,11 @@ func tildeSeverityEC2Instances() []resource.Resource {
 //  3. One Wave-1 broken resource + one "~" finding on its ID → count = 1
 //     (broken comes from Wave-1 IsIssue; "~" must not double-count or bump).
 //
-// unifiedIssueCount ignores findings whose Severity is not "!"; the menu badge
+// IssueCount ignores findings whose Severity is not "!"; the menu badge
 // (" issues:N") reflects only "!" findings.
 //
 // Navigation pattern: AvailabilityCheckedMsg seeds probeResources so that
-// unifiedIssueCount has wave1Resources to work with; NavigateMsg pops back to
+// IssueCount has wave1Resources to work with; NavigateMsg pops back to
 // the menu so that m.View() renders the menu (not the resource list).
 func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 	tui.Version = "test"
@@ -115,23 +114,21 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 
 		// Use AvailabilityCheckedMsg stamped with the live AvailabilityGen
 		// (session.New seeds it to 1) to seed probeResources["ec2"]
-		// so unifiedIssueCount has wave1Resources.
+		// so IssueCount has wave1Resources.
 		// All three resources are running → Wave-1 contributes 0 to issue IDs.
 		resources := tildeSeverityEC2Instances()
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: "ec2",
 			Count:        3,
 			Resources:    resources,
-			Issues:       0,
 			Gen:          m.Core().Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
 
-		// EnrichmentCheckedMsg: unifiedIssueCount re-derives from Findings.
+		// EnrichmentCheckedMsg: IssueCount re-derives from Findings.
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Truncated:    false,
 			Findings: map[string][]domain.Finding{
 				"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 				"i-bbb": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
@@ -165,7 +162,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Count:        3,
 			Resources:    resources,
-			Issues:       0,
 			Gen:          m.Core().Session().AvailabilityGen,
 		})
 
@@ -174,7 +170,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// All three findings are "~" (informational).
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Truncated:    false,
 			Findings: map[string][]domain.Finding{
 				"i-aaa": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
 				"i-bbb": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
@@ -212,7 +207,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Count:        1,
 			Resources:    []resource.Resource{brokenResource},
-			Issues:       1, // Wave-1 issue
 			Gen:          m.Core().Session().AvailabilityGen,
 		})
 
@@ -221,7 +215,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// A "~" finding on the same ID; Wave-1 already contributes 1.
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Truncated:    false,
 			Findings: map[string][]domain.Finding{
 				"i-stopped": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
 			},

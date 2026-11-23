@@ -83,8 +83,8 @@ func TestD3MaintenanceWalkKeepsThePagesItRead(t *testing.T) {
 
 	w4AssertFinding(t, res.Findings[instance], d3CodeDBIMaintenance,
 		"maintenance scheduled", domain.SevWarn, "wave2")
-	if !res.Truncated {
-		t.Errorf("Truncated = false; a walk that stopped early has not seen every instance")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
@@ -404,8 +404,8 @@ func TestD3MaintenanceFirstPageFailureIsNotClean(t *testing.T) {
 		&awsclient.ServiceClients{RDS: &d3RDSFirstPageFails{}, Region: "us-east-1"},
 		[]resource.Resource{{ID: instance, Name: instance, Type: "dbi"}}, nil)
 
-	if !res.Truncated && err == nil {
-		t.Errorf("a walk that read no pages reported neither truncation nor an error")
+	if len(res.TruncatedIDs) == 0 && err == nil {
+		t.Errorf("a walk that read no pages marked no row and reported no error")
 	}
 	w4AssertNoCode(t, res.Findings[instance], d3CodeDBIMaintenance)
 }

@@ -69,7 +69,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	}
 
 	taskDefByTaskID := make(map[string]string, len(resources))
-	truncated := false
 	var failures []Failure
 	total := 0
 	const op = "DescribeTasks"
@@ -87,7 +86,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				Tasks:   batch,
 			})
 			if err != nil {
-				truncated = true
 				for _, taskID := range batch {
 					MarkSkipped(&result, taskID, &failures, err)
 				}
@@ -152,8 +150,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	}
 
 	postureErr := ecsTaskDefinitionPosture(ctx, clients, &result, taskDefByTaskID)
-	SetTruncated(&result, truncated || postureErr != nil)
-	err := JoinAggregates(Finish(&result, failures, total, op), postureErr)
+	err := JoinAggregates(AggregateFailures(op, failures, total), postureErr)
 	return result, err
 }
 
@@ -213,9 +210,8 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 			markUninspected(result, taskID, check)
 		}
 	}
-	SetTruncated(result, unstarted.Truncated)
 
-	return errors.Join(loopErr, Finish(result, failures, len(defARNs), op))
+	return errors.Join(loopErr, AggregateFailures(op, failures, len(defARNs)))
 }
 
 // applyTaskDefinitionFindings evaluates every task-definition posture rule

@@ -382,8 +382,8 @@ func TestEnrichBackupJobs_UncutWalkLeavesNoPlanUninspected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichBackupJobs: %v", err)
 	}
-	if result.Truncated {
-		t.Errorf("Truncated = true on a walk that read its last page")
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 	for _, r := range rows {
 		if _, marked := result.TruncatedIDs[r.ID]; marked {

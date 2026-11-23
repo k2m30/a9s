@@ -13,7 +13,7 @@ package unit
 //	Truncated or (Err+resources-present) -> "partial"; else "ok". A
 //	following EnrichmentChecked result folds onto the existing record:
 //	Duration accumulates (availability + enrichment, summed), an
-//	enrichment Err/Truncated degrades ok/skipped-no-rules to "partial" but
+//	enrichment Err or marked row degrades ok/skipped-no-rules to "partial" but
 //	never turns "failed" into anything else, and Err is re-classified from
 //	the enrichment error whenever the enrichment probe itself errored
 //	(independent of whether the outcome actually changed). Session.Rotate
@@ -268,14 +268,14 @@ func TestScanStatus_OutcomeMapping_Table(t *testing.T) {
 			wantOutcome: runtime.ProbePartial, wantErr: "access-denied", wantDur: 15 * time.Millisecond,
 		},
 		{
-			name: "enrichment_truncated_degrades_ok_to_partial_keeps_empty_err",
+			name: "enrichment_marked_row_degrades_ok_to_partial_keeps_empty_err",
 			drive: func(c *runtime.Core, shortName string) {
 				c.HandleEvent(messages.AvailabilityChecked{
 					ResourceType: shortName, HasResources: true, Resources: oneResource,
 					Gen: c.AvailabilityGen(), Duration: 10 * time.Millisecond,
 				})
 				c.HandleEvent(messages.EnrichmentChecked{
-					ResourceType: shortName, Truncated: true,
+					ResourceType: shortName, TruncatedIDs: map[string]string{"res-1": "stopped at the inspection cap"},
 					Gen: c.EnrichmentGen(), Duration: 5 * time.Millisecond,
 				})
 			},

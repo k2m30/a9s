@@ -231,7 +231,7 @@ func TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 }
 
 // waf only emits "~" findings, so a coverage gap never lower-bounds the
-// issue badge: Truncated stays false.
+// issue badge.
 func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("wafv2: GetLoggingConfiguration throttled")
 	fake := &wafLoggingFake{
@@ -267,9 +267,6 @@ func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 				t.Errorf("%s: logging finding raised though GetLoggingConfiguration failed", arn)
 			}
 		}
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: waf only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, marked := result.TruncatedIDs[wafACLARN1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN1)

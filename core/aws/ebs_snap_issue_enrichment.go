@@ -71,7 +71,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 	// the walked pages never named is uninspected once the walk is cut, not
 	// private. Membership of the all-restorable set is decided by a single
 	// sighting, so a named snapshot stays answered.
-	public, pages, cut, walkErr := walkAccountPages(ctx, result, resources, oneItemPerRow,
+	public, pages, walkErr := walkAccountPages(ctx, result, resources, oneItemPerRow,
 		func(snap ec2types.Snapshot) string { return aws.ToString(snap.SnapshotId) },
 		func(token *string) ([]ec2types.Snapshot, *string, error) {
 			out, err := clients.EC2.DescribeSnapshots(ctx, &ec2svc.DescribeSnapshotsInput{
@@ -91,9 +91,6 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 			continue
 		}
 		setWave2Finding(result, id, ebsSnapCodePublic, []domain.DetailRow{{Label: "Public", Value: "yes", Tier: tierOf(ebsSnapCodePublic)}})
-	}
-	if cut {
-		SetTruncated(result, true)
 	}
 	if walkErr != nil {
 		return AggregateFailures(op, []Failure{FailedOnPage(pages, walkErr)}, len(resources))

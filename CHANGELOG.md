@@ -106,6 +106,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ctrl+z` on a list shows exactly the rows its issue count counts. Before, a
+  row whose only finding was a Wave 2 warning (an SQS queue with no
+  dead-letter queue) was listed although the
+  title and the menu badge did not count it.
+- A type whose issue count is zero but a lower bound now shows `issues:0+` in
+  the menu and `!0+` in its list title. Rows on it were not inspected, and the
+  type can raise a `!` finding. Before, the menu under `ctrl+z` listed such a
+  type with no badge, so nothing said why it was there.
+- A menu refresh keeps the issue badge the Wave 2 checks left. Before, it reset
+  the badge to the Wave 1 count and dropped its "+" until the next Wave 2
+  answer.
+- A list title shows the same "+" as the menu badge. A badge loaded from the
+  previous session showed `issues:0+` in the menu and nothing in the list
+  title of the headless and web views. Under `ctrl+z` the `(5+ of 50)` count
+  carries the "+" too.
+- An EFS file system whose mount-target list stopped at the page cap reads
+  "not inspected" for that check, and the issue count and scan status show
+  that the check did not finish. Before, the file system read as checked.
+- A log group past the inspection cap of the last-event pass keeps its "Last
+  Event" value instead of losing it on every scan.
+- The scan status is "partial" only while a row is still marked not
+  inspected or the check returned an error. Answering the last marked row on
+  demand clears it.
+- An IAM user's "has console password" is unknown until the Wave 2 check
+  answers, instead of reading "false" before the check runs.
+- A Wave 2 column value is cleared when the next Wave 2 answer has none. A
+  backup plan no longer shows "N jobs failed in last 24h" after the failures
+  age out of the window, and an S3 bucket no longer shows "public access
+  block incomplete" after the block is completed. A row the answer could not
+  inspect keeps its value.
+- A CloudTrail trail keeps its logging state, last delivery error and last
+  delivery time over a menu refresh until the next Wave 2 answer, like every
+  other Wave 2 column.
+- A type whose Wave 2 check left rows not inspected reports partial coverage
+  in the scan status, whatever the check emits. An SES account with
+  identities past the inspection cap, and an Athena account with workgroups
+  past it, reported full coverage before.
 - A policy that does not parse is never shown as private. A queue, topic,
   key, secret, table, file system, function, repository or REST API row reads "not inspected: policy does not parse" and the type
   returns no error; before, the type logged a failed call. An OpenSearch

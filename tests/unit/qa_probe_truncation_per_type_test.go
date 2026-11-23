@@ -59,11 +59,9 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 
 	probeResource := resource.Resource{ID: "pt1-target-001", Name: "pt1-target-001"}
 	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
-		Entries:        map[string]int{targetType: 1},
-		Truncated:      map[string]bool{targetType: false}, // NOT truncated: complete single page
-		IssueCounts:    map[string]int{targetType: 0},
-		IssueTruncated: map[string]bool{targetType: false},
-		Resources:      map[string][]resource.Resource{targetType: {probeResource}},
+		Entries:   map[string]int{targetType: 1},
+		Truncated: map[string]bool{targetType: false},
+		Resources: map[string][]resource.Resource{targetType: {probeResource}},
 		// Stamp the live AvailabilityGen so the staleness guard accepts the
 		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
@@ -148,11 +146,9 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 
 	probeResource := resource.Resource{ID: "pt2-target-001", Name: "pt2-target-001"}
 	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
-		Entries:        map[string]int{targetType: 1},
-		Truncated:      map[string]bool{targetType: true}, // TRUNCATED: more pages exist
-		IssueCounts:    map[string]int{targetType: 0},
-		IssueTruncated: map[string]bool{targetType: true},
-		Resources:      map[string][]resource.Resource{targetType: {probeResource}},
+		Entries:   map[string]int{targetType: 1},
+		Truncated: map[string]bool{targetType: true},
+		Resources: map[string][]resource.Resource{targetType: {probeResource}},
 		// Stamp the live AvailabilityGen so the staleness guard accepts the
 		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,

@@ -33,12 +33,10 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 	}
 
 	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
-		Entries:        map[string]int{targetType: 2},
-		Truncated:      map[string]bool{targetType: true},
-		IssueCounts:    map[string]int{targetType: 0},
-		IssueTruncated: map[string]bool{targetType: true},
-		Resources:      map[string][]resource.Resource{targetType: {first, second}},
-		Pagination:     map[string]*resource.PaginationMeta{targetType: wantMeta},
+		Entries:    map[string]int{targetType: 2},
+		Truncated:  map[string]bool{targetType: true},
+		Resources:  map[string][]resource.Resource{targetType: {first, second}},
+		Pagination: map[string]*resource.PaginationMeta{targetType: wantMeta},
 		// Stamp the live AvailabilityGen so the staleness guard accepts the
 		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
@@ -76,11 +74,9 @@ func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 	r := resource.Resource{ID: "db-001", Name: "db-001"}
 
 	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
-		Entries:        map[string]int{targetType: 1},
-		Truncated:      map[string]bool{targetType: true},
-		IssueCounts:    map[string]int{targetType: 0},
-		IssueTruncated: map[string]bool{targetType: true},
-		Resources:      map[string][]resource.Resource{targetType: {r}},
+		Entries:   map[string]int{targetType: 1},
+		Truncated: map[string]bool{targetType: true},
+		Resources: map[string][]resource.Resource{targetType: {r}},
 		// Stamp the live AvailabilityGen so the staleness guard accepts the message
 		// (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,

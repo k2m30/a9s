@@ -363,9 +363,8 @@ func TestW6BECR_PastEnrichmentCap_ReportsTruncated(t *testing.T) {
 		names = append(names, "acme/repo-"+strconv.Itoa(i))
 	}
 	res := w6bECREnrichOK(t, fake, names...)
-	if !res.Truncated {
-		t.Errorf("%d repositories is past the cap of %d; the result must report Truncated",
-			len(names), awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
@@ -376,8 +375,8 @@ func TestW6BECR_AtEnrichmentCap_IsNotTruncated(t *testing.T) {
 		names = append(names, "acme/repo-"+strconv.Itoa(i))
 	}
 	res := w6bECREnrichOK(t, fake, names...)
-	if res.Truncated {
-		t.Errorf("exactly %d repositories is within the cap; the result must not report Truncated", awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", res.TruncatedIDs)
 	}
 }
 

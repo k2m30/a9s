@@ -42,8 +42,8 @@ func TestCBBatchGetBuildsRefused_ProjectsAreMarked(t *testing.T) {
 			t.Errorf("%s: TruncatedIDs = %q, want %q", p.ID, got, "BatchGetBuilds")
 		}
 	}
-	if !res.Truncated {
-		t.Error("result.Truncated = false with every project unread")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

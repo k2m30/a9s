@@ -31,8 +31,8 @@ func newCountTruncationDriftController(t *testing.T) *app.Controller {
 
 // s3BrokenFindings builds n Wave-1-shaped (non-wave2-sourced), SevBroken
 // findings for distinct fake S3 bucket IDs — matching the shape
-// listHasBadgeFinding (core/app/list_body.go) counts unconditionally at
-// any issue severity, so each row bumps listIssueCount by exactly one.
+// runtime.IsIssueRow counts at any issue severity, so each row bumps the
+// list issue count by exactly one.
 func s3BrokenFindings(n int) []domain.Finding {
 	out := make([]domain.Finding, n)
 	for i := range out {

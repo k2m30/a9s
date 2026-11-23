@@ -56,7 +56,6 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 	// above rather than sharing its shape.
 	dkimErr := sesIdentityDKIM(ctx, clients, &result, resources)
 
-	MarkInformationalOnly(&result)
 	return result, errors.Join(err, dkimErr)
 }
 

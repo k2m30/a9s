@@ -9,7 +9,7 @@ package unit
 //
 // When an enricher returns (IssueEnricherResult{...}, err), probeEnrichment
 // returns EnrichmentCheckedMsg with Err set and Findings/FieldUpdates/
-// TruncatedIDs/Issues/Truncated populated from the result. Delivering
+// TruncatedIDs/Issues populated from the result. Delivering
 // AvailabilityCheckedMsg seeds probeResources and starts enrichment, which
 // runs the enricher without an AWS call.
 
@@ -102,7 +102,6 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 
 	partialErr := errors.New("partial: enrichment call timed out for 1 resource")
 	partialResult := awsclient.IssueEnricherResult{
-		Truncated: true,
 		TruncatedIDs: map[string]string{
 			"res-pe-002": "",
 		},
@@ -176,8 +175,5 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	}
 	if len(gotMsg.TruncatedIDs) == 0 {
 		t.Errorf("probeEnrichment partial success: TruncatedIDs empty — PARTIAL-SUCCESS BUG: TruncatedIDs dropped on error")
-	}
-	if !gotMsg.Truncated {
-		t.Errorf("probeEnrichment partial success: Truncated = false, want true — PARTIAL-SUCCESS BUG: Truncated dropped on error")
 	}
 }

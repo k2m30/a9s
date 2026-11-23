@@ -95,7 +95,6 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 		}
 	})
 
-	MarkInformationalOnly(&result)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeStreamSummary", failures, total))
 }
 

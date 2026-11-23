@@ -2,7 +2,12 @@
 
 package app
 
-import "github.com/k2m30/a9s/v3/core/domain"
+import (
+	"strconv"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+)
 
 // ViewState is the renderer-agnostic snapshot that both the TUI and web
 // renderers consume and that integration tests assert on. It carries no
@@ -185,18 +190,17 @@ type PaginationInfo struct {
 
 // ListBody is the body of a resource-list screen.
 type ListBody struct {
-	Columns             []ColumnDef                 `json:"columns,omitempty"`
-	Rows                []ListRow                   `json:"rows,omitempty"`
-	Selected            int                         `json:"selected"`
-	ScrollX             int                         `json:"scroll_x"`
-	Filter              string                      `json:"filter,omitempty"`
-	Sort                SortSpec                    `json:"sort,omitzero"`
-	AttentionOnly       bool                        `json:"attention_only,omitempty"`
-	Loading             bool                        `json:"loading,omitempty"`
-	Truncated           bool                        `json:"truncated,omitempty"`
-	Pagination          PaginationInfo              `json:"pagination,omitzero"`
-	EnrichmentFindings  map[string][]domain.Finding `json:"enrichment_findings,omitempty"`
-	EnrichmentTruncated map[string]bool             `json:"enrichment_truncated,omitempty"`
+	Columns            []ColumnDef                 `json:"columns,omitempty"`
+	Rows               []ListRow                   `json:"rows,omitempty"`
+	Selected           int                         `json:"selected"`
+	ScrollX            int                         `json:"scroll_x"`
+	Filter             string                      `json:"filter,omitempty"`
+	Sort               SortSpec                    `json:"sort,omitzero"`
+	AttentionOnly      bool                        `json:"attention_only,omitempty"`
+	Loading            bool                        `json:"loading,omitempty"`
+	Truncated          bool                        `json:"truncated,omitempty"`
+	Pagination         PaginationInfo              `json:"pagination,omitzero"`
+	EnrichmentFindings map[string][]domain.Finding `json:"enrichment_findings,omitempty"`
 	// IdentityCol is the full-column-list index (before hscroll) of the
 	// identity column — the one column whose cell names the row, elected by
 	// IdentityColumnIndex and pre-computed by buildListBody so no renderer
@@ -377,6 +381,23 @@ type TextBody struct {
 type IssueBadge struct {
 	Count     int  `json:"count"`
 	Truncated bool `json:"truncated,omitempty"`
+	Hidden    bool `json:"hidden,omitempty"`
+}
+
+// Text is the issue count as every surface renders it — the menu badge on
+// both hosts and the list title: "" for an exact zero or a hidden badge, "N",
+// or "N+" for a lower bound, zero included, since a lower bound over no
+// counted row is what puts a type in the issues-only menu.
+func (b IssueBadge) Text() string {
+	switch {
+	case b.Hidden:
+		return ""
+	case b.Truncated:
+		return resource.FormatTruncated(b.Count)
+	case b.Count > 0:
+		return strconv.Itoa(b.Count)
+	}
+	return ""
 }
 
 // MenuEntry is one entry in the main-menu body.

@@ -81,10 +81,6 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			setWave2Finding(&result, r.ID, ddbCodePITROff, nil)
 		}
 	})
-	// AggregateFailures rather than Finish: this pass emits only "~", so a
-	// table it could not read is a coverage gap on that row, never a lower
-	// bound on the issue count the badge shows.
-
 	pitrErr := AggregateFailures("DescribeContinuousBackups", pitrFailures, n)
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
 	return result, errors.Join(tagErr, loopErr, pitrErr, err)
@@ -136,7 +132,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		}
 		readPolicy("ddb", policy, ownAccount, r.Fields["arn"]).raise(result, r.ID)
 	})
-	return errors.Join(loopErr, Finish(result, failures, n, "GetResourcePolicy"))
+	return errors.Join(loopErr, AggregateFailures("GetResourcePolicy", failures, n))
 }
 
 // isDDBPolicyAbsent reports whether err is DynamoDB's way of saying the table

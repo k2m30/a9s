@@ -108,7 +108,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 
-	err := errors.Join(loopErr, Finish(&result, failures, len(targets), op))
+	err := errors.Join(loopErr, AggregateFailures(op, failures, len(targets)))
 	return result, err
 }
 

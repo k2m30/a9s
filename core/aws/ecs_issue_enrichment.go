@@ -121,6 +121,5 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	MarkInformationalOnly(&result)
 	return result, AggregateFailures("DescribeClusters", failures, len(clusterNames))
 }

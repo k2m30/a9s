@@ -128,8 +128,5 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows)
 	})
-	MarkInformationalOnly(&result)
-	// See EnrichIAMRoleLastUsed: the flag and the composite error are two
-	// separate answers, and both are returned.
 	return result, errors.Join(loopErr, AggregateFailures("group membership", failures, n))
 }

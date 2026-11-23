@@ -42,6 +42,5 @@ func Wave2Result(t *testing.T, shortName string, clients *awsclient.ServiceClien
 		AttentionDetails: res.AttentionDetails,
 		FieldUpdates:     res.FieldUpdates,
 		TruncatedIDs:     res.TruncatedIDs,
-		Truncated:        res.Truncated,
 	}
 }

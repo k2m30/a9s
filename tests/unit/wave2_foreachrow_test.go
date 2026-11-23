@@ -230,8 +230,8 @@ func TestEBRuleDeadline_RulesNeverAskedAreMarkedAndTheErrorSurfaces(t *testing.T
 	if unasked == 0 {
 		t.Fatal("every rule was asked despite an expired deadline — the stop was never observed")
 	}
-	if !res.Truncated {
-		t.Error("result.Truncated = false: the issue count reads complete although rules were never checked")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

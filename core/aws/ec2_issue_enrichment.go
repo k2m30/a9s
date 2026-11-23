@@ -98,7 +98,7 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 	// renders "?" rather than inspected-and-healthy, the same contract as the
 	// ebs-snap public-share query. The findings the cache-only and user-data
 	// passes already produced survive.
-	allInstanceStatuses, _, cut, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow,
+	allInstanceStatuses, _, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow,
 		func(is ec2types.InstanceStatus) string { return aws.ToString(is.InstanceId) },
 		func(token *string) ([]ec2types.InstanceStatus, *string, error) {
 			out, err := clients.EC2.DescribeInstanceStatus(ctx, &ec2svc.DescribeInstanceStatusInput{
@@ -200,7 +200,6 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		}
 	}
 
-	SetTruncated(&result, cut)
 	return result, walkErr
 }
 
@@ -501,5 +500,5 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 
 	})
 
-	return errors.Join(loopErr, Finish(result, failures, len(targets), op))
+	return errors.Join(loopErr, AggregateFailures(op, failures, len(targets)))
 }

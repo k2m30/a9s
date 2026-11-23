@@ -173,7 +173,7 @@ func TestEnrichStepFunctionsStatus_RunningExcluded(t *testing.T) {
 	}
 }
 
-// TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap verifies Truncated.
+// TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap verifies the rows past the cap are marked not inspected.
 func TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	count := awsclient.EnrichmentCap + 1
 	resources := make([]resource.Resource, count)
@@ -191,9 +191,8 @@ func TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap(t *testing.T)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Errorf("Truncated must be true when len(resources)=%d > EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

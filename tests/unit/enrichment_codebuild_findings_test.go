@@ -205,8 +205,8 @@ func TestEnrichCodeBuildStatus_MultipleFailedProjects_AllKeyedInFindings(t *test
 	}
 }
 
-// TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap verifies Truncated=true
-// when len(resources) > EnrichmentCap (50).
+// TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap verifies the projects past
+// EnrichmentCap (50) are marked not inspected.
 func TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	count := awsclient.EnrichmentCap + 1
 	resources := make([]resource.Resource, count)
@@ -229,14 +229,13 @@ func TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Errorf("Truncated must be true when len(resources)=%d > EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
-// TestEnrichCodeBuildStatus_AtCapNotTruncated verifies Truncated=false
-// when len(resources) == EnrichmentCap exactly.
+// TestEnrichCodeBuildStatus_AtCapNotTruncated verifies no project is
+// marked not inspected when len(resources) == EnrichmentCap exactly.
 func TestEnrichCodeBuildStatus_AtCapNotTruncated(t *testing.T) {
 	count := awsclient.EnrichmentCap // exactly 50
 	resources := make([]resource.Resource, count)
@@ -259,9 +258,8 @@ func TestEnrichCodeBuildStatus_AtCapNotTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Truncated {
-		t.Errorf("Truncated must be false when len(resources)=%d == EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 }
 

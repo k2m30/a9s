@@ -111,18 +111,31 @@ func availabilityOutcome(c *Core, shortName string, resourcesReturned bool, trun
 // "failed" — the availability data is already on screen — so an
 // enrichment error or truncation only ever downgrades ok/skipped-no-rules
 // to "partial"; a Wave-1 "failed" outcome has nothing worse to degrade to
-// and passes through unchanged, and "partial" stays "partial".
-func degradeForEnrichment(prev ProbeOutcome, err error, truncated bool) ProbeOutcome {
+// and passes through unchanged, and "partial" stays "partial". marked is
+// whether any row of the type is still marked not inspected, so a partial
+// status always has a marked row or the enrichment's error behind it.
+func degradeForEnrichment(prev ProbeOutcome, errored, marked bool) ProbeOutcome {
 	if prev == "" {
 		prev = ProbeOK
 	}
-	if err == nil && !truncated {
+	if !errored && !marked {
 		return prev
 	}
 	if prev == ProbeFailed {
 		return prev
 	}
 	return ProbePartial
+}
+
+// rescoreScanStatus re-derives a type's scan status from the marks it now
+// holds, after a row answered on demand changed them outside a sweep answer.
+func (c *Core) rescoreScanStatus(canon string) {
+	rec, ok := c.session.GetProbeStatus(canon)
+	if !ok {
+		return
+	}
+	outcome := degradeForEnrichment(ProbeOutcome(rec.AvailOutcome), rec.EnrichErrored, len(c.session.EnrichmentTruncatedIDs[canon]) > 0)
+	c.setProbeStatus(canon, outcome, rec.Duration, rec.Err, rec.At, ProbeOutcome(rec.AvailOutcome), rec.AvailDuration, rec.AvailErr, rec.EnrichErrored)
 }
 
 // setProbeStatus is the shared write path both handleAvailabilityChecked
@@ -134,7 +147,7 @@ func degradeForEnrichment(prev ProbeOutcome, err error, truncated bool) ProbeOut
 // handleEnrichmentChecked passes through the baseline it read from the PRIOR
 // record, unchanged, so a later enrichment rerun folds from the same
 // baseline rather than the previous rerun's aggregate.
-func (c *Core) setProbeStatus(shortName string, outcome ProbeOutcome, duration time.Duration, errClass string, at time.Time, availOutcome ProbeOutcome, availDuration time.Duration, availErr string) {
+func (c *Core) setProbeStatus(shortName string, outcome ProbeOutcome, duration time.Duration, errClass string, at time.Time, availOutcome ProbeOutcome, availDuration time.Duration, availErr string, enrichErrored bool) {
 	c.session.SetProbeStatus(shortName, session.ProbeStatusRecord{
 		Outcome:       string(outcome),
 		Duration:      duration,
@@ -143,5 +156,6 @@ func (c *Core) setProbeStatus(shortName string, outcome ProbeOutcome, duration t
 		AvailOutcome:  string(availOutcome),
 		AvailDuration: availDuration,
 		AvailErr:      availErr,
+		EnrichErrored: enrichErrored,
 	})
 }

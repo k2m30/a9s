@@ -53,7 +53,7 @@ func TestScenario_MWAAVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// Menu badge — unifiedIssueCount counts issue-COLORED rows
+	// Menu badge — IssueCount counts issue-COLORED rows
 	// (Warning + Broken). For mwaa: 6 Warning-state + 3 Broken + 3
 	// background-warning + 1 details-denied = 13. Dim rows do not bump.
 	scenario.ExpectMenuIssueCount("mwaa", 14)

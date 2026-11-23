@@ -44,7 +44,6 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 	if !ok1 || !ok2 {
 		return result, nil
 	}
-	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -72,7 +71,6 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
@@ -100,7 +98,6 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			"risk": riskVal,
 		}
 	})
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("GetPolicy and GetPolicyVersion", failures, n))
 }
 

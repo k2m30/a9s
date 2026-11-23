@@ -21,12 +21,14 @@
 package unit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -206,12 +208,19 @@ func TestIntentParity_CachePatches_RepeatedApply_StaysAdditiveOnce(t *testing.T)
 // session.New()'s seeded AvailabilityGen (AvailabilityPrefetched.AcceptZeroGen()
 // is false, so Gen=0 here would be silently dropped as stale).
 func availabilityPrefetchedParityEvent() messages.AvailabilityPrefetched {
+	rows := make([]resource.Resource, 7)
+	for i := range rows {
+		id := fmt.Sprintf("i-0parity%011d", i)
+		rows[i] = resource.Resource{ID: id, Name: id, Fields: map[string]string{"state": "running"}}
+		if i < 3 {
+			rows[i].Findings = []domain.Finding{{Code: "ec2.system-status-impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+	}
 	return messages.AvailabilityPrefetched{
-		Entries:        map[string]int{"ec2": 7},
-		Truncated:      map[string]bool{"ec2": false},
-		IssueCounts:    map[string]int{"ec2": 3},
-		IssueTruncated: map[string]bool{"ec2": false},
-		Gen:            1,
+		Entries:   map[string]int{"ec2": 7},
+		Truncated: map[string]bool{"ec2": false},
+		Resources: map[string][]resource.Resource{"ec2": rows},
+		Gen:       1,
 	}
 }
 
@@ -259,6 +268,6 @@ func TestIntentParity_MenuPatches_SingleApplication(t *testing.T) {
 		t.Errorf("TUI lane: rendered menu should contain %q after AvailabilityPrefetched(Count=7), got: %s", "EC2 Instances (7)", tuiPlain)
 	}
 	if !strings.Contains(tuiPlain, "issues:3") {
-		t.Errorf("TUI lane: rendered menu should contain %q after AvailabilityPrefetched(IssueCounts=3), got: %s", "issues:3", tuiPlain)
+		t.Errorf("TUI lane: rendered menu should contain %q after AvailabilityPrefetched with three issue rows, got: %s", "issues:3", tuiPlain)
 	}
 }

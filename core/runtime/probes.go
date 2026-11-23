@@ -33,7 +33,6 @@ type ProbeAvailabilityResult struct {
 	HasResources bool
 	Count        int
 	Truncated    bool
-	Issues       int
 	Resources    []resource.Resource
 	Err          error
 }
@@ -50,7 +49,6 @@ type ProbeAvailabilityResult struct {
 // r.Findings entry when writing onto cached rows.
 type ProbeEnrichmentResult struct {
 	ResourceType     string
-	Truncated        bool
 	Findings         map[string][]domain.Finding
 	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	FieldUpdates     map[string]map[string]string
@@ -63,12 +61,10 @@ type ProbeEnrichmentResult struct {
 // a platform-specific message (e.g. messages.AvailabilityPrefetched for
 // the Bubble Tea adapter).
 type DemoPrefetchResult struct {
-	Entries        map[string]int
-	Truncated      map[string]bool
-	IssueCounts    map[string]int
-	IssueTruncated map[string]bool
-	Resources      map[string][]resource.Resource
-	Pagination     map[string]*resource.PaginationMeta
+	Entries    map[string]int
+	Truncated  map[string]bool
+	Resources  map[string][]resource.Resource
+	Pagination map[string]*resource.PaginationMeta
 	// Errs is the error each type's rows arrived with, which decides whether
 	// the stored page is whole.
 	Errs map[string]error
@@ -466,7 +462,7 @@ func (c *Core) saveAvailabilityCache(
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
-				tf.IssuesTruncated = c.badgeLowerBound(name, tf, issueTruncated[rawName])
+				tf.IssuesTruncated = badgeLowerBound(name, tf, issueTruncated[rawName])
 			} else {
 				tf.Issues = existing.Issues
 				tf.IssuesKnown = existing.IssuesKnown
@@ -754,7 +750,7 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 		if content.IssuesKnown {
 			tf.Issues = content.Issues
 			tf.IssuesKnown = true
-			tf.IssuesTruncated = c.badgeLowerBound(canon, tf, content.IssuesTruncated)
+			tf.IssuesTruncated = badgeLowerBound(canon, tf, content.IssuesTruncated)
 		} else {
 			tf.Issues = existing.Issues
 			tf.IssuesKnown = existing.IssuesKnown
@@ -832,14 +828,6 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 	result, err := pf(probeCtx, clients, "")
 
 	truncated := result.Pagination != nil && result.Pagination.IsTruncated
-	// Count issue-status resources (red/yellow only, not green/dim).
-	issues := 0
-	td := resource.FindResourceType(shortName)
-	for _, r := range result.Resources {
-		if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
-			issues++
-		}
-	}
 
 	if err != nil {
 		if len(result.Resources) == 0 {
@@ -857,7 +845,6 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 			HasResources: true,
 			Count:        len(result.Resources),
 			Truncated:    truncated,
-			Issues:       issues,
 			Resources:    result.Resources,
 			Err:          err,
 		}
@@ -867,7 +854,6 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 		HasResources: len(result.Resources) > 0,
 		Count:        len(result.Resources),
 		Truncated:    truncated,
-		Issues:       issues,
 		Resources:    result.Resources,
 	}
 }
@@ -880,8 +866,6 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	allNames := resource.AllShortNames()
 	entries := make(map[string]int, len(allNames))
 	truncated := make(map[string]bool)
-	issueCounts := make(map[string]int, len(allNames))
-	issueTruncated := make(map[string]bool)
 	retainedResources := make(map[string][]resource.Resource, len(allNames))
 	pagination := make(map[string]*resource.PaginationMeta, len(allNames))
 	errs := make(map[string]error)
@@ -928,20 +912,9 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 		if result.Pagination != nil {
 			pagination[shortName] = result.Pagination
 		}
-		isTrunc := result.Pagination != nil && result.Pagination.IsTruncated
-		if isTrunc {
+		if result.Pagination != nil && result.Pagination.IsTruncated {
 			truncated[shortName] = true
-			issueTruncated[shortName] = true
 		}
-		// Count issue-status resources (red/yellow only).
-		issues := 0
-		td := resource.FindResourceType(shortName)
-		for _, r := range result.Resources {
-			if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
-				issues++
-			}
-		}
-		issueCounts[shortName] = issues
 		// Retain first-page resources for Wave 2 enricher consumption.
 		retainedResources[shortName] = result.Resources
 	}
@@ -949,8 +922,6 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	return DemoPrefetchResult{
 		Entries:         entries,
 		Truncated:       truncated,
-		IssueCounts:     issueCounts,
-		IssueTruncated:  issueTruncated,
 		Resources:       retainedResources,
 		Pagination:      pagination,
 		Errs:            errs,
@@ -1007,15 +978,10 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 }
 
 // badgeLowerBound is issueLowerBound for a type file about to be written: the
-// rows' own not-inspected marks, read under the store lock every writer holds,
-// and the enricher's cut flag from the session.
-func (c *Core) badgeLowerBound(shortName string, tf cache.TypeFile, pageTruncated bool) bool {
-	found := tf.Issues > 0
-	for _, row := range tf.Rows {
-		found = found || rowHasWave2Finding(row.Findings)
-	}
+// rows' own not-inspected marks, read under the store lock every writer holds.
+func badgeLowerBound(shortName string, tf cache.TypeFile, pageTruncated bool) bool {
 	marked := uncountedMarks(shortName, rowsFromCacheRows(shortName, tf.Rows), uninspectedFromCacheRows(tf.Rows))
-	return issueLowerBound(shortName, pageTruncated, c.session.EnrichmentCutGet(shortName), found, marked)
+	return issueLowerBound(shortName, pageTruncated, marked)
 }
 
 // probeEnrichmentRows runs shortName's Wave-2 enricher over exactly the rows
@@ -1061,14 +1027,54 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	}
 
 	result, err := e.Fn(probeCtx, clients, resources, cacheSnap)
+	if !answeredNobody(result, err) {
+		writeDeclaredFields(shortName, resources, &result)
+	}
 	return ProbeEnrichmentResult{
 		ResourceType:     shortName,
-		Truncated:        result.Truncated,
 		Findings:         result.Findings,
 		AttentionDetails: result.AttentionDetails,
 		FieldUpdates:     result.FieldUpdates,
 		TruncatedIDs:     result.TruncatedIDs,
 		Err:              err,
+	}
+}
+
+// answeredNobody is the one rule for an enricher call that came back with an
+// error and nothing else — no finding, no field, no marked row. It is not a
+// verdict on any row: the runner writes no field for it, and the sweep and
+// the on-demand row check both leave the rows and the badge as they stand.
+func answeredNobody(result awsclient.IssueEnricherResult, err error) bool {
+	return err != nil && len(result.Findings) == 0 && len(result.FieldUpdates) == 0 && len(result.TruncatedIDs) == 0
+}
+
+// writeDeclaredFields gives every row the enricher answered — handed to it and
+// not in result.Unreached — every field its type declares in
+// IssueEnricherFieldKeys, empty where the enricher set no value. The fold
+// merges fields into the row, so an answer that leaves a key out would
+// otherwise keep the value an earlier answer wrote.
+func writeDeclaredFields(shortName string, handed []resource.Resource, result *awsclient.IssueEnricherResult) {
+	td := resource.FindResourceType(shortName)
+	if td == nil || len(td.IssueEnricherFieldKeys) == 0 {
+		return
+	}
+	if result.FieldUpdates == nil {
+		result.FieldUpdates = make(map[string]map[string]string, len(handed))
+	}
+	for _, r := range handed {
+		if _, unreached := result.Unreached[r.ID]; unreached || r.ID == "" {
+			continue
+		}
+		fields := result.FieldUpdates[r.ID]
+		if fields == nil {
+			fields = make(map[string]string, len(td.IssueEnricherFieldKeys))
+			result.FieldUpdates[r.ID] = fields
+		}
+		for _, k := range td.IssueEnricherFieldKeys {
+			if _, ok := fields[k]; !ok {
+				fields[k] = ""
+			}
+		}
 	}
 }
 

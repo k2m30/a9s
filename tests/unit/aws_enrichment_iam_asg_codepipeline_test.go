@@ -95,12 +95,10 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 // coverage gap), reports the failure, and keeps going. A second role that is
 // dormant still produces a finding — confirming the loop continues past the
 // error. iam-role is a "~"-only enricher (IssueCount always 0), so the
-// coverage gap must never lower-bound the aggregate issue badge — Truncated
-// stays false.
+// coverage gap must never lower-bound the aggregate issue badge.
 //
 // A refused GetRole call reaches the operator through the aggregate error.
-// The aggregate error and the Truncated flag are two different answers — only
-// the flag is governed by the "~"-only rule — and the wave-2 runner
+// The wave-2 runner
 // (core/runtime/probes.go, "Always populate fields from result regardless of
 // err") keeps every finding when the enricher returns one, so nothing is lost
 // by reporting it. A vanished resource is the one error that stays out of the
@@ -134,9 +132,6 @@ func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *te
 	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("a failed GetRole must reach the operator through the composite error")
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: iam-role is a \"~\"-only enricher, so a GetRole error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, ok := result.TruncatedIDs["broken-role"]; !ok {
 		t.Error("TruncatedIDs must contain broken-role")
@@ -246,7 +241,7 @@ func TestEnrichIAMRoleLastUsed_IAMClientNotGetRoleAPI(t *testing.T) {
 
 // TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError verifies that when
 // FetchManagedPolicyDocument fails for a policy, that policy is added to
-// TruncatedIDs, Truncated is set, the failure is reported in the returned
+// TruncatedIDs, the failure is reported in the returned
 // error, and a second safe policy is still processed.
 func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	fake := &iamPolicyFake{
@@ -272,8 +267,8 @@ func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	if err == nil {
 		t.Fatal("a failed document fetch returned no error — the reason never reaches the log")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when at least one policy fetch failed")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if _, ok := result.TruncatedIDs[iamPolicyARN2]; !ok {
 		t.Errorf("TruncatedIDs must contain %s", iamPolicyARN2)
@@ -414,7 +409,7 @@ var _ awsclient.IAMAPI = (*iamGroupErrorFake)(nil)
 // left unread (no member count, no member-derived row), TruncatedIDs marks its
 // row, the policy walks that answered still report on it, and processing
 // continues for the next group. iam-group is a "~"-only enricher (IssueCount
-// always 0), so the aggregate Truncated flag must stay false — the coverage
+// always 0), so the coverage
 // gap never lower-bounds the issue badge.
 func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *testing.T) {
 	fake := &iamGroupErrorFake{
@@ -431,14 +426,9 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *te
 	resources := iamGroupResources("broken-group", "ok-group")
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	// A refused GetGroup reaches the operator through the composite error. The
-	// composite error and the Truncated flag are two answers; only the flag is
-	// governed by the "~"-only rule.
+	// A refused GetGroup reaches the operator through the composite error.
 	if err == nil {
 		t.Fatal("a failed GetGroup must reach the operator through the composite error")
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: iam-group is a \"~\"-only enricher, so a GetGroup error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, ok := result.TruncatedIDs["broken-group"]; !ok {
 		t.Error("TruncatedIDs must contain broken-group")

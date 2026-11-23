@@ -32,7 +32,7 @@ func TestECSTaskAggregate_NamesTheCallThatFailed(t *testing.T) {
 	if strings.Contains(err.Error(), "DescribeTasks failed") {
 		t.Errorf("error = %q claims DescribeTasks failed; it succeeded", err.Error())
 	}
-	if !res.Truncated {
-		t.Error("a refused definition read still leaves the issue count a lower bound")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

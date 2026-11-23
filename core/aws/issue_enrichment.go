@@ -58,7 +58,6 @@ func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.R
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
 		TruncatedIDs:     map[string]string{},
 		FieldUpdates:     map[string]map[string]string{},
-		Truncated:        false,
 	}, nil
 }
 
@@ -207,12 +206,12 @@ func wave2Finding(code domain.FindingCode, values ...string) domain.Finding {
 
 // MarkSkipped records one item from a failed batch call: it sets
 // result.TruncatedIDs[id] so the row renders "?" instead of vanishing, and
-// records the failure for Finish to fold into the caller's composite error.
-// Every "!"-severity Wave 2 enricher that iterates batched AWS calls
+// records the failure for AggregateFailures to fold into the caller's
+// composite error. Every Wave 2 enricher that iterates batched AWS calls
 // (DescribeTasks, DescribeServices, …) MUST call this once per item in a
-// failed batch — recording only the aggregate Truncated flag drops the
-// per-row signal the list view needs to distinguish "not inspected" from
-// "inspected and healthy".
+// failed batch: the mark is the only record that the row was not inspected,
+// which the list view, the scan status and the issue badge's lower bound all
+// read.
 //
 // A resource that went away between the list call and this one is the
 // exception, and it is decided here rather than at each of the call sites:
@@ -258,7 +257,6 @@ func mergeRowResult(mu *sync.Mutex, shared *IssueEnricherResult, sharedFailures 
 	mu.Lock()
 	defer mu.Unlock()
 
-	shared.Truncated = shared.Truncated || row.Truncated
 	for id, findings := range row.Findings {
 		for _, f := range findings {
 			if slices.ContainsFunc(shared.Findings[id], func(g domain.Finding) bool { return g.Code == f.Code }) {
@@ -269,6 +267,9 @@ func mergeRowResult(mu *sync.Mutex, shared *IssueEnricherResult, sharedFailures 
 	}
 	for id, check := range row.TruncatedIDs {
 		markUninspected(shared, id, check)
+	}
+	for id := range row.Unreached {
+		markUnreached(shared, id)
 	}
 	if len(row.FieldUpdates) > 0 && shared.FieldUpdates == nil {
 		shared.FieldUpdates = make(map[string]map[string]string)
@@ -364,10 +365,25 @@ func markUninspected(result *IssueEnricherResult, id, check string) {
 	if id == "" {
 		return
 	}
+	markUnreached(result, id)
 	if prev, ok := result.TruncatedIDs[id]; ok && prev != "" && !strings.HasSuffix(prev, checkListIncomplete("")) {
 		return
 	}
 	result.TruncatedIDs[id] = check
+}
+
+// markUnreached is the one writer of result.Unreached: the enricher gave no
+// answer for this row. markUninspected calls it for every marked row; a pass
+// that fills a column and decides no finding calls it alone, since none of
+// the row's checks went unrun and "not inspected" would be false.
+func markUnreached(result *IssueEnricherResult, id string) {
+	if id == "" {
+		return
+	}
+	if result.Unreached == nil {
+		result.Unreached = make(map[string]struct{})
+	}
+	result.Unreached[id] = struct{}{}
 }
 
 // UnusableAnswerErr is what a helper returns when the service answered and the
@@ -392,32 +408,6 @@ func (e UnusableAnswerErr) Error() string { return e.Call + " returned no " + e.
 func MarkUnusable(result *IssueEnricherResult, id string, failures *[]Failure, cause string) {
 	markUninspected(result, id, cause)
 	*failures = append(*failures, UnusableAnswer(id, cause))
-}
-
-// SetTruncated raises result.Truncated when cut is true and never lowers it.
-//
-// One enricher discovers a cut answer in several independent places — a failed
-// batch, a work list trimmed at EnrichmentCap, a walk stopped at the page cap,
-// a second pass over the same rows — and each of them runs whether or not the
-// others did. A bare assignment composes with none of them: the last pass to
-// finish cleanly erases what an earlier one found. This is the only writer
-// that raises the flag; MarkInformationalOnly is the only one that lowers it.
-func SetTruncated(result *IssueEnricherResult, cut bool) {
-	if cut {
-		result.Truncated = true
-	}
-}
-
-// MarkInformationalOnly declares that an enricher's whole answer is "~":
-// capping or cutting its walk hides no issue, only informational coverage, so
-// the issue count it contributes to is not a lower bound and the flag every
-// cap along the way raised is dropped. Call it last — a later pass that emits
-// "!" would have nothing to raise the flag with afterwards.
-//
-// Per-resource truncation is unaffected: TruncatedIDs still says which rows
-// were not looked at.
-func MarkInformationalOnly(result *IssueEnricherResult) {
-	result.Truncated = false
 }
 
 // resourceIDsOf is capAtEnrichmentCap's idsOf for the common case: a work list
@@ -461,41 +451,42 @@ func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, eligible 
 			markUninspected(result, id, CheckCap)
 		}
 	}
-	SetTruncated(result, true)
 	return items[:EnrichmentCap]
 }
 
 // fieldOnlyCap bounds a pass that fills a list column and decides no finding.
-// The rows past the cap show an empty column and are not marked: none of their
-// checks went unrun, so "not inspected" would be false.
-func fieldOnlyCap[T any](items []T) []T {
-	return items[:min(len(items), EnrichmentCap)]
-}
-
-// Finish folds a Wave 2 enricher's accumulated per-batch failures into result
-// and returns the composite error via AggregateFailures. It raises Truncated
-// through SetTruncated, so a call with zero failures composes safely with a
-// flag another pass raised earlier in the same enricher (EnrichmentCap, the
-// page cap, a per-parent cap).
-func Finish(result *IssueEnricherResult, failures []Failure, total int, op string) error {
-	SetTruncated(result, len(failures) > 0)
-	return AggregateFailures(op, failures, total)
+// The rows past the cap are not marked — none of their checks went unrun — and
+// are recorded unreached, so their column keeps what an earlier answer wrote.
+func fieldOnlyCap[T any](result *IssueEnricherResult, items []T, idsOf func(T) []string) []T {
+	if len(items) <= EnrichmentCap {
+		return items
+	}
+	for _, item := range items[EnrichmentCap:] {
+		for _, id := range idsOf(item) {
+			markUnreached(result, id)
+		}
+	}
+	return items[:EnrichmentCap]
 }
 
 // IssueEnricherResult is the typed return value of a Wave 2 issue enricher.
-//
-//   - Truncated: true when the ISSUE count (severity "!") is a lower bound —
-//     the enricher's walk was cut short (EnrichmentCap/page cap/API errors) AND
-//     this enricher can emit "!" findings. Enrichers that emit only "~"
-//     informational findings MUST leave Truncated false: capping their walk
-//     hides no issues, only informational coverage. Use TruncatedIDs for
-//     per-resource "?" coverage gaps regardless of severity.
 //
 //   - TruncatedIDs: per-resource truncation. Key = Resource.ID that could not be
 //     fully inspected (API error on that resource, page cap hit during a
 //     per-parent paginated walk, etc.). The UI renders "?" on just that row
 //     instead of a global banner. An ID appearing here MUST NOT also appear in
-//     Findings unless the partial data was still usable.
+//     Findings unless the partial data was still usable. A cut that leaves a
+//     row unanswered marks the row: the marks, read against the catalog's
+//     severities (runtime issueLowerBound), are the only record that the
+//     issue count may be short and that the scan was partial.
+//
+//   - Unreached: the rows the enricher gave no answer for, written by
+//     markUnreached alone — through every mark, and through the field-only
+//     cap and loop, which mark nothing. FieldUpdates for an answered row need
+//     carry only the values it has: the runner writes every
+//     IssueEnricherFieldKeys key it left out as empty on every handed row not
+//     in Unreached, so a value an earlier answer wrote does not outlive the
+//     answer, and a row nobody reached keeps it.
 //
 //   - Findings: map from Resource.ID → []domain.Finding. The enricher emits
 //     one entry per independently-evaluated Wave-2 condition for the
@@ -518,8 +509,8 @@ func Finish(result *IssueEnricherResult, failures []Failure, total int, op strin
 // MAY have empty maps but MUST NOT be nil for any reference field on
 // success — initialize each with `make(...)` before returning.
 type IssueEnricherResult struct {
-	Truncated    bool
 	TruncatedIDs map[string]string
+	Unreached    map[string]struct{}
 	Findings     map[string][]domain.Finding
 	// AttentionDetails carries per-resource, per-Code supporting rows for the
 	// Wave-2 Finding(s) emitted in Findings. Keyed by Resource.ID then by the
@@ -656,9 +647,6 @@ const (
 // across pages answers nothing until the walk reaches the end. Getting this
 // wrong is silent: a backup plan seen once on page 1 reads as inspected while
 // its failed job sits past the cap.
-//
-// The aggregate Truncated flag stays with the caller: a walk that can hide
-// only informational coverage lower-bounds no issue count.
 func walkAccountPages[T any](
 	ctx context.Context,
 	result *IssueEnricherResult,
@@ -666,7 +654,7 @@ func walkAccountPages[T any](
 	rule sightingRule,
 	idOf func(T) string,
 	next func(token *string) ([]T, *string, error),
-) (items []T, pages int, cut bool, err error) {
+) (items []T, pages int, err error) {
 	items, complete, err := PageAll(ctx, EnrichmentCap, func(_ context.Context, token *string) ([]T, *string, error) {
 		page, following, pageErr := next(token)
 		if pageErr == nil {
@@ -678,7 +666,7 @@ func walkAccountPages[T any](
 		pages++
 	}
 	if complete {
-		return items, pages, false, nil
+		return items, pages, nil
 	}
 	seen := make(map[string]bool, len(resources))
 	for _, item := range items {
@@ -697,5 +685,5 @@ func walkAccountPages[T any](
 			markUninspected(result, r.ID, check)
 		}
 	}
-	return items, pages, true, err
+	return items, pages, err
 }

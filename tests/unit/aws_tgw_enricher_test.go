@@ -189,7 +189,7 @@ func TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError(t *testing.T
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

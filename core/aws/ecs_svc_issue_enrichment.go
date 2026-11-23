@@ -88,7 +88,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		resourceByService[ecsSvcID(cluster, svcName)] = r
 	}
 
-	truncated := false
 	var failures []Failure
 	total := 0
 	const op = "DescribeServices"
@@ -113,7 +112,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 						failures = append(failures, FailedCall(svcName, err))
 					}
 				}
-				truncated = true
 				continue
 			}
 
@@ -227,7 +225,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	SetTruncated(&result, truncated)
-	err := Finish(&result, failures, total, op)
+	err := AggregateFailures(op, failures, total)
 	return result, err
 }

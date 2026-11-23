@@ -550,8 +550,8 @@ func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
 	if _, marked := result.TruncatedIDs[deletedBucket]; !marked {
 		t.Error("TruncatedIDs[deleted-bucket] must be true — data incomplete because the bucket no longer exists")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a bucket's PAB state cannot be determined (deleted mid-sweep)")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
@@ -576,8 +576,8 @@ func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
 	if _, marked := result.TruncatedIDs[deletedBucket]; !marked {
 		t.Error("TruncatedIDs[gone-empty-body-bucket] must be true — data incomplete because the bucket no longer exists")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a bucket's PAB state cannot be determined (deleted mid-sweep)")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

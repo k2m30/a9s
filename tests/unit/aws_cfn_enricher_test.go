@@ -189,7 +189,7 @@ func TestEnrichCFNDrift_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 }
 
 // TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError verifies that when the
-// API call for stack-1 returns a generic error, the enricher sets Truncated=true,
+// API call for stack-1 returns a generic error, the enricher marks stack-1 not inspected,
 // produces 0 findings for that stack, and returns a composite error containing the
 // failing stack ID.
 func TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
@@ -224,7 +224,7 @@ func TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	if _, ok := result.Findings[cfnDriftStack1]; ok {
 		t.Error("stack-1 must NOT appear in Findings on generic API error")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a generic API call fails")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

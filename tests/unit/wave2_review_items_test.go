@@ -134,7 +134,6 @@ func TestBadge_RefusedRowOnIssueCapableTypeIsALowerBound(t *testing.T) {
 			ResourceType: "vpc",
 			Findings:     map[string][]domain.Finding{rows[1].ID: {rvFinding(rvWave2Codes(t, "vpc")[0])}},
 			TruncatedIDs: map[string]string{rows[0].ID: "DescribeFlowLogs"},
-			Truncated:    true,
 		})
 		if pm.Truncated {
 			t.Error("vpc badge reads as a lower bound, but a refused flow-log check cannot hide an issue")
@@ -347,10 +346,10 @@ func TestBadge_EveryRowRefusedIsNotConfirmedZero(t *testing.T) {
 	}
 }
 
-// TestBadge_EnricherCutWithoutRowMarksSurvivesRestart: the enricher reports a
-// cut walk with no per-row marks and one "!" finding. The badge that shows
-// live is the badge the next session boots on.
-func TestBadge_EnricherCutWithoutRowMarksSurvivesRestart(t *testing.T) {
+// TestBadge_EnricherCutSurvivesRestart: the enricher cut its walk short of one
+// row, which it marks, and raised one "!" finding. The badge that shows live
+// is the badge the next session boots on.
+func TestBadge_EnricherCutSurvivesRestart(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "pilot-prof", "us-east-1"
 	rows := uninspectedEC2Rows()
@@ -365,8 +364,7 @@ func TestBadge_EnricherCutWithoutRowMarksSurvivesRestart(t *testing.T) {
 	ev := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings:     map[string][]domain.Finding{rows[0].ID: {rvFinding(def)}},
-		TruncatedIDs: map[string]string{},
-		Truncated:    true,
+		TruncatedIDs: map[string]string{rows[1].ID: awsclient.CheckCap},
 	}
 	intents, _ := core.HandleEvent(ev)
 	var live runtime.PatchMenu
@@ -499,7 +497,6 @@ func TestRedshiftBadge_CapDoesNotMakeTheCountALowerBound(t *testing.T) {
 		ResourceType: "redshift",
 		Findings:     res.Findings,
 		TruncatedIDs: res.TruncatedIDs,
-		Truncated:    res.Truncated,
 	})
 	if pm.Truncated {
 		t.Error("the redshift badge reads as a lower bound, but a capped cluster can only hide \"~\" findings")

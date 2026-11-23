@@ -182,7 +182,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	scanAPI, _ := clients.ECR.(ECRDescribeImageScanFindingsAPI)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -245,14 +244,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		case policyErr != nil:
 			// Unknown, not clean: the row renders "?" rather than claiming a
 			// repository nobody could read is private.
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, policyErr)
 		case hasPolicy:
 			readPolicy("ecr", policy, ownAccount, r.Fields["arn"]).raise(&result, r.ID)
 		}
 		switch {
 		case lifecycleErr != nil:
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, lifecycleErr)
 		case noLifecyclePolicy:
 			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, nil)
@@ -260,15 +257,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 
 		switch {
 		case imagesErr != nil:
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, imagesErr)
 			return
 		case scanErr != nil:
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, scanErr)
 			return
 		case !imagesComplete || !scanComplete:
-			truncated = true
 			markUninspected(&result, r.ID, CheckCap)
 			return
 		case latest != nil && latest.ImageScanFindingsSummary == nil && scanAPI == nil:
@@ -276,7 +270,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			// count, and no mark, as for any call a client predates.
 			return
 		case latest != nil && ecrScanUnread(*latest) != "":
-			truncated = true
 			markUninspected(&result, r.ID, ecrScanUnread(*latest))
 			return
 		}
@@ -325,7 +318,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		setWave2Finding(&result, r.ID, ecrCodeHighVulnerabilities, rows, strconv.Itoa(int(highTotal)))
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(registryErr, loopErr, AggregateFailures("repository posture", failures, total))
 }
 

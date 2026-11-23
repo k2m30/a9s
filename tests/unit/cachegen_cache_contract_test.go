@@ -705,7 +705,6 @@ func TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType(t *testing.T) {
 	ctrl.Handle(messages.AvailabilityChecked{
 		ResourceType: "s3",
 		Count:        0,
-		Issues:       0,
 		Gen:          core.AvailabilityGen(),
 	})
 	if got := ctrl.GetMenuIssueCounts()["s3"]; got != 0 {

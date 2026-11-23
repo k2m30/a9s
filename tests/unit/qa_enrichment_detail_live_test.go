@@ -91,7 +91,6 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 
 	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"db-live-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update — live update test", Severity: domain.SevBroken, Source: "wave2:rds"}},
 		},

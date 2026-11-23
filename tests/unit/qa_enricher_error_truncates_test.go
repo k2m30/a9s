@@ -1,7 +1,7 @@
 package unit
 
 // A per-resource API error marks the
-// enricher result Truncated and processing continues, so the badge shows
+// failing row not inspected and processing continues, so the badge shows
 // "N+" rather than a definitive count.
 
 import (
@@ -21,7 +21,7 @@ import (
 var errFakeAPI = errors.New("simulated API error")
 
 // TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated verifies that a
-// ListBuildsForProject error sets Truncated=true (not an abort).
+// ListBuildsForProject error marks the project not inspected (not an abort).
 func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 12, 0, 0, 0, time.UTC)
 
@@ -44,18 +44,18 @@ func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	// A nil error here would be a proxy for "the run was not aborted" that
 	// also requires the reason to be dropped. The run continues — the other
-	// resource is processed and Truncated is raised below — and the call that
+	// resource is processed and the failing one is marked below — and the call that
 	// failed says so.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a per-resource ListBuildsForProject call fails — was the per-resource error handling reverted?")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
 // TestEnrichTargetGroupHealth_DescribeError_SetsTruncated verifies that a
-// DescribeTargetHealth error sets Truncated=true and surfaces a composite error
+// DescribeTargetHealth error marks the row not inspected and surfaces a composite error
 // containing the enricher prefix and the failing resource ID.
 func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 	const tgName = "err-tg"
@@ -82,13 +82,13 @@ func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 	if errStr := err.Error(); !strings.Contains(errStr, tgName) {
 		t.Errorf("composite error must contain the failing target group ID %q, got: %q", tgName, errStr)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when DescribeTargetHealth fails — was the per-resource error handling reverted?")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
 // TestEnrichCodePipelineStatus_GetStateError_SetsTruncated verifies that a
-// GetPipelineState error sets Truncated=true and surfaces a composite error
+// GetPipelineState error marks the row not inspected and surfaces a composite error
 // containing the enricher prefix.
 func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	fake := &pipelineStateFake{
@@ -96,8 +96,8 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{CodePipeline: fake}
 	resources := []resource.Resource{
-		{Name: "pipeline-that-errors"},
-		{Name: "another-pipeline"},
+		{ID: "pipeline-that-errors", Name: "pipeline-that-errors"},
+		{ID: "another-pipeline", Name: "another-pipeline"},
 	}
 
 	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
@@ -110,13 +110,13 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	if errStr := err.Error(); !strings.Contains(errStr, "GetPipelineState") {
 		t.Errorf("composite error must name the call, GetPipelineState, got: %q", errStr)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when GetPipelineState fails — was the per-resource error handling reverted?")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
 // TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated verifies that a
-// ListExecutions error sets Truncated=true and surfaces a composite error containing
+// ListExecutions error marks the row not inspected and surfaces a composite error containing
 // the enricher prefix and the failing state machine ARN.
 func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.T) {
 	const smName = "err-sm"
@@ -148,13 +148,13 @@ func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.
 	if errStr := err.Error(); !strings.Contains(errStr, smName) {
 		t.Errorf("composite error must contain the failing state machine ID %q, got: %q", smName, errStr)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when ListExecutions fails — was the per-resource error handling reverted?")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
 // TestEnrichGlueJobStatus_GetJobRunsError_SetsTruncated verifies that a
-// GetJobRuns error sets Truncated=true.
+// GetJobRuns error marks the job not inspected.
 func TestEnrichGlueJobStatus_GetJobRunsError_SetsTruncated(t *testing.T) {
 	fake := &glueJobFake{
 		err: errFakeAPI,
@@ -168,12 +168,12 @@ func TestEnrichGlueJobStatus_GetJobRunsError_SetsTruncated(t *testing.T) {
 	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	// A nil error here would be a proxy for "the run was not aborted" that
 	// also requires the reason to be dropped. The run continues — the other
-	// resource is processed and Truncated is raised below — and the call that
+	// resource is processed and the failing one is marked below — and the call that
 	// failed says so.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when GetJobRuns fails — was the per-resource error handling reverted?")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

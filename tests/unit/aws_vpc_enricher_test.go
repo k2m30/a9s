@@ -174,7 +174,7 @@ func TestEnrichVPCFlowLogs_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 }
 
 // vpc is a "~"-only enricher (IssueCount is always 0), so a coverage gap
-// never lower-bounds the issue badge: Truncated stays false.
+// never lower-bounds the issue badge.
 func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *testing.T) {
 	apiErr := errors.New("ec2: DescribeFlowLogs throttled")
 	fake := &vpcFlowLogFake{
@@ -193,9 +193,6 @@ func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *te
 	// nothing in the error log to say what refused.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: vpc is a \"~\"-only enricher, so a DescribeFlowLogs error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, marked := result.TruncatedIDs["vpc-00000001"]; !marked {
 		t.Error("TruncatedIDs[\"vpc-00000001\"] must be true — the DescribeFlowLogs error must mark that VPC's row with a \"?\" coverage gap")

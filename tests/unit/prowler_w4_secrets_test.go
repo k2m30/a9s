@@ -250,8 +250,8 @@ func TestW4SecretPolicyBeyondCapIsTruncated(t *testing.T) {
 	}
 	res := w4EnrichSecrets(t, &w4SecretsFake{policies: policies}, rs)
 
-	if !res.Truncated {
-		t.Errorf("Truncated = false with %d secrets and a cap of %d", len(rs), awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if len(res.Findings) != awsclient.EnrichmentCap {
 		t.Errorf("evaluated %d secrets, want exactly the cap %d", len(res.Findings), awsclient.EnrichmentCap)

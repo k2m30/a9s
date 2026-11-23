@@ -138,14 +138,14 @@ func TestEnrichCodePipelineStatus_NoFailedStageExcluded(t *testing.T) {
 	}
 }
 
-// TestEnrichCodePipelineStatus_TruncatedWhenResourcesExceedCap verifies Truncated.
+// TestEnrichCodePipelineStatus_TruncatedWhenResourcesExceedCap verifies the rows past the cap are marked not inspected.
 func TestEnrichCodePipelineStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	count := awsclient.EnrichmentCap + 1
 	resources := make([]resource.Resource, count)
 	states := make(map[string]*codepipeline.GetPipelineStateOutput, count)
 	for i := range count {
 		name := fmt.Sprintf("pipeline-%03d", i)
-		resources[i] = resource.Resource{Name: name}
+		resources[i] = resource.Resource{ID: name, Name: name}
 		states[name] = &codepipeline.GetPipelineStateOutput{
 			StageStates: []cptypes.StageState{stageState("Deploy", cptypes.StageExecutionStatusSucceeded)},
 		}
@@ -157,9 +157,8 @@ func TestEnrichCodePipelineStatus_TruncatedWhenResourcesExceedCap(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Errorf("Truncated must be true when len(resources)=%d > EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

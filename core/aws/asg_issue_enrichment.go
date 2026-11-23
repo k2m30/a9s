@@ -38,7 +38,6 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 	if clients.AutoScaling == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -62,7 +61,6 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
 			return
 		}
 		if len(out.Activities) == 0 {
@@ -91,7 +89,6 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, rows)
 	})
 
-	SetTruncated(&result, truncated)
 	activitiesErr := AggregateFailures("DescribeScalingActivities", failures, total)
 	lcErr := asgLaunchConfigurationPosture(ctx, clients, &result, resources)
 	return result, errors.Join(loopErr, activitiesErr, lcErr)
@@ -159,7 +156,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 		// One failure per group, so the aggregate's total counts groups
 		// too: several groups can share a launch configuration, and
 		// len(names) would read "8 of 5".
-		return Finish(result, failures, groups, op)
+		return AggregateFailures(op, failures, groups)
 	}
 
 	// A token still pending means the cap fell through, not the pages: the
@@ -168,7 +165,6 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 	// marked — a group whose configuration DID arrive was inspected, and
 	// hiding its finding behind a "?" would lose a real one.
 	if !complete {
-		SetTruncated(result, true)
 		read := make(map[string]bool, len(configs))
 		for _, lc := range configs {
 			read[aws.ToString(lc.LaunchConfigurationName)] = true

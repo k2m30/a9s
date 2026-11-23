@@ -305,7 +305,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 
-	MarkInformationalOnly(&result)
 	return result, errors.Join(attrErr, listenerErr, AggregateFailures("load balancer attributes and listeners", failures, total))
 }
 

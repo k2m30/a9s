@@ -488,13 +488,11 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	if ls == nil || c.core.NoCache() {
 		return
 	}
-	td := resource.FindResourceType(canon)
-	if td == nil {
+	if resource.FindResourceType(canon) == nil {
 		// Issue-badge eligibility unknowable without a ResourceTypeDef.
 		return
 	}
 	issues, issuesKnown := c.menuIssueBadge(canon)
-	issuesKnown = issuesKnown && !td.ExcludeFromIssueBadge
 	// Two facts, two fields: "another page exists" is what puts the "+" on
 	// the count and offers the m key; "this list cannot claim to be the
 	// type's whole population" is what forbids recording it as an exact

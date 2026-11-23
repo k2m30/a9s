@@ -1,6 +1,6 @@
 package unit_test
 
-// Truncated is what puts the "+" on the menu's
+// A row the enricher marked not inspected is what puts the "+" on the menu's
 // issue badge, so these pin that the codebuild banner lights when the walk
 // was cut short and stays dark when it was not.
 
@@ -17,6 +17,8 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // cbBannerFake gives every project one failed build, and fails the list call
@@ -59,8 +61,8 @@ func (f *cbBannerFake) BatchGetBuilds(_ context.Context, in *codebuild.BatchGetB
 // enricher and then the controller the menu reads, so the assertion is on what
 // an operator sees: "issues:N+" when the walk did not reach every project, and
 // "issues:N" when it did. The suffix comes from MenuEntry.IssueBadge.Truncated
-// (internal/tui/views/mainmenu.go entryIssueBadge), which is fed by the
-// enricher's own Truncated flag.
+// (internal/tui/views/mainmenu.go entryIssueBadge), which is fed by the rows
+// the enricher marked not inspected.
 func TestPartialCB_TheIssueBadgeStillSaysTheCountIsALowerBound(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -101,12 +103,14 @@ func TestPartialCB_TheIssueBadgeStillSaysTheCountIsALowerBound(t *testing.T) {
 			res, _ := awsclient.EnrichCodeBuildStatus(context.Background(),
 				&awsclient.ServiceClients{CodeBuild: &cbBannerFake{failFor: tc.failFor}}, rows, nil)
 
-			if res.Truncated != tc.wantTruncated {
-				t.Errorf("enricher Truncated = %v, want %v", res.Truncated, tc.wantTruncated)
-			}
-
-			c := newTestController(t)
-			c.ApplyEnrichmentState("cb", len(res.Findings), res.Truncated, res.Findings, res.AttentionDetails)
+			c, core := newTestControllerAndCore(t)
+			core.ObserveRows("cb", rows, nil, session.OriginFetch, false)
+			c.Handle(messages.EnrichmentChecked{
+				ResourceType:     "cb",
+				Findings:         res.Findings,
+				AttentionDetails: res.AttentionDetails,
+				TruncatedIDs:     res.TruncatedIDs,
+			})
 			snap := c.Snapshot()
 			entry := menuEntryFor(snap.Body.Menu, "cb")
 			if entry == nil {

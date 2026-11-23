@@ -39,7 +39,6 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	if clients.SFN == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -88,7 +87,6 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 				return
 			}
 			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
 			return
 		}
 		if len(out.Executions) > 0 {
@@ -127,7 +125,6 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		}
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("state machine executions and configuration", failures, total))
 }
 

@@ -63,7 +63,7 @@ func enrichTrailStatus(ctx context.Context, clients *ServiceClients, resources [
 			addWave2Finding(result, r.ID, f, nil)
 		}
 	})
-	return errors.Join(loopErr, Finish(result, failures, len(resources), "GetTrailStatus"))
+	return errors.Join(loopErr, AggregateFailures("GetTrailStatus", failures, len(resources)))
 }
 
 // trailLogBucketAPI is the read-only S3 calls the log-bucket rows need: the

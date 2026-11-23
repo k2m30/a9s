@@ -151,8 +151,8 @@ func TestEnrichStepFunctionsStatus_ExpressMachineSkipsListExecutions(t *testing.
 	if _, marked := result.TruncatedIDs[expressName]; marked {
 		t.Errorf("EXPRESS state machine %q must not be marked truncated/errored", expressName)
 	}
-	if result.Truncated {
-		t.Error("Truncated must be false: the only non-STANDARD machine was correctly skipped, no real failures occurred")
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 }
 
@@ -190,8 +190,8 @@ func TestEnrichStepFunctionsStatus_StateMachineTypeNotSupportedIsBenignSkip(t *t
 	if _, marked := result.TruncatedIDs[name]; marked {
 		t.Errorf("resource %q must not be marked truncated for a benign StateMachineTypeNotSupported skip", name)
 	}
-	if result.Truncated {
-		t.Error("Truncated must be false: StateMachineTypeNotSupported is not a real failure")
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 }
 

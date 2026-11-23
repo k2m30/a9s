@@ -70,6 +70,17 @@ func ForEachParallel(ctx context.Context, n, limit int, fn func(i int)) error {
 // without the mark renders as inspected-and-healthy. It returns the context
 // error, which the caller hands back with its own.
 func ForEachRow(ctx context.Context, result *IssueEnricherResult, ids []string, limit int, fn func(i int)) error {
+	return forEachRowLeaving(ctx, ids, limit, fn, func(id string) { markUninspected(result, id, CheckDeadline) })
+}
+
+// forEachFieldRow is ForEachRow for a pass that fills a list column and
+// decides no finding: a row the deadline stopped is recorded unreached, not
+// marked, so its column keeps what an earlier answer wrote.
+func forEachFieldRow(ctx context.Context, result *IssueEnricherResult, ids []string, limit int, fn func(i int)) error {
+	return forEachRowLeaving(ctx, ids, limit, fn, func(id string) { markUnreached(result, id) })
+}
+
+func forEachRowLeaving(ctx context.Context, ids []string, limit int, fn func(i int), leave func(id string)) error {
 	started := make([]bool, len(ids))
 	err := ForEachParallel(ctx, len(ids), limit, func(i int) {
 		started[i] = true
@@ -77,8 +88,7 @@ func ForEachRow(ctx context.Context, result *IssueEnricherResult, ids []string, 
 	})
 	for i, id := range ids {
 		if !started[i] {
-			markUninspected(result, id, CheckDeadline)
-			SetTruncated(result, true)
+			leave(id)
 		}
 	}
 	return err

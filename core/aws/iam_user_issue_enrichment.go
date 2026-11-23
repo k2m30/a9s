@@ -56,7 +56,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 	}
 
 	keyLastUsedAPI, _ := clients.IAM.(IAMGetAccessKeyLastUsedAPI)
-	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -136,9 +135,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		defer mu.Unlock()
 
-		if len(rowErrs) > 0 {
-			truncated = true
-		}
 		for _, err := range append(rowErrs, aerr, keyUseErr) {
 			if err != nil {
 				MarkSkipped(&result, r.ID, &failures, err)
@@ -234,7 +230,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 		result.FieldUpdates[r.ID] = fields
 	})
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("user credentials", failures, n))
 }
 

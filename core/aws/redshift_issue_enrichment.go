@@ -93,7 +93,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 
-	err := errors.Join(loopErr, Finish(&result, failures, n, "cluster posture"))
+	err := errors.Join(loopErr, AggregateFailures("cluster posture", failures, n))
 	return result, err
 }
 

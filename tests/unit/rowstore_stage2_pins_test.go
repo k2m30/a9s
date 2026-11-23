@@ -431,7 +431,7 @@ func TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
 
 // handCountDistinctIssueRows returns the count of rows carrying at least one
 // finding — a faithful hand-count only when every finding in the row set is
-// domain.SevBroken. unifiedIssueCount's wave2 contribution
+// domain.SevBroken. IssueCount's wave2 contribution
 // (handlers_availability.go:701-708) counts a finding toward the badge ONLY
 // at SevBroken; a SevWarn-only row set would make this helper overcount
 // relative to the production aggregation (see TestUnifiedIssueCount_
@@ -453,8 +453,8 @@ func handCountDistinctIssueRows(rows []resource.Resource) int {
 // healthy, then asserts the menu's issue-count badge
 // (Controller.GetMenuIssueCounts) equals a hand-count performed directly over
 // RowStore's own retained rows for the type — the two aggregations (the
-// production unifiedIssueCount path feeding the menu badge, and a
-// store-rows-first-principles count) must agree. unifiedIssueCount reads
+// production IssueCount path feeding the menu badge, and a
+// store-rows-first-principles count) must agree. IssueCount reads
 // RowStore.Snapshot(canon).Rows; a read of a DIFFERENT rows view (a
 // partial-included snapshot, or a stale pre-Amend snapshot) would desync the
 // menu badge from the store's own canonical row set.
@@ -509,6 +509,6 @@ func TestStage2Pin_IssueCountParity_MenuBadgeMatchesStoreRowAggregation(t *testi
 	}
 
 	if badge != handCount {
-		t.Errorf("menu issue badge = %d, hand-count over RowStore rows = %d — the production unifiedIssueCount aggregation feeding the menu badge must agree with the store's own row set", badge, handCount)
+		t.Errorf("menu issue badge = %d, hand-count over RowStore rows = %d — the production IssueCount aggregation feeding the menu badge must agree with the store's own row set", badge, handCount)
 	}
 }

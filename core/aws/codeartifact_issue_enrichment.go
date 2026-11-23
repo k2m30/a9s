@@ -31,7 +31,8 @@ const (
 //   - the resource policy grants a wildcard principal with no restrictive
 //     condition → "!" severity, "public access policy".
 //
-// Per-repo errors other than ResourceNotFoundException mark Truncated=true and are skipped.
+// A repository whose read fails with anything but ResourceNotFoundException is
+// marked not inspected and skipped.
 // Skip when clients.CodeArtifact == nil.
 func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -43,7 +44,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -108,7 +108,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, nil)
 				return
 			}
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
@@ -118,6 +117,5 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 		readPolicy("codeartifact", policy, ownAccount, r.Fields["arn"]).raise(&result, key)
 	})
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("repository packages and policy", failures, n))
 }

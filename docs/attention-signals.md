@@ -26,7 +26,7 @@ definition; `docs/resources/<shortName>.md` §4 transcribes it verbatim.
 
 | # | Surface | Mechanism |
 |---|---|---|
-| S1 | Menu `issues:N` count + list frame title `!N` suffix | A row counts when its Wave 1 colour is an issue — Warning or Broken, never Dim — and a Wave 2 finding counts only at `!` severity; `~` findings do not bump. `core/runtime/handlers_availability.go` `unifiedIssueCount` and `core/app/list_body.go` are the two callers, and both read the same rule. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound; N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix when N = 0, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so `name(5 of 50+) [!]` stays as-is. |
+| S1 | Menu `issues:N` count + list frame title `!N` suffix | A row counts when its Wave 1 colour is an issue — Warning or Broken, never Dim — and a Wave 2 finding counts only at `!` severity; `~` findings do not bump. `core/runtime/issue_class.go` `IsIssueRow` is the one rule; the menu badge, the disk count, the list title and the `ctrl+z` filter all call it. The list frame title appends a space-separated `!N` after the count parentheses when the current list has N > 0 issues (`s3(50+) !5`, `ec2(17) !1`), or `!N+` when N is a truncated lower bound, zero included (`!0+`, menu `issues:0+`); N uses the same aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity findings). No suffix for an exact zero, and omitted in attention-only mode (`ctrl+z`) — the filtered count already is the issue count, so the title reads `name(5 of 50+) [!]`, or `name(5+ of 50) [!]` when that count is a lower bound. |
 | S2 | Row color (list view) | Row colored by state bucket — Healthy=green, Warning=yellow, Broken=red, Dim=gray. Yellow/red/dim are themselves the attention signal. |
 | S3 | `!` / `~` tier in the detail-view Attention section | One entry per finding, `!` at Broken and `~` at Warning — `internal/tui/views/detail_fields.go`. A finding that is neither, such as a Dim lifecycle state, is skipped there and has no tier. **Not a list-row marker**: a list row's colour is the worst finding over both waves (`tests/unit/qa_color_findings_conformance_test.go`, empty divergence allowlist), so a row carrying a finding is never green for a glyph to annotate. |
 | S4 | Status / description column text | Short human-readable cause (e.g. `stopping: Server.SpotInstanceShutdown`, `expires in 7d`). **Healthy rows render blank** — no `OK` / `available` / `ACTIVE` / `running`. Empty means "nothing to see." A row the Wave 2 enricher could not inspect reads `not inspected` instead, so an unknown posture is never mistaken for a clean one; a finding phrase always wins over that word, and the row's colour is unchanged because an uninspected row is not an issue. |
@@ -51,8 +51,8 @@ there is no separate case for a Wave 2 finding landing on a green row:
 S2 and S4 are on every row: the colour and the cause text are what a non-healthy
 row is. S3 and S5 are the Attention section's tier and sentence, so they follow
 the same issue-severity test that section applies. S1 is
-`core/runtime/handlers_availability.go` `unifiedIssueCount` with
-`core/app/list_body.go`.
+`core/runtime/issue_class.go` `IsIssueRow`, the one predicate the badge,
+the list title and the `ctrl+z` filter all call.
 
 ### S1 — list frame title issue count
 
@@ -62,14 +62,25 @@ resource-list frame title. The frame-title rules:
 - The title appends a space-separated `!N` after the count parentheses
   when the current list has N > 0 issues: `s3(50+) !5`, `ec2(17) !1`.
 - When N is a truncated lower bound, the suffix renders `!N+` —
-  mirroring the menu badge's truncated `N+` form.
+  mirroring the menu badge's truncated `N+` form. A lower bound of zero
+  renders too, as `!0+` and `issues:0+`: rows went uninspected on a type
+  that can raise a `!` finding. `app.IssueBadge.Text` is the one
+  formatter for the menu badge on both hosts and for the title, and the
+  menu's lower bound is the one fact both read, so a badge loaded from
+  the previous session reads the same in the title.
 - N uses the same aggregation as the menu badge: Wave 1 issue-colored
   rows plus Wave 2 `!`-severity findings for the resources in the list.
   `~` findings do not bump.
 - Attention-only mode (`ctrl+z`): the existing `[!]` title suffix
   stays and `!N` is omitted — the filtered count already is the issue
-  count; `name(5 of 50+) [!]` renders exactly as today.
-- Healthy list (N = 0): no suffix — the title is unchanged.
+  count, `name(5 of 50+) [!]`, and it carries the same `+` as the badge
+  when it is a lower bound, `name(5+ of 50) [!]`.
+- Healthy list (an exact N = 0): no suffix — the title is unchanged.
+- Issues-only menu (`ctrl+z`): a type is listed exactly when its badge
+  has text, `issues:N` or `issues:N+`, so every listed type shows why it
+  is there. An `ExcludeFromIssueBadge` type (CloudTrail events) draws no
+  badge and is not listed; its own list under `ctrl+z` still keeps its
+  issue rows.
 
 ## Signals
 

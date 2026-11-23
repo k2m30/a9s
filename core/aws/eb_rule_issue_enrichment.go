@@ -39,7 +39,6 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 
-	truncated := false
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -113,10 +112,8 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			// A refused call counted nothing: the column is blanked, since
 			// "0" is the answer of a call that succeeded with no targets.
 			targetCountStr = ""
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, fetchErr)
 		case targetsTruncated:
-			truncated = true
 			// A page cap, not a failed call, and not a coverage gap on the
 			// row: the "+" on target_count is where it is reported. The rows
 			// below name targets the walk really did see — a target without a
@@ -139,6 +136,5 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		setWave2Finding(&result, r.ID, ebRuleCodeTargetIssue, rows)
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("ListTargetsByRule", failures, n))
 }

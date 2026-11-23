@@ -322,11 +322,11 @@ func TestW6ATrailLogBucket_CapBoundsTheIssueCount(t *testing.T) {
 		}
 		return out
 	}
-	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap)...); res.Truncated {
-		t.Error("exactly EnrichmentCap trails reported Truncated")
+	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap)...); len(res.TruncatedIDs) != 0 {
+		t.Errorf("exactly EnrichmentCap trails marked rows not inspected: %v", res.TruncatedIDs)
 	}
-	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap+1)...); !res.Truncated {
-		t.Error("EnrichmentCap+1 trails did not report Truncated")
+	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap+1)...); len(res.TruncatedIDs) == 0 {
+		t.Error("EnrichmentCap+1 trails marked no row not inspected")
 	}
 }
 

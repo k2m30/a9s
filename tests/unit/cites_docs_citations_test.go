@@ -454,11 +454,10 @@ func expectedGlyph(sig catalogSignal) string {
 }
 
 // expectedS1 derives whether a finding reaches surface S1, the menu `issues:N`
-// count and the list-title `!N` suffix. Same one source: core/app/list_body.go
-// counts a row whose wave-1 colour is an issue (`ResolveColor(Wave1Only(r)).IsIssue()`,
-// which is Warning or Broken and not Dim), and `listHasBadgeFinding` plus the
-// findings-map branch add a wave-2 finding only at SevBroken — "~ findings do
-// not bump".
+// count and the list-title `!N` suffix. Same one source: runtime.IsIssueRow
+// (core/runtime/issue_class.go) counts a row whose wave-1 colour or wave-1
+// finding is an issue (Warning or Broken, not Dim), and a wave-2 finding only
+// at SevBroken — "~ findings do not bump".
 func expectedS1(sig catalogSignal) bool {
 	if sig.wave == "wave2" {
 		return sig.severity == "broken"

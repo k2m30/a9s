@@ -81,9 +81,8 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 
 	// A page that fails ends the walk but keeps the pages already read: the
 	// instances they name have real pending maintenance whatever happened
-	// afterwards. A failed page does lower-bound the walk, unlike the cap,
-	// which bounds only informational coverage for this "~"-only pass.
-	allActions, _, _, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow, instanceKeyOf,
+	// afterwards.
+	allActions, _, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow, instanceKeyOf,
 		func(token *string) ([]rdstypes.ResourcePendingMaintenanceActions, *string, error) {
 			out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: token})
 			if err != nil {
@@ -91,7 +90,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 			return out.PendingMaintenanceActions, out.Marker, nil
 		})
-	SetTruncated(&result, walkErr != nil)
 
 	for _, action := range allActions {
 		key := instanceKeyOf(action)
@@ -124,10 +122,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	engineErr := enrichDBIEngineVersions(ctx, clients, resources, &result)
-
-	// Pending maintenance is "~"-only: EnrichmentCap bounds informational
-	// coverage, never the issue count. The engine-deprecated pass below is
-	// "!", and sets Truncated itself when its walk is cut short.
 	return result, errors.Join(tagErr, walkErr, engineErr)
 }
 
@@ -180,7 +174,6 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 		setWave2Finding(result, r.ID, dbiCodeEngineDeprecated, []domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: tierOf(dbiCodeEngineDeprecated)}})
 	})
 
-	SetTruncated(result, len(failures) > 0)
 	return errors.Join(loopErr, AggregateFailures("DescribeDBEngineVersions", failures, len(resources)))
 }
 

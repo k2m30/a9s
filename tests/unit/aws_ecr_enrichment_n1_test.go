@@ -260,8 +260,8 @@ func TestEnrichECRRepository_N1_DescribeImagesErrorSurfaces(t *testing.T) {
 	if !strings.Contains(err.Error(), errRepo) {
 		t.Errorf("composite error must name the failing repo %q; got: %v", errRepo, err)
 	}
-	if !result.Truncated {
-		t.Error("expected Truncated=true when any repo fails")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if _, marked := result.TruncatedIDs[errRepo]; !marked {
 		t.Errorf("expected TruncatedIDs[%q]=true", errRepo)
@@ -289,9 +289,8 @@ func TestEnrichECRRepository_N1_RespectsEnrichmentCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Errorf("Truncated must be true when len(resources)=%d > EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	uncalled := 0
 	for i := awsclient.EnrichmentCap; i < count; i++ {

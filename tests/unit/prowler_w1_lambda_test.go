@@ -261,8 +261,8 @@ func TestLambda_PublicPolicy_NoPolicyIsHealthyNotAFailure(t *testing.T) {
 	if _, marked := res.TruncatedIDs[name]; marked {
 		t.Errorf("%s marked truncated for having no resource policy", name)
 	}
-	if res.Truncated {
-		t.Errorf("Truncated set for a function with no resource policy")
+	if len(res.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", res.TruncatedIDs)
 	}
 }
 
@@ -312,8 +312,8 @@ func TestLambda_Posture_CapBoundsTheWalk(t *testing.T) {
 		names = append(names, "acme-fn-"+strings.Repeat("x", i%3)+pw1Digits(i))
 	}
 	res := pw1EnrichLambda(t, fake, names...)
-	if !res.Truncated {
-		t.Errorf("Truncated = false for %d functions; EnrichmentCap is %d", len(names), awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if len(fake.getPolicy) > awsclient.EnrichmentCap {
 		t.Errorf("GetPolicy called %d times, cap is %d", len(fake.getPolicy), awsclient.EnrichmentCap)

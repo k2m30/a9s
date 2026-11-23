@@ -10,6 +10,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // relatedIDSubset applies the related-drill prefilter: when RelatedIDSet is
@@ -32,13 +33,13 @@ func relatedIDSubset(ls *ListState, base []resource.Resource) []resource.Resourc
 
 func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
 	td, columns := c.listColumnsAndTypeLocked(typeName)
-	return applyListFiltersWith(ls, td, columns, c.listEnrichmentFindings(typeName), base)
+	return applyListFiltersWith(ls, td, columns, base)
 }
 
 // applyListFiltersWith is applyListFilters with its controller reads hoisted
 // into arguments, so an off-lock build (listBodyBuild.run) and the locked
 // callers run the identical filter chain rather than two spellings of it.
-func applyListFiltersWith(ls *ListState, td *resource.ResourceTypeDef, columns []ColumnDef, findings map[string][]domain.Finding, base []resource.Resource) []resource.Resource {
+func applyListFiltersWith(ls *ListState, td *resource.ResourceTypeDef, columns []ColumnDef, base []resource.Resource) []resource.Resource {
 	// RelatedIDSet prefilter: when non-nil (even if empty), only IDs in the set pass.
 	base = relatedIDSubset(ls, base)
 
@@ -46,24 +47,12 @@ func applyListFiltersWith(ls *ListState, td *resource.ResourceTypeDef, columns [
 	// the filter compares the strings the rows on screen are made of.
 	result := listFilterResources(ls.Filter, columns, td, base)
 
-	// Attention filter: a row is kept when it carries an issue finding of its
-	// own, or — having no findings at all — when the type's classifier calls
-	// it an issue or the Wave-2 store holds one for it.
+	// The issues-only filter keeps exactly the rows the issue count counts.
 	if ls.AttentionOnly && td != nil {
 		kept := make([]resource.Resource, 0, len(result))
 		for _, r := range result {
-			if listHasIssueFinding(r) {
+			if runtime.IsIssueRow(*td, r) {
 				kept = append(kept, r)
-				continue
-			}
-			if len(r.Findings) == 0 {
-				if td.ResolveColor(r).IsIssue() {
-					kept = append(kept, r)
-					continue
-				}
-				if _, hasFinding := findings[r.ID]; hasFinding {
-					kept = append(kept, r)
-				}
 			}
 		}
 		result = kept
@@ -114,15 +103,6 @@ func listRowMatches(q string, columns []ColumnDef, td *resource.ResourceTypeDef,
 	}
 	for _, f := range r.Findings {
 		if strings.Contains(strings.ToLower(f.Phrase), q) {
-			return true
-		}
-	}
-	return false
-}
-
-func listHasIssueFinding(r resource.Resource) bool {
-	for _, f := range r.Findings {
-		if f.Severity.IsIssue() {
 			return true
 		}
 	}
@@ -259,12 +239,8 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	if c.enrichmentDetails == nil {
 		c.enrichmentDetails = make(map[string]map[string]map[domain.FindingCode]domain.AttentionDetail)
 	}
-	if c.enrichmentTruncated == nil {
-		c.enrichmentTruncated = make(map[string]bool)
-	}
 	c.enrichmentStore[typeName] = findings
 	c.enrichmentDetails[typeName] = details
-	c.enrichmentTruncated[typeName] = truncated
 	c.enrichmentGen++
 	c.syncEnrichmentBadge(typeName, issueCount, truncated, authoritative)
 }
@@ -279,9 +255,6 @@ func (c *Controller) mergeEnrichmentRows(typeName string, issueCount int, trunca
 	}
 	if c.enrichmentDetails == nil {
 		c.enrichmentDetails = make(map[string]map[string]map[domain.FindingCode]domain.AttentionDetail)
-	}
-	if c.enrichmentTruncated == nil {
-		c.enrichmentTruncated = make(map[string]bool)
 	}
 	if c.enrichmentStore[typeName] == nil {
 		c.enrichmentStore[typeName] = make(map[string][]domain.Finding)
@@ -301,7 +274,6 @@ func (c *Controller) mergeEnrichmentRows(typeName string, issueCount int, trunca
 			delete(c.enrichmentDetails[typeName], id)
 		}
 	}
-	c.enrichmentTruncated[typeName] = truncated
 	c.enrichmentGen++
 	c.syncEnrichmentBadge(typeName, issueCount, truncated, authoritative)
 }

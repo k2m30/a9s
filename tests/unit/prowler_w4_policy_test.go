@@ -244,9 +244,8 @@ func TestW4PolicyPrivEscBeyondCap(t *testing.T) {
 	}
 	res := w4EnrichPolicies(t, &w4PolicyFake{docs: docs}, rs)
 
-	if !res.Truncated {
-		t.Errorf("Truncated = false with %d resources and a cap of %d",
-			len(rs), awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if len(res.Findings) != awsclient.EnrichmentCap {
 		t.Errorf("evaluated %d policies, want exactly the cap %d", len(res.Findings), awsclient.EnrichmentCap)

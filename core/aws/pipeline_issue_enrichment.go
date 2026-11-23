@@ -33,7 +33,6 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 	if clients.CodePipeline == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -53,7 +52,6 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
 			return
 		}
 		key := r.ID
@@ -99,6 +97,5 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("GetPipelineState", failures, total))
 }

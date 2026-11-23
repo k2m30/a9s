@@ -95,7 +95,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			"flow_logs": flowLogsVal,
 		}
 	})
-	MarkInformationalOnly(&result)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeFlowLogs", failures, n))
 }
 

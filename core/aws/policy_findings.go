@@ -342,12 +342,11 @@ func (p policyReading) detail() domain.AttentionDetail {
 
 // markUnread marks the row not inspected when its policy could not be read,
 // and reports whether it did. The policy it could not read may grant anyone,
-// a "!" finding, so the issue count becomes a lower bound.
+// a "!" finding, so the mark makes the issue count a lower bound.
 func (p policyReading) markUnread(result *IssueEnricherResult, id string) bool {
 	check := p.unreadCheck()
 	if check != "" {
 		markUninspected(result, id, check)
-		SetTruncated(result, true)
 	}
 	return check != ""
 }

@@ -128,7 +128,6 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
 		TypeGen:      1,

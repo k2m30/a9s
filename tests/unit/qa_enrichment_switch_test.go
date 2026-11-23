@@ -21,7 +21,6 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 	// tui.Model exposes no EnrichmentGen() accessor; 0 is a fresh model's value.
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
@@ -30,7 +29,6 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 	})
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevWarn, Source: "wave2:rds"}},
 		},

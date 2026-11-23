@@ -384,13 +384,11 @@ func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
 	const targetType = "ec2"
 	staleResource := resource.Resource{ID: "i-stale-prefetch", Name: "stale-prefetch-target"}
 	staleMsg := messages.AvailabilityPrefetched{
-		Entries:        map[string]int{targetType: 1},
-		Truncated:      map[string]bool{},
-		IssueCounts:    map[string]int{},
-		IssueTruncated: map[string]bool{},
-		Resources:      map[string][]resource.Resource{targetType: {staleResource}},
-		Pagination:     map[string]*resource.PaginationMeta{},
-		Gen:            staleGen,
+		Entries:    map[string]int{targetType: 1},
+		Truncated:  map[string]bool{},
+		Resources:  map[string][]resource.Resource{targetType: {staleResource}},
+		Pagination: map[string]*resource.PaginationMeta{},
+		Gen:        staleGen,
 	}
 	m, _ = rootApplyMsg(m, staleMsg)
 

@@ -495,7 +495,7 @@ func (c *Core) ProbeOriginTypeNames() []string {
 // Disk, Probe, or Fetch: a top-level list fetch REPLACES the probe/disk entry
 // for its type (one RowStore entry per type), so an origin gate here would
 // blind every probe-lane reader (ProbeEnrichment's enricher input,
-// handleEnrichmentChecked's unifiedIssueCount, handleAvailabilityChecked's
+// handleEnrichmentChecked's IssueCount, handleAvailabilityChecked's
 // Wave-2 carry) for exactly the type whose list is open on screen — the
 // open type's Wave-2 findings would silently vanish while every other type
 // enriches normally. Mirrors BuildEnrichQueue's observed-at-all membership

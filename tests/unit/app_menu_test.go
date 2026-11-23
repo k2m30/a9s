@@ -566,9 +566,7 @@ func TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded(t *testing.T) {
 		t.Fatal("AttentionOnly should be true after toggle")
 	}
 
-	// Cold-start: no issue counts seeded.
-	// All types visible EXCEPT ExcludeFromIssueBadge ones, PLUS the permanent
-	// synthetic "costs" entry, which has no issue-badge concept and is never
+	// The synthetic "costs" entry has no issue-badge concept and is never
 	// hidden by the attention-only filter.
 	want := len(allTypes) - excludedCount + 1
 	if len(menu.Entries) != want {

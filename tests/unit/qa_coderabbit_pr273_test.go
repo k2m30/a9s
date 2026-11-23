@@ -19,6 +19,7 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -92,7 +93,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
-			Truncated:    false,
 			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
 			Gen:          0,
@@ -124,7 +124,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 // TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes drives
 // the truncated-zero → authoritative-zero flip for every enricher-backed
 // type. Wave 1 reports issueTruncated=true issues=0 (first-page lower
-// bound); Wave 2 runs clean (Truncated=false, Findings={}). Every
+// bound); Wave 2 runs clean (no row marked, Findings={}). Every
 // enricher-backed type must flip to HIDDEN under ctrl+z.
 func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -152,7 +152,6 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
-			Truncated:    false,
 			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
 			Gen:          0,
@@ -178,7 +177,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 		t.Errorf(
 			"Wave 2 confirmed zero for every enricher-backed type (account-wide authoritative) "+
 				"but these types remain visible under ctrl+z — false positives:\n  %v\n\n"+
-				"Expected: Wave 2 Truncated=false with empty Findings flips the menu from "+
+				"Expected: a Wave 2 answer with no marked row and empty Findings flips the menu from "+
 				"truncated-zero lower-bound to confirmed-zero.\n\nRendered menu:\n%s",
 			stuckVisible, plain,
 		)
@@ -187,15 +186,15 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 
 // TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes pins the
 // partial-error case across every enricher-backed type: one sub-call
-// erred in Wave 2, so the enricher returned Truncated=true with IssueCount=0
-// and empty Findings. The result carries no actual issue — the type must
-// NOT appear under ctrl+z.
-//
-// Affected enrichers (per-resource callers that promote error to truncated):
-// every entry in awsclient.AllWave2(). This test iterates all of them.
+// erred in Wave 2, so the enricher marked a row not inspected with IssueCount=0
+// and empty Findings. On a type that can raise a "!" Wave-2 finding the
+// unread row may hold an issue, so the count is a lower bound: the type stays
+// under ctrl+z with the badge "issues:0+" that says why. On a "~"-only type
+// the count is exact and the type is hidden.
 func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 220})
 
 	entries := map[string]int{}
 	issueCounts := map[string]int{}
@@ -216,12 +215,12 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 		IssueKnown:     issueKnown,
 	})
 
-	// Wave 2: for each enricher-backed type, a sub-call errored → Truncated=true,
-	// but Findings={} and Issues=0 (no actual issue seen).
+	// Wave 2: for each enricher-backed type, a sub-call errored → a row marked
+	// not inspected, but Findings={} and Issues=0 (no actual issue seen).
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
-			Truncated:    true,
+			TruncatedIDs: map[string]string{"unread-1": "GetResourcePolicy"},
 			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
 			Gen:          0,
@@ -232,28 +231,29 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
 	plain := stripANSI(rootViewContent(m))
 
-	var falsePositives []string
+	var wrong []string
+	lowerBounds := 0
 	for _, ent := range awsclient.AllWave2() {
 		td := resource.FindResourceType(ent.ShortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
 		}
-		if strings.Contains(plain, td.Name) {
-			falsePositives = append(falsePositives, ent.ShortName+" ("+td.Name+")")
+		want := declaresBrokenWave2(t, ent.ShortName)
+		if want {
+			lowerBounds++
+		}
+		got := strings.Contains(plain, td.Name+" (")
+		if got != want {
+			wrong = append(wrong, fmt.Sprintf("%s listed=%v, declares a \"!\" Wave-2 finding=%v", ent.ShortName, got, want))
+		} else if got && !strings.Contains(t6DevLineWith(t, plain, td.Name+" ("), "issues:0+") {
+			wrong = append(wrong, ent.ShortName+" listed without the lower-bound badge \"issues:0+\"")
 		}
 	}
-
-	if len(falsePositives) > 0 {
-		t.Errorf(
-			"Wave 2 errored on one sub-call per enricher (Truncated=true, Issues=0, Findings={}) "+
-				"— the enricher saw zero actual issues but set the truncation flag. These types "+
-				"appear under ctrl+z with no issue badge — false positives:\n  %v\n\n"+
-				"Contract: when Wave 2 returns IssueCount=0 AND Findings is empty, Truncated must "+
-				"NOT promote the type into the attention filter. Truncation signals count "+
-				"completeness, not hidden issues — if the enricher had seen an issue, it would "+
-				"have produced a Finding.\n\nRendered menu:\n%s",
-			falsePositives, plain,
-		)
+	if lowerBounds == 0 {
+		t.Fatal("no enricher-backed type declares a \"!\" Wave-2 finding")
+	}
+	if len(wrong) > 0 {
+		t.Errorf("a marked row with no findings lists a type under ctrl+z exactly when its count is a lower bound:\n  %v\n\nRendered menu:\n%s", wrong, plain)
 	}
 }
 
@@ -355,7 +355,6 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 
 	injected := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},

@@ -65,7 +65,6 @@ func driveSweepCompletion(m tui.Model, sweepResources []resource.Resource) (tui.
 		ResourceType: "s3",
 		HasResources: true,
 		Count:        len(sweepResources),
-		Issues:       1,
 		Resources:    sweepResources,
 		Gen:          1,
 	})

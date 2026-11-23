@@ -114,7 +114,6 @@ func rerunEBSResources() []resource.Resource {
 func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.EnrichmentChecked {
 	return messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
@@ -396,7 +395,6 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 	// Simulate stale startup probe: TypeGen=0 (captured before Ctrl+R).
 	staleProbeMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 			"i-0abc2222bbb222222": {{Code: "ec2.instance.status.impaired", Phrase: "instance status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},

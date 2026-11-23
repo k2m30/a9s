@@ -248,21 +248,18 @@ func TestW2RedshiftCapBoundary(t *testing.T) {
 	ssl := map[string]string{"acme-params-open": "false"}
 
 	atCap := w2RedshiftEnrich(t, &w2RedshiftFake{requireSSL: ssl}, clusters[:awsclient.EnrichmentCap]...)
-	if atCap.Truncated {
-		t.Error("exactly EnrichmentCap clusters reported Truncated")
+	if len(atCap.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", atCap.TruncatedIDs)
 	}
 
 	overCap := w2RedshiftEnrich(t, &w2RedshiftFake{requireSSL: ssl}, clusters...)
-	if !overCap.Truncated {
-		t.Error("EnrichmentCap+1 clusters did not report Truncated")
+	if len(overCap.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
 // A per-item failure is itself a reason the issue count is a lower bound, so
-// Truncated must be true even when the cap was never reached. The flag is set
-// by Finish, which runs as an operand of the same return statement that yields
-// the result value; Go does not specify that ordering for non-call operands,
-// so this pins the outcome rather than the mechanism.
+// the failing row is marked even when the cap was never reached.
 func TestW2RedshiftFailureAloneRaisesTruncated(t *testing.T) {
 	fake := &w2RedshiftFake{
 		clusterErrs: map[string]error{
@@ -276,8 +273,8 @@ func TestW2RedshiftFailureAloneRaisesTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected a composite error for the denied cluster")
 	}
-	if !res.Truncated {
-		t.Error("a failed item left Truncated false; the issue count is presented as complete when it is a lower bound")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

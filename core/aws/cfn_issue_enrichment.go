@@ -37,7 +37,6 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	if clients.CloudFormation == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -63,7 +62,6 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
 			return
 		}
 		var failedRows []domain.DetailRow
@@ -108,7 +106,6 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeStackEvents", failures, total))
 }
 
@@ -163,7 +160,6 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	if clients.CloudFormation == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -189,7 +185,6 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
 			return
 		}
 		if len(out.Stacks) == 0 {
@@ -214,6 +209,5 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeStacks", failures, total))
 }

@@ -27,8 +27,8 @@ const (
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
 // to surface missing DLQ and missing KMS encryption as Wave 2 findings.
-// Per-queue errors set Truncated=true + TruncatedIDs[id]=true for the affected
-// queue (per-row `?` marker) AND aggregate into the returned composite error
+// A per-queue error marks the queue not inspected (per-row `?` marker) AND
+// aggregates into the returned composite error
 // via AggregateFailures so the operator sees the failure in the error log (!).
 // Partial findings are returned alongside the composite error on partial fail.
 func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {

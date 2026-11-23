@@ -364,14 +364,15 @@ func (AvailabilityCacheLoaded) isEvent() {}
 // AvailabilityCacheLoaded it does NOT trigger background probes — all counts
 // are already populated.
 type AvailabilityPrefetched struct {
-	Entries        map[string]int                      // shortName -> resource count
-	Truncated      map[string]bool                     // shortName -> true if truncated
-	IssueCounts    map[string]int                      // shortName -> issue-status resource count
-	IssueTruncated map[string]bool                     // shortName -> true if issue count is lower bound
-	Resources      map[string][]resource.Resource      // shortName -> retained first-page resources for Wave 2
-	Pagination     map[string]*resource.PaginationMeta // shortName -> full pagination meta (NextToken, etc.) for cache seeding
-	Errs           map[string]error                    // shortName -> the error its rows arrived with
-	Gen            domain.Gen                          // availabilityGen captured at dispatch — stale if != current
+	Entries   map[string]int  // shortName -> resource count
+	Truncated map[string]bool // shortName -> true if truncated
+	// Resources are the retained first-page rows per type, for Wave 2 and
+	// for the menu's issue badge, which is counted over them once they are
+	// stored.
+	Resources  map[string][]resource.Resource
+	Pagination map[string]*resource.PaginationMeta // shortName -> full pagination meta (NextToken, etc.) for cache seeding
+	Errs       map[string]error                    // shortName -> the error its rows arrived with
+	Gen        domain.Gen                          // availabilityGen captured at dispatch — stale if != current
 	// PrefetchErr is the composite error aggregating HARD per-type fetch
 	// failures (the type yielded no rows) during the synchronous availability
 	// prefetch. Non-nil when any paginated fetcher errored row-less; the app
@@ -406,7 +407,6 @@ type AvailabilityChecked struct {
 	Truncated    bool                // true if count is from a truncated first page
 	Err          error               // non-nil means "couldn't check" -- treat as unknown, don't grey out
 	Gen          domain.Gen          // generation counter -- ignore if != current availabilityGen
-	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
 	Resources    []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
 	// Duration is the wall time ExecuteTaskAt spent inside
 	// ProbeResourceAvailability for this probe (runtime.ProbeStatus.Duration).
@@ -421,7 +421,6 @@ func (AvailabilityChecked) AcceptZeroGen() bool    { return false } // Availabil
 // EnrichmentChecked reports one resource type's Wave 2 enrichment result.
 type EnrichmentChecked struct {
 	ResourceType string
-	Truncated    bool // whether the enrichment count is a lower bound
 	// Findings carries every independently-evaluated Wave-2 Finding per
 	// Resource.ID (IssueEnricherResult.Findings, unfiltered), keyed by
 	// resource.Resource.ID. Populated on success AND on partial-success (Err
@@ -429,10 +428,9 @@ type EnrichmentChecked struct {
 	// off-page (account-wide enrichers). A resource with more than one
 	// independently-evaluated condition carries every one of them — the
 	// row-level fold (applyEnrichment/ApplyWave2ToRow) uses this so a
-	// multi-condition resource retains every Finding on its cached row,
-	// unifiedIssueCount uses this to count a resource once if ANY entry is
-	// SevBroken, and PatchDetail.EnrichmentFindings is built from this so
-	// every independently-evaluated finding reaches an already-open detail.
+	// multi-condition resource retains every Finding on its cached row, and
+	// PatchDetail.EnrichmentFindings is built from this so every
+	// independently-evaluated finding reaches an already-open detail.
 	// A render-boundary consumer that needs a single representative (a row's
 	// one-character glyph) reduces via domain.WorstSeverityFinding — never
 	// stored pre-reduced here.

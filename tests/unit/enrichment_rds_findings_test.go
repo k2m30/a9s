@@ -139,7 +139,7 @@ func TestEnrichDBIMaintenance_SummaryFormat(t *testing.T) {
 
 // TestEnrichDBIMaintenance_OffInputFindingsAreSkipped verifies that findings
 // for resources NOT in the input slice are dropped. Emitting them would
-// inflate unifiedIssueCount above the visible row count — e.g. an instance ARN
+// inflate IssueCount above the visible row count — e.g. an instance ARN
 // not present in the probed dbi list must not produce a finding keyed by an
 // ID that doesn't correspond to any visible row, surfacing as
 // "DB Instances (1) issues:2".

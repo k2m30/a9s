@@ -11,6 +11,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ebsStatusFake satisfies the EC2API subset needed by EnrichEBSVolumeStatus.
@@ -149,8 +150,9 @@ func TestEnrichEBSVolumeStatus_MultipleImpairedVolumes_AllKeyedInFindings(t *tes
 	}
 }
 
-// TestEnrichEBSVolumeStatus_TruncatedWhenNextTokenPresent verifies Truncated=true
-// when the API response includes a NextToken.
+// TestEnrichEBSVolumeStatus_TruncatedWhenNextTokenPresent verifies that a walk
+// whose every page carries a NextToken stops at the cap and marks a volume no
+// walked page named.
 func TestEnrichEBSVolumeStatus_TruncatedWhenNextTokenPresent(t *testing.T) {
 	out := &ec2.DescribeVolumeStatusOutput{
 		VolumeStatuses: []ec2types.VolumeStatusItem{
@@ -160,12 +162,13 @@ func TestEnrichEBSVolumeStatus_TruncatedWhenNextTokenPresent(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
+	unseen := resource.Resource{ID: "vol-unseen", Name: "vol-unseen"}
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, []resource.Resource{unseen}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when NextToken is non-nil")
+	if got := result.TruncatedIDs[unseen.ID]; got != awsclient.CheckCap {
+		t.Errorf("TruncatedIDs[%s] = %q, want %q", unseen.ID, got, awsclient.CheckCap)
 	}
 }
 

@@ -195,8 +195,9 @@ type ResourceTypeDef struct {
 	// configuration calls land in its home Region. Empty string (including a
 	// nil function) means the session Region.
 	CloudTrailRegion func(domain.Resource) string
-	// ExcludeFromIssueBadge, when true, excludes this type from the main-menu
-	// badge count while still coloring rows and honoring ctrl+z.
+	// ExcludeFromIssueBadge, when true, draws no issue number for this type on
+	// the menu badge or the list title; its rows are colored, counted and kept
+	// by ctrl+z like any type's. Read only through runtime.ShowsIssueBadge.
 	ExcludeFromIssueBadge bool
 	// StubCreator optionally creates a minimal stub Resource for the given ID
 	// when the target is not yet in the resource cache.

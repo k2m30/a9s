@@ -173,12 +173,12 @@ func TestW2DBISnapCapBoundary(t *testing.T) {
 	}
 
 	atCap := w2DBISnapEnrich(t, &w2DBISnapAttrFake{sharedWith: shared}, ids[:awsclient.EnrichmentCap]...)
-	if atCap.Truncated {
-		t.Error("exactly EnrichmentCap snapshots reported Truncated")
+	if len(atCap.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", atCap.TruncatedIDs)
 	}
 
 	overCap := w2DBISnapEnrich(t, &w2DBISnapAttrFake{sharedWith: shared}, ids...)
-	if !overCap.Truncated {
-		t.Error("EnrichmentCap+1 snapshots did not report Truncated")
+	if len(overCap.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

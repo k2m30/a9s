@@ -228,9 +228,6 @@ func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 		t.Errorf("failure line %q does not name the table it could not read", err)
 	}
 
-	if result.Truncated {
-		t.Errorf("Truncated = true, want false: ddb is a \"~\"-only enricher, so a sub-call error marks the row via TruncatedIDs, never the aggregate issue badge")
-	}
 	if _, marked := result.TruncatedIDs[errorTableID]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false, want true (error on this table)", errorTableID)
 	}

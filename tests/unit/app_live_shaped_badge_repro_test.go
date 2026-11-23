@@ -72,7 +72,7 @@ func liveShapedBadgeReproS3Resources(n int) []resource.Resource {
 // shape EnrichmentChecked.Findings carries in production
 // (core/runtime/handlers_availability.go handleEnrichmentChecked).
 //
-// Severity is SevBroken: unifiedIssueCount (core/runtime/handlers_availability.go)
+// Severity is SevBroken: IssueCount (core/runtime/issue_class.go)
 // counts only SevBroken findings toward the "!" badge, so a SevWarn fixture
 // would give a count of 0.
 func liveShapedBadgeReproWave2Findings(n int) map[string][]domain.Finding {
@@ -148,8 +148,8 @@ func TestLiveShapedBadgeRepro_S3_SurvivesEscapeToMenu(t *testing.T) {
 	findings := liveShapedBadgeReproWave2Findings(4)
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Truncated:    true,
 		Findings:     findings,
+		TruncatedIDs: map[string]string{buckets[4].ID: "GetBucketPolicy"},
 		Gen:          0,
 		TypeGen:      0,
 	})
@@ -218,7 +218,6 @@ func TestLiveShapedBadgeRepro_S3_LateDiskCacheReplayDoesNotClobberFreshBadge(t *
 	findings := liveShapedBadgeReproWave2Findings(4)
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Truncated:    true,
 		Findings:     findings,
 		Gen:          0,
 		TypeGen:      0,

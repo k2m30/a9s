@@ -89,7 +89,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return key
 	}
 
-	allActions, pages, cut, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow, clusterKeyOf,
+	allActions, pages, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow, clusterKeyOf,
 		func(token *string) ([]docdbtypes.ResourcePendingMaintenanceActions, *string, error) {
 			out, err := clients.DocDB.DescribePendingMaintenanceActions(ctx, &docdb.DescribePendingMaintenanceActionsInput{Marker: token})
 			if err != nil {
@@ -146,7 +146,6 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, rows)
 	}
 
-	SetTruncated(&result, cut)
 	return result, errors.Join(tagErr, AggregateFailures("DescribePendingMaintenanceActions", failures, pages))
 }
 

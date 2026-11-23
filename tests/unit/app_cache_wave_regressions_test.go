@@ -8,7 +8,7 @@
 //     before any refetch lands.
 //  3. A row whose only finding is a non-badge Wave-2 "~" (SevWarn) finding
 //     does not count in listIssueCount/GetListIssueCount, so the list frame
-//     title matches the menu badge's unifiedIssueCount.
+//     title matches the menu badge's IssueCount.
 package unit_test
 
 import (
@@ -141,9 +141,9 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 }
 
 // Per docs/attention-signals.md, "~" findings do not bump the issue count.
-// colorEC2 derives color from findings only, so once runtime.Wave1Only strips
+// colorEC2 derives color from findings only, so once stripping Wave-2 findings strips
 // the lone Wave-2 warn no issue signal remains, and the list frame title
-// matches the menu badge's unifiedIssueCount.
+// matches the menu badge's IssueCount.
 func TestGetListIssueCount_LoneWave2Warn_NotCounted(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
@@ -175,7 +175,7 @@ func TestGetListIssueCount_LoneWave2Warn_NotCounted(t *testing.T) {
 
 	got := ctrl.GetListIssueCount()
 	if got != 0 {
-		t.Errorf("GetListIssueCount() = %d, want 0 — a lone Wave-2 \"~\" (SevWarn) finding must not bump the count (docs/attention-signals.md S1); Wave1Only strips it and colorEC2 reads no other signal", got)
+		t.Errorf("GetListIssueCount() = %d, want 0 — a lone Wave-2 \"~\" (SevWarn) finding must not bump the count (docs/attention-signals.md S1); the Wave-2 strip removes it and colorEC2 reads no other signal", got)
 	}
 
 	title := ctrl.ListFrameTitle()

@@ -51,9 +51,13 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 
 	var streamsErr error
 	var streamFailures []Failure
-	groups := fieldOnlyCap(resources)
-	if hasStreams {
-		streamsErr = ForEachParallel(ctx, len(groups), EnrichmentParallelism, func(i int) {
+	groups := fieldOnlyCap(&result, resources, resourceIDsOf)
+	if !hasStreams {
+		for _, r := range groups {
+			markUnreached(&result, r.ID)
+		}
+	} else {
+		streamsErr = forEachFieldRow(ctx, &result, resourceIDs(groups), EnrichmentParallelism, func(i int) {
 			r := groups[i]
 			name := logGroupNameOf(r)
 			if name == "" {
@@ -136,7 +140,6 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		})
 	})
 
-	MarkInformationalOnly(&result)
 	return result, errors.Join(streamsErr, AggregateFailures("DescribeLogStreams", streamFailures, len(groups)), loopErr, AggregateFailures("DescribeMetricFilters", failures, len(audit)))
 }
 

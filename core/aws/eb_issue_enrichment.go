@@ -95,7 +95,6 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		setWave2Finding(&result, key, ebCodeEnvironmentCauses, rows)
 	})
 	settingsErr := ebConfigurationPosture(ctx, clients, &result, resources)
-	MarkInformationalOnly(&result)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeEnvironmentHealth", failures, n), settingsErr)
 }
 

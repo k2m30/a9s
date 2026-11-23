@@ -76,7 +76,6 @@ func TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment(t *testing.T) {
 	// it regardless of the real EnrichmentTypeGen value.
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Truncated:    false,
 		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
 		TypeGen:      1,

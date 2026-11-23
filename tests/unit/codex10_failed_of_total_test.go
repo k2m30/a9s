@@ -278,8 +278,12 @@ func TestEnrichECRRepository_ReadablePostureReportsNoFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a posture pass that read both policies must report no failure; got: %v", err)
 	}
-	if result.Truncated {
-		t.Error("a fully read repository must not be marked data-incomplete")
+	// The session names no own account here, so the cross-account check marks
+	// the row for that; no read the pass made is what left it uninspected.
+	for id, check := range result.TruncatedIDs {
+		if check != awsclient.CheckOwnAccountUnknown {
+			t.Errorf("%s marked %q after both policies were read", id, check)
+		}
 	}
 }
 

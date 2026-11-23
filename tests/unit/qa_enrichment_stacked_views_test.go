@@ -61,7 +61,6 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 
 	enrichMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"db-stacked-a-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevBroken, Source: "wave2:rds"}},
 		},
@@ -147,7 +146,6 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 
 	enrichMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"db-stacked-a-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update on A", Severity: domain.SevBroken, Source: "wave2:rds"}},
 			"db-stacked-b-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: minor-version-upgrade on B", Severity: domain.SevWarn, Source: "wave2:rds"}},

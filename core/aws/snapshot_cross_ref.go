@@ -325,5 +325,5 @@ func enrichSnapshotPublicShare(
 		setWave2Finding(result, res.ID, cfg.PublicCode, []domain.DetailRow{{Label: "Restore", Value: "all", Tier: tierOf(cfg.PublicCode)}})
 
 	})
-	return errors.Join(loopErr, Finish(result, failures, n, "snapshot share attributes"))
+	return errors.Join(loopErr, AggregateFailures("snapshot share attributes", failures, n))
 }

@@ -194,7 +194,7 @@ func TestEnrichSNSSubscriptions_NilClientReturnsEmptyFindingsNoError(t *testing.
 }
 
 // sns is a "~"-only enricher (IssueCount is always 0), so a coverage gap
-// never lower-bounds the issue badge: Truncated stays false.
+// never lower-bounds the issue badge.
 func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("sns: ListSubscriptionsByTopic throttled")
 	topic1 := snsARNFor("my-topic-1")
@@ -220,9 +220,6 @@ func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T
 	}
 	if _, ok := result.Findings[topic1]; ok {
 		t.Error("my-topic-1 must NOT have a finding when the API call fails")
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: sns is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, marked := result.TruncatedIDs[topic1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the ListSubscriptionsByTopic error must mark that topic's row with a \"?\" coverage gap", topic1)

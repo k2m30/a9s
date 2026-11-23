@@ -216,14 +216,14 @@ func TestEnrichGlueJobStatus_MultipleFailedJobs_AllKeyedInFindings(t *testing.T)
 	}
 }
 
-// TestEnrichGlueJobStatus_TruncatedWhenResourcesExceedCap verifies Truncated=true.
+// TestEnrichGlueJobStatus_TruncatedWhenResourcesExceedCap verifies the rows past the cap are marked not inspected.
 func TestEnrichGlueJobStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	count := awsclient.EnrichmentCap + 1
 	resources := make([]resource.Resource, count)
 	jobRuns := make(map[string]gluetypes.JobRunState, count)
 	for i := range count {
 		name := fmt.Sprintf("glue-job-%03d", i)
-		resources[i] = resource.Resource{Name: name}
+		resources[i] = resource.Resource{ID: name, Name: name}
 		jobRuns[name] = gluetypes.JobRunStateSucceeded
 	}
 	fake := &glueJobFake{jobRuns: jobRuns}
@@ -233,9 +233,8 @@ func TestEnrichGlueJobStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Errorf("Truncated must be true when len(resources)=%d > EnrichmentCap=%d",
-			count, awsclient.EnrichmentCap)
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

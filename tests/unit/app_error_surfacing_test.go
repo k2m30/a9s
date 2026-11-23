@@ -69,11 +69,9 @@ func TestEnrichmentCheckedMsg_ErrorEmitsFlash(t *testing.T) {
 func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
 	m := newTestModel(t)
 	errMsg := messages.AvailabilityPrefetched{
-		Entries:        map[string]int{},
-		Truncated:      map[string]bool{},
-		IssueCounts:    map[string]int{},
-		IssueTruncated: map[string]bool{},
-		Resources:      map[string][]resource.Resource{},
+		Entries:   map[string]int{},
+		Truncated: map[string]bool{},
+		Resources: map[string][]resource.Resource{},
 		// Stamp the live AvailabilityGen — the staleness guard
 		// drops zero-stamped prefetches (AcceptZeroGen=false).
 		Gen:         m.Core().Session().AvailabilityGen,
@@ -98,11 +96,9 @@ func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
 func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
 	m := newTestModel(t)
 	cleanMsg := messages.AvailabilityPrefetched{
-		Entries:        map[string]int{},
-		Truncated:      map[string]bool{},
-		IssueCounts:    map[string]int{},
-		IssueTruncated: map[string]bool{},
-		Resources:      map[string][]resource.Resource{},
+		Entries:   map[string]int{},
+		Truncated: map[string]bool{},
+		Resources: map[string][]resource.Resource{},
 		// Stamp the live AvailabilityGen — the staleness guard
 		// drops zero-stamped prefetches (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,

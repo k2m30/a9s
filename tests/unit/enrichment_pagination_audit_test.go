@@ -215,9 +215,9 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 		t.Errorf("ListBackupJobs called %d times, want 2 (one per page)", fake.callCount)
 	}
 
-	// Truncated must be false — both pages were fully consumed.
-	if result.Truncated {
-		t.Errorf("result.Truncated = true, want false (both pages consumed)")
+	// Both pages were fully consumed, so no row is left unanswered.
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 
 	// 5 failed jobs on page 1 → 5 findings (each distinct plan-failed-N key).
@@ -244,7 +244,7 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 
 // TestEnrichBackupJobs_CapsAtEnrichmentCap verifies that when ListBackupJobs
 // always returns NextToken (simulating an enormous account), the enricher
-// stops after EnrichmentCap pages and sets result.Truncated = true.
+// stops after EnrichmentCap pages and marks the row it never reached.
 func TestEnrichBackupJobs_CapsAtEnrichmentCap(t *testing.T) {
 	pages := make([]*backupsdk.ListBackupJobsOutput, awsclient.EnrichmentCap+2)
 	for i := range pages {
@@ -263,7 +263,7 @@ func TestEnrichBackupJobs_CapsAtEnrichmentCap(t *testing.T) {
 	fake := newBackupPaginatedFake(pages...)
 
 	clients := &awsclient.ServiceClients{Backup: fake}
-	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, backupResources(), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, []resource.Resource{{ID: "plan-cap-0", Name: "plan-cap-0"}}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,8 +272,8 @@ func TestEnrichBackupJobs_CapsAtEnrichmentCap(t *testing.T) {
 		t.Errorf("ListBackupJobs called %d times, want at most %d (EnrichmentCap)", fake.callCount, awsclient.EnrichmentCap)
 	}
 
-	if !result.Truncated {
-		t.Errorf("result.Truncated = false, want true (walk capped at EnrichmentCap pages)")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
@@ -313,9 +313,9 @@ func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
 		t.Errorf("DescribeInstanceStatus called %d times, want 2 (one per page)", fake.instanceStatusCallCount)
 	}
 
-	// Truncated must be false — both pages fully consumed.
-	if result.Truncated {
-		t.Errorf("result.Truncated = true, want false (both pages consumed)")
+	// Both pages were fully consumed, so no row is left unanswered.
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 
 	wantFindings := len(p1Impaired) + len(p2Impaired)
@@ -337,7 +337,7 @@ func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
 
 // TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap verifies that when
 // DescribeInstanceStatus always returns NextToken the enricher stops after
-// EnrichmentCap pages and sets result.Truncated = true.
+// EnrichmentCap pages and marks the row it never reached.
 func TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap(t *testing.T) {
 	pages := make([]*ec2sdk.DescribeInstanceStatusOutput, awsclient.EnrichmentCap+2)
 	for i := range pages {
@@ -351,7 +351,7 @@ func TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap(t *testing.T) {
 	fake.instanceStatusPages = pages
 
 	clients := &awsclient.ServiceClients{EC2: fake}
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, ec2InstanceResources(), nil)
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, ec2InstanceResources("i-0cap000000000001"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -361,8 +361,8 @@ func TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap(t *testing.T) {
 			fake.instanceStatusCallCount, awsclient.EnrichmentCap)
 	}
 
-	if !result.Truncated {
-		t.Errorf("result.Truncated = false, want true (walk capped at EnrichmentCap pages)")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
@@ -401,9 +401,13 @@ func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 		t.Errorf("DescribeVolumeStatus called %d times, want 2 (one per page)", fake.volumeStatusCallCount)
 	}
 
-	// Truncated must be false — both pages fully consumed.
-	if result.Truncated {
-		t.Errorf("result.Truncated = true, want false (both pages consumed)")
+	// Both pages were fully consumed, so the walk left no row at its cap. The
+	// backup-coverage check marks every row here because no backup list is
+	// loaded; that mark is not the walk's.
+	for id, check := range result.TruncatedIDs {
+		if check == awsclient.CheckCap {
+			t.Errorf("%s marked at the cap after a complete walk", id)
+		}
 	}
 
 	wantFindings := len(p1Degraded) + len(p2Degraded)
@@ -425,7 +429,7 @@ func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 
 // TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap verifies that when
 // DescribeVolumeStatus always returns NextToken the enricher stops after
-// EnrichmentCap pages and sets result.Truncated = true.
+// EnrichmentCap pages and marks the row it never reached.
 func TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap(t *testing.T) {
 	pages := make([]*ec2sdk.DescribeVolumeStatusOutput, awsclient.EnrichmentCap+2)
 	for i := range pages {
@@ -439,7 +443,7 @@ func TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap(t *testing.T) {
 	fake.volumeStatusPages = pages
 
 	clients := &awsclient.ServiceClients{EC2: fake}
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, ebsVolumeResources(), nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, ebsVolumeResources("vol-0cap000000000001"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -449,8 +453,8 @@ func TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap(t *testing.T) {
 			fake.volumeStatusCallCount, awsclient.EnrichmentCap)
 	}
 
-	if !result.Truncated {
-		t.Errorf("result.Truncated = false, want true (walk capped at EnrichmentCap pages)")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

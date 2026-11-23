@@ -17,7 +17,9 @@ import (
 // A degraded row is a Warning row the badge already counts, so a check left
 // unrun on it cannot make the count short: after the Wave-2 sweep, no type
 // whose demo list carries degraded rows shows its issue badge as a lower
-// bound.
+// bound. The demo's ng list is the exception for another reason: ListNodegroups
+// is refused for one cluster (fixtures.EKS DeniedNodegroupListClusters), so the
+// stored list lacks that cluster's node groups and its count is a lower bound.
 func TestT577Dev_DegradedRowsNeverOpenTheBadge(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	clients := demo.NewServiceClients()
@@ -37,14 +39,15 @@ func TestT577Dev_DegradedRowsNeverOpenTheBadge(t *testing.T) {
 	view := (&fullIntegrationScenario{t: t, model: m}).currentView()
 	for _, short := range []string{"sqs", "cb", "ecs", "ecs-svc", "ecs-task", "kms", "athena", "eks", "ng", "ddb", "mwaa", "transfer", "opensearch", "lt"} {
 		rt := resource.FindResourceType(short)
+		wantLowerBound := short == "ng"
 		found := false
 		for _, line := range strings.Split(view, "\n") {
 			if !strings.Contains(line, rt.Name+" (") {
 				continue
 			}
 			found = true
-			if _, badge, ok := strings.Cut(line, " issues:"); !ok || strings.Contains(strings.Fields(badge)[0], "+") {
-				t.Errorf("%s after the sweep: %s", short, strings.TrimSpace(line))
+			if _, badge, ok := strings.Cut(line, " issues:"); !ok || strings.Contains(strings.Fields(badge)[0], "+") != wantLowerBound {
+				t.Errorf("%s after the sweep (lower bound wanted %v): %s", short, wantLowerBound, strings.TrimSpace(line))
 			}
 		}
 		if !found {

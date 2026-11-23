@@ -189,8 +189,8 @@ func TestW4KMSPublicPolicyBeyondCapIsTruncated(t *testing.T) {
 	}
 	res := w4EnrichKMS(t, &w4KMSFake{policies: policies}, rs)
 
-	if !res.Truncated {
-		t.Errorf("Truncated = false with %d keys and a cap of %d", len(rs), awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

@@ -245,8 +245,7 @@ func TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFind
 // API call for cluster-1 returns an error, the enricher marks that
 // cluster's row via TruncatedIDs, produces 0 findings for that cluster, and
 // returns a composite error containing the enricher prefix and the failing
-// cluster ARN. msk only ever emits "~" (informational) findings, so the
-// aggregate Truncated flag must stay false — a coverage gap never
+// cluster ARN. msk only ever emits "~" (informational) findings, so a coverage gap never
 // lower-bounds the issue badge.
 func TestEnrichMSKCluster_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("kafka: DescribeClusterV2 throttled")
@@ -279,9 +278,6 @@ func TestEnrichMSKCluster_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: msk only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, marked := result.TruncatedIDs[mskName1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the DescribeClusterV2 error must mark that cluster's row with a \"?\" coverage gap", mskName1)

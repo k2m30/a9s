@@ -10,9 +10,9 @@ package runtime
 
 import (
 	"maps"
-	"slices"
 	"time"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/logging"
@@ -265,27 +265,20 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			Origin: OriginVerified,
 		})
 	}
-	for shortName, count := range msg.IssueCounts {
-		intents = append(intents, PatchMenu{
-			ResourceType: shortName,
-			Issues:       count,
-			Truncated:    msg.IssueTruncated[shortName],
-		})
-	}
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // signal "done"
 
 	// Retain prefetch resources for Wave-2 enrichment. Fetcher-emitted rows
 	// already carry Findings, and ObserveRows below is this write's only
 	// destination. A synchronous prefetch is a live, full result —
 	// OriginFetch, wholesale replace.
-	if msg.Resources != nil {
-		for rt, resources := range msg.Resources {
-			pageMeta := msg.Pagination[rt]
-			if pageMeta == nil {
-				pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
-			}
-			c.ObserveFetchResult(rt, resource.FetchResult{Resources: resources, Pagination: pageMeta}, msg.Errs[rt], session.OriginFetch, false)
+	for rt, resources := range msg.Resources {
+		pageMeta := msg.Pagination[rt]
+		if pageMeta == nil {
+			pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
 		}
+		c.ObserveFetchResult(rt, resource.FetchResult{Resources: resources, Pagination: pageMeta}, msg.Errs[rt], session.OriginFetch, false)
+		issues, lowerBound := c.issueBadge(resource.CanonicalShortName(rt))
+		intents = append(intents, PatchMenu{ResourceType: rt, Issues: issues, Truncated: lowerBound})
 	}
 
 	enrichIntents, enrichTasks := c.startEnrichment()
@@ -327,7 +320,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// hard-failed probe still needs to be visible via Core.ScanStatus.
 	outcome, errClass := availabilityOutcome(c, canon, len(msg.Resources) > 0, msg.Truncated, msg.Err)
 	// This probe IS the new Wave-1 baseline: aggregate == baseline.
-	c.setProbeStatus(canon, outcome, msg.Duration, errClass, time.Now(), outcome, msg.Duration, errClass)
+	c.setProbeStatus(canon, outcome, msg.Duration, errClass, time.Now(), outcome, msg.Duration, errClass, false)
 
 	var intents []UIIntent
 	var tasks []TaskRequest
@@ -354,11 +347,6 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			// prior Count/Truncated.
 			Origin: OriginVerified,
 		})
-		intents = append(intents, PatchMenu{
-			ResourceType: canon,
-			Issues:       msg.Issues,
-			Truncated:    msg.Truncated,
-		})
 
 		// Retain probe resources for Wave-2 enrichment. Fetcher-emitted rows
 		// already carry Findings.
@@ -376,6 +364,8 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		previous, _ := c.ProbeResources(canon)
 		freshResources := carryWave2ForResources(previous, msg.Resources, issueEnricherFieldKeysFor(canon))
 		c.ObserveFetchResult(canon, resource.FetchResult{Resources: freshResources, Pagination: &resource.PaginationMeta{IsTruncated: msg.Truncated}}, msg.Err, session.OriginProbe, false)
+		issues, lowerBound := c.issueBadge(canon)
+		intents = append(intents, PatchMenu{ResourceType: canon, Issues: issues, Truncated: lowerBound})
 	}
 
 	// Surface probe failures. A soft failure records into the `!` error log
@@ -676,6 +666,16 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// errored, otherwise the baseline's own classification is kept. The
 	// baseline fields themselves pass through unchanged, so a later rerun
 	// folds from the same Wave-1 observation, not from this rerun's result.
+	// An answer for nobody is not a verdict that this type is clean, so
+	// nothing it touches may be treated as a Wave-2 answer — the rows keep the
+	// findings they are rendering, the type stays out of this sweep's
+	// authoritative save, and the menu badge stands until a probe actually
+	// answers (a marked, stale answer beats a confidently wrong clean one).
+	nobody := answeredNobody(awsclient.IssueEnricherResult{Findings: msg.Findings, FieldUpdates: msg.FieldUpdates, TruncatedIDs: msg.TruncatedIDs}, msg.Err)
+	if !nobody {
+		msg = c.keepRowAnswers(msg)
+	}
+
 	prevStatus, _ := c.session.GetProbeStatus(msg.ResourceType)
 	enrichErrClass := classifyProbeErr(msg.Err)
 	aggErr := enrichErrClass
@@ -684,11 +684,12 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	}
 	c.setProbeStatus(
 		msg.ResourceType,
-		degradeForEnrichment(ProbeOutcome(prevStatus.AvailOutcome), msg.Err, msg.Truncated),
+		degradeForEnrichment(ProbeOutcome(prevStatus.AvailOutcome), msg.Err != nil, len(msg.TruncatedIDs) > 0),
 		prevStatus.AvailDuration+msg.Duration,
 		aggErr,
 		time.Now(),
 		ProbeOutcome(prevStatus.AvailOutcome), prevStatus.AvailDuration, prevStatus.AvailErr,
+		msg.Err != nil,
 	)
 
 	var intents []UIIntent
@@ -702,15 +703,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 	}
 
-	// A probe that came back empty-handed with an error answered for nobody:
-	// no findings, no field updates, no per-id truncation list. It is not a
-	// verdict that this type is clean, so nothing it touches may be treated
-	// as a Wave-2 answer — the rows keep the findings they are rendering,
-	// the type stays out of this sweep's authoritative save, and the menu
-	// badge stands until a probe actually answers (a marked, stale answer
-	// beats a confidently wrong clean one).
-	answeredNobody := msg.Err != nil && len(msg.Findings) == 0 && len(msg.FieldUpdates) == 0 && len(msg.TruncatedIDs) == 0
-	if answeredNobody {
+	if nobody {
 		intents = append(intents, PatchMenuEnrichProgress{
 			Checked: c.session.EnrichChecked,
 			Total:   c.session.EnrichTotal,
@@ -720,7 +713,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 	{
 		c.session.EnrichmentRanSet(msg.ResourceType)
-		msg = c.keepRowAnswers(msg)
 
 		if c.session.EnrichmentTruncatedIDs == nil {
 			c.session.EnrichmentTruncatedIDs = make(map[string]map[string]string)
@@ -764,24 +756,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			})
 		}
 
-		// td is never nil here in practice: every TaskKindProbeEnrich task is
-		// scoped to a ResourceType that already passed a FindResourceType != nil
-		// check at dispatch time (HandleResourcesLoaded's list-open branch,
-		// startEnrichment's queue, and this handler's own canonicalization
-		// above), and unifiedIssueCount needs *td (ExcludeFromIssueBadge,
-		// ResolveColor) to compute anything meaningful — there is no
-		// findings-only fallback that would produce a comparable count. The nil
-		// guard stays only to avoid a *td panic on a malformed/unresolvable
-		// message; unified simply stays 0 in that unreached case.
-		td := resource.FindResourceType(msg.ResourceType)
-		var unified int
-		rows, _ := c.ProbeResources(msg.ResourceType)
-		if td != nil {
-			unified = unifiedIssueCount(rows, *td)
-		}
-
-		c.session.EnrichmentCutSet(msg.ResourceType, msg.Truncated)
-		issueTruncated := issueLowerBound(msg.ResourceType, c.pageTruncated(msg.ResourceType), msg.Truncated, unified > 0 || len(allFindings) > 0, uncountedMarks(msg.ResourceType, rows, msg.TruncatedIDs))
+		unified, issueTruncated := c.issueBadge(msg.ResourceType)
 
 		intents = append(intents, PatchMenu{
 			ResourceType: msg.ResourceType,
@@ -957,52 +932,17 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	return out
 }
 
-// unifiedIssueCount returns the distinct count of resources with ≥1
-// SevBroken-equivalent issue: a Wave-1 structural/wave1-Finding color of
-// ColorBroken/ColorWarning (IsIssue()), or ANY Wave-2 SevBroken finding folded
-// onto the row — so a resource counts once even when it carries more than one
-// independently-evaluated Wave-2 condition. Never a SevWarn Wave-2 finding.
-//
-// The single counter behind every issue number the operator can see or
-// reload: the menu badge, the list title, and the count each save projects
-// onto disk. It reads the rows' own Wave-2 findings and nothing else, so the
-// badge counts exactly what the list renders: a finding a result carried but
-// the fold did not land on a row is a finding no row shows.
-func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef) int {
-	if td.ExcludeFromIssueBadge {
-		return 0
-	}
-	// Count per resource, not per ID: two DISTINCT resources that share an ID
-	// (e.g. two ACM certs for one domain — ACM keys on the domain name) must
-	// each bump the badge, matching the list title (listIssueCount counts per
-	// row). A resource issue-colored by Wave-1 is counted and `continue`d so a
-	// Wave-2 finding on the same resource never double-counts it.
-	count := 0
-	for _, r := range wave1Resources {
-		if countsAsIssue(r, td) {
-			count++
-		}
-	}
-	return count
-}
-
-func countsAsIssue(r resource.Resource, td resource.ResourceTypeDef) bool {
-	return td.ResolveColor(Wave1Only(r)).IsIssue() || slices.ContainsFunc(r.Findings, func(f domain.Finding) bool {
-		return f.Severity == domain.SevBroken && f.IsWave2Sourced()
-	})
-}
-
 // uncountedMarks counts the rows marked not inspected that the badge does not
 // already count: a check left unrun on a row the badge counts cannot make the
 // count short. A mark naming no row in rows is counted.
 func uncountedMarks(shortName string, rows []resource.Resource, marks map[string]string) int {
 	td := resource.FindResourceType(shortName)
-	if td == nil || td.ExcludeFromIssueBadge {
+	if td == nil {
 		return len(marks)
 	}
 	counted := make(map[string]bool, len(rows))
 	for _, r := range rows {
-		if countsAsIssue(r, *td) {
+		if IsIssueRow(*td, r) {
 			counted[r.ID] = true
 		}
 	}
@@ -1015,57 +955,36 @@ func uncountedMarks(shortName string, rows []resource.Resource, marks map[string
 	return n
 }
 
-// Wave1Only returns a copy of r with every Wave-2-sourced Finding
-// (Finding.IsWave2Sourced()) stripped, so a Color func reading
-// r.Findings (colorFromAnyFinding and friends) sees only wave1-sourced
-// signal — never a merged Wave-2 SevWarn/SevBroken finding. Wave-2's own
-// contribution to the badge is folded in separately from the live findings
-// map, which is why this copy must not leak wave2 Findings into ResolveColor.
-//
-// Exported because both issue-count surfaces — the menu badge (unifiedIssueCount)
-// and the list title (Controller.listIssueCount) — must strip Wave-2 the same
-// way per docs/attention-signals.md ("~ findings do not bump"), so the two
-// counts cannot drift.
-func Wave1Only(r resource.Resource) resource.Resource {
-	if len(r.Findings) == 0 {
-		return r
-	}
-	kept := make([]domain.Finding, 0, len(r.Findings))
-	for _, f := range r.Findings {
-		if !f.IsWave2Sourced() {
-			kept = append(kept, f)
-		}
-	}
-	r.Findings = kept
-	return r
-}
-
 // issueLowerBound is the one rule for whether a type's issue badge may be
-// short, used by the sweep, the on-demand row check and the type file alike.
+// short, used by every live badge (issueBadge) and the type file alike.
 // A truncated page always leaves the count open. Otherwise the count can be
-// short only when something went unchecked and the type has a Wave-2 check
-// that raises an issue at all, since an unchecked "~" check hides none.
-// uninspected is uncountedMarks: the marked rows the badge does not already
-// count are unchecked whatever else was counted. A cut the enricher
-// reports without marking a row only opens a count it produced: when it found
-// nothing and left no row unanswered there is no count to be short.
-func issueLowerBound(shortName string, pageTruncated, enricherCut, found bool, uninspected int) bool {
+// short only when a row went unchecked (uninspected is uncountedMarks: the
+// marked rows the badge does not already count) and the type has a Wave-2
+// check that raises an issue. The marks are the whole of what went unchecked:
+// an enricher stops early only through the cap, deadline and refusal helpers,
+// and each marks the rows it leaves.
+func issueLowerBound(shortName string, pageTruncated bool, uninspected int) bool {
 	if pageTruncated {
 		return true
 	}
-	if uninspected == 0 && (!enricherCut || !found) {
+	if uninspected == 0 {
 		return false
 	}
 	td := resource.FindResourceType(shortName)
-	if td == nil {
-		return true
+	return td == nil || raisesWave2Issue(*td)
+}
+
+// issueBadge is the type's issue badge as the row store holds it: the count
+// over the rows it holds after any carry or fold, and the lower bound over
+// those rows' marks. Every handler that changes a type's rows or marks emits
+// the menu badge from here, so no badge is counted from rows the store does
+// not hold.
+func (c *Core) issueBadge(canon string) (issues int, lowerBound bool) {
+	rows, _ := c.ProbeResources(canon)
+	if td := resource.FindResourceType(canon); td != nil {
+		issues = IssueCount(*td, rows)
 	}
-	for _, f := range td.Findings {
-		if f.Source == "wave2" && f.Severity == domain.SevBroken {
-			return true
-		}
-	}
-	return false
+	return issues, issueLowerBound(canon, c.pageTruncated(canon), uncountedMarks(canon, rows, c.session.EnrichmentTruncatedIDs[canon]))
 }
 
 // pageTruncated reports whether the row store holds only part of the type's

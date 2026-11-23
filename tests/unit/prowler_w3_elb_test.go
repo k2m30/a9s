@@ -607,10 +607,11 @@ func TestW3ELBListeners_FailureMarksOnlyThatBalancer(t *testing.T) {
 	}
 }
 
-// TestW3ELBEnrich_CapBoundsCallsWithoutTruncatingTheCount pins the "~"-only
-// rule: the per-resource call cap limits how much informational coverage the
-// enricher buys, but must never set Truncated, which would lower-bound the
-// issue badge for warnings.
+// TestW3ELBEnrich_CapBoundsCallsWithoutTruncatingTheCount pins the per-resource
+// call cap: it limits how much informational coverage the enricher buys and
+// marks the balancer past it. elb declares only "~" Wave-2 findings, so that
+// mark never lower-bounds the issue badge
+// (TestBadge_OnDemandRowCheckKeepsTheSweepsRule).
 func TestW3ELBEnrich_CapBoundsCallsWithoutTruncatingTheCount(t *testing.T) {
 	fake := w3NewELBFake()
 	resources := make([]resource.Resource, 0, awsclient.EnrichmentCap+1)
@@ -627,8 +628,8 @@ func TestW3ELBEnrich_CapBoundsCallsWithoutTruncatingTheCount(t *testing.T) {
 
 	res := w3RunELBEnrich(t, fake, resources...)
 
-	if res.Truncated {
-		t.Error("Truncated = true on a warn-only enricher; the cap bounds coverage, not the issue count")
+	if got := res.TruncatedIDs[resources[awsclient.EnrichmentCap].ID]; got != awsclient.CheckCap {
+		t.Errorf("balancer past the cap marked %q, want %q", got, awsclient.CheckCap)
 	}
 	inspected := 0
 	for _, r := range resources {

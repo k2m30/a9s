@@ -93,9 +93,5 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			setWave2Finding(&result, r.ID, iamRoleCodeDormant, nil)
 		}
 	})
-	MarkInformationalOnly(&result)
-	// MarkInformationalOnly owns the aggregate Truncated flag for this
-	// "~"-only enricher; the composite error is a separate answer naming
-	// any refused call.
 	return result, errors.Join(loopErr, AggregateFailures("role last-used", failures, n))
 }

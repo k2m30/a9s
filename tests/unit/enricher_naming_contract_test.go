@@ -97,8 +97,8 @@ func TestNamingContract_InFetcherWave2Sentinel_ReturnsEmptyResult(t *testing.T) 
 	if err != nil {
 		t.Fatalf("InFetcherWave2Sentinel must not error, got %v", err)
 	}
-	if res.Truncated {
-		t.Error("InFetcherWave2Sentinel must not be truncated")
+	if len(res.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", res.TruncatedIDs)
 	}
 	if len(res.Findings) != 0 {
 		t.Errorf("Findings must be empty, got %d entries", len(res.Findings))

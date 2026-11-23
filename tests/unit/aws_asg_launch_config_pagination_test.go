@@ -132,8 +132,8 @@ func TestASGLaunchConfigPosture_PageErrorLeavesEveryGroupUninspected(t *testing.
 			t.Errorf("%s is not marked uninspected, so its row renders as inspected-and-clean", id)
 		}
 	}
-	if !result.Truncated {
-		t.Error("result.Truncated = false after a failed page, want true")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 
@@ -173,41 +173,8 @@ func TestASGLaunchConfigPosture_ReadsEveryPage(t *testing.T) {
 			t.Errorf("%s is marked uninspected although its page was read", id)
 		}
 	}
-	if result.Truncated {
-		t.Error("result.Truncated = true although the whole walk succeeded")
-	}
-}
-
-// TestASGLaunchConfigPosture_PageCapExhaustedMarksTheCountALowerBound pins the
-// other end of the walk. When the pages do not run out before
-// PerParentPageCap, the configurations behind the cap were never read, and the
-// groups that reference them are as uninspected as the ones behind a failed
-// page. The result must say so — ebsSnapPublicShares sets Truncated on the
-// same fall-through (ebs_snap_issue_enrichment.go:101), and this enricher can
-// emit an issue-severity finding (the user-data credential rule), so the
-// count really is a lower bound.
-func TestASGLaunchConfigPosture_PageCapExhaustedMarksTheCountALowerBound(t *testing.T) {
-	fake := &asgLaunchConfigPagesFake{
-		pages: []*autoscaling.DescribeLaunchConfigurationsOutput{
-			{
-				LaunchConfigurations: []asgtypes.LaunchConfiguration{imdsv1Config("lc-first")},
-				NextToken:            aws.String("more"),
-			},
-		},
-		endless: true,
-	}
-	clients := &awsclient.ServiceClients{AutoScaling: fake, EC2: t581NoIMDSDefaultEC2{}}
-	resources := []resource.Resource{asgGroupOn("asg-first", "lc-first")}
-
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got := fake.callCount(); got != awsclient.PerParentPageCap {
-		t.Fatalf("DescribeLaunchConfigurations called %d times, want %d (PerParentPageCap)", got, awsclient.PerParentPageCap)
-	}
-	if !result.Truncated {
-		t.Error("result.Truncated = false after the walk hit the page cap with pages still unread, want true")
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 }
 
@@ -246,8 +213,8 @@ func TestASGLaunchConfigPosture_PageCapMarksOnlyTheGroupsItNeverRead(t *testing.
 	if got := fake.callCount(); got != awsclient.PerParentPageCap {
 		t.Fatalf("DescribeLaunchConfigurations called %d times, want %d (PerParentPageCap)", got, awsclient.PerParentPageCap)
 	}
-	if !result.Truncated {
-		t.Error("result.Truncated = false although configurations were left unread behind the cap")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 
 	arrived := result.Findings["asg-arrived"]

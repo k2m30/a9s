@@ -222,8 +222,8 @@ func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 	if _, ok := result.Findings[ecrRepo1]; ok {
 		t.Error("repo-1 must NOT appear in Findings — unscanned repo produces no finding")
 	}
-	if result.Truncated {
-		t.Error("Truncated must be false — missing scan data is operational, not an error")
+	if len(result.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", result.TruncatedIDs)
 	}
 }
 
@@ -266,7 +266,7 @@ func TestEnrichECRRepository_APIErrorSetsTruncatedNoError(t *testing.T) {
 	if _, ok := result.Findings[ecrRepo1]; ok {
 		t.Error("repo-1 must NOT appear in Findings on generic API error")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a generic API call fails")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

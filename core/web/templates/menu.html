@@ -12,7 +12,7 @@
         {{if $e.AvailTruncated}}({{$e.Availability}}+){{else}}({{$e.Availability}}){{end}}
       {{end}}
     </span>
-    {{if $e.IssueBadge.Count}}<span class="badge">! {{$e.IssueBadge.Count}}{{if $e.IssueBadge.Truncated}}+{{end}}</span>{{end}}
+    {{with $e.IssueBadge.Text}}<span class="badge">! {{.}}</span>{{end}}
     <span class="alias">{{$e.Alias}}</span>
   </li>
 {{end}}

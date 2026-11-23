@@ -171,7 +171,7 @@ func TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError(t *testing.T) 
 }
 
 // sqs only emits "~" findings, so a coverage gap never lower-bounds the
-// issue badge: Truncated stays false.
+// issue badge.
 func TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("sqs: GetQueueAttributes throttled")
 	fake := &sqsGetQueueAttributesFake{
@@ -203,9 +203,6 @@ func TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	}
 	if _, ok := result.Findings["my-queue-1"]; ok {
 		t.Error("my-queue-1 must NOT have a finding when the API call fails")
-	}
-	if result.Truncated {
-		t.Error("Truncated must stay false: sqs only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, marked := result.TruncatedIDs["my-queue-1"]; !marked {
 		t.Error("TruncatedIDs[\"my-queue-1\"] must be true — the GetQueueAttributes error must mark that queue's row with a \"?\" coverage gap")

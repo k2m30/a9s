@@ -38,7 +38,6 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	truncated := false
 	var failures []Failure
 	var policyFailures []Failure
 	total := 0
@@ -72,16 +71,15 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		})
 
 		if !complete {
+			// The mount-target check needs a complete walk and can raise "!",
+			// so a walk stopped at the page cap leaves the row marked; the
+			// policy checks above already answered from their own call.
+			if pageErr == nil {
+				pageErr = errPageCap
+			}
 			mu.Lock()
 			defer mu.Unlock()
-			truncated = true
-			if pageErr != nil {
-				MarkSkipped(&result, r.ID, &failures, pageErr)
-			}
-			// A page cap is not a failed call and not a coverage gap on the
-			// row: the mount-target findings below need a complete walk and
-			// are skipped, but the policy checks above already answered from
-			// their own call.
+			MarkSkipped(&result, r.ID, &failures, pageErr)
 			return
 		}
 
@@ -124,7 +122,6 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 
 	})
 
-	SetTruncated(&result, truncated)
 	result.FieldUpdates = make(map[string]map[string]string)
 	// The two passes are counted separately: each names how many of the same
 	// N file systems it could not answer for, and folding them into one

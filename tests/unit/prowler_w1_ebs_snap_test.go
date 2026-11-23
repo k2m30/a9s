@@ -215,8 +215,8 @@ func TestEBSSnap_Public_APIErrorMarksEveryRowUninspected(t *testing.T) {
 		}
 		pw1RequireNoFinding(t, res.Findings[id], pw1EBSSnapCodePublic)
 	}
-	if !res.Truncated {
-		t.Errorf("Truncated = false after a failed query for a Broken-severity signal")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

@@ -71,9 +71,11 @@ func (f *efsEndlessMountTargetsFake) DescribeBackupPolicy(
 const efsWideOpenPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["elasticfilesystem:ClientMount","elasticfilesystem:ClientWrite"],"Resource":"*"}]}`
 
 // TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding: the file-system
-// policy check runs before the mount-target walk precisely so a pagination
-// problem cannot swallow it; marking the file system uninspected when the
-// walk hits its page cap would swallow it anyway.
+// policy check runs before the mount-target walk so a pagination problem
+// cannot swallow it. A walk stopped at its page cap leaves the mount-target
+// check unrun, and that check can raise "!", so the file system is marked at
+// the cap; the fold keeps a marked row's findings, so the policy finding
+// still reaches the row.
 func TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding(t *testing.T) {
 	fake := &efsEndlessMountTargetsFake{policy: efsWideOpenPolicy}
 	clients := &awsclient.ServiceClients{EFS: fake}
@@ -92,10 +94,8 @@ func TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding(t *testing.T) {
 		t.Fatalf("precondition: DescribeFileSystemPolicy called %d times, want 1", fake.policyCalls)
 	}
 
-	if _, marked := res.TruncatedIDs["fs-0123456789abcdef0"]; marked {
-		t.Errorf("TruncatedIDs[fs-0123456789abcdef0] = true — a mount-target page cap must not " +
-			"mark the file system uninspected: FoldWave2Rows skips every id in this map, " +
-			"so the efs.public-policy finding below never reaches the row")
+	if got := res.TruncatedIDs["fs-0123456789abcdef0"]; got != awsclient.CheckCap {
+		t.Errorf("TruncatedIDs[fs-0123456789abcdef0] = %q, want %q: the mount-target check went unrun", got, awsclient.CheckCap)
 	}
 	if !hasFindingCode(res.Findings["fs-0123456789abcdef0"], "efs.public-policy") {
 		t.Errorf("findings for the capped file system = %v, want efs.public-policy — "+
@@ -111,14 +111,14 @@ func TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding(t *testing.T) {
 	runtime.FoldWave2Rows(folded, *td, res.Findings, res.AttentionDetails, res.TruncatedIDs)
 	if !hasFindingCode(folded[0].Findings, "efs.public-policy") {
 		t.Errorf("after FoldWave2Rows the row carries %v, want efs.public-policy — "+
-			"this is the drop the uninspected mark causes", codesOf(folded[0].Findings))
+			"a marked row keeps what its probe proved", codesOf(folded[0].Findings))
 	}
 }
 
 // TestEnrichEFS_HealthyPolicyOnCappedWalkRaisesNothing is the negative half:
 // the cap must not invent a finding either. A file system whose policy is
-// absent and whose backups are on stays clean even when its mount-target
-// walk is capped.
+// absent and whose backups are on raises nothing when its mount-target walk
+// is capped; the walk it could not finish leaves it marked at the cap.
 func TestEnrichEFS_HealthyPolicyOnCappedWalkRaisesNothing(t *testing.T) {
 	fake := &efsEndlessMountTargetsFake{
 		policy: `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"elasticfilesystem:ClientMount","Resource":"*"}]}`,
@@ -132,8 +132,8 @@ func TestEnrichEFS_HealthyPolicyOnCappedWalkRaisesNothing(t *testing.T) {
 	if got := codesOf(res.Findings["fs-0123456789abcdef1"]); len(got) != 0 {
 		t.Errorf("findings for a healthy, page-capped file system = %v, want none", got)
 	}
-	if _, marked := res.TruncatedIDs["fs-0123456789abcdef1"]; marked {
-		t.Errorf("TruncatedIDs[fs-0123456789abcdef1] = true on a page cap alone, want false")
+	if got := res.TruncatedIDs["fs-0123456789abcdef1"]; got != awsclient.CheckCap {
+		t.Errorf("TruncatedIDs[fs-0123456789abcdef1] = %q, want %q", got, awsclient.CheckCap)
 	}
 }
 

@@ -65,6 +65,6 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		}
 		readPolicy("secrets", aws.ToString(out.ResourcePolicy), ownAccount, r.Fields["arn"]).raise(&result, r.ID)
 	})
-	err := errors.Join(loopErr, Finish(&result, failures, n, "secrets-policy"))
+	err := errors.Join(loopErr, AggregateFailures("secrets-policy", failures, n))
 	return result, err
 }

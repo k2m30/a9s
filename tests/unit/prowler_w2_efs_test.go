@@ -304,13 +304,13 @@ func TestW2EFSCapBoundary(t *testing.T) {
 	}
 
 	atCap := w2EFSEnrich(t, &w2EFSPolicyFake{backupOff: backupOff}, ids[:awsclient.EnrichmentCap]...)
-	if atCap.Truncated {
-		t.Error("exactly EnrichmentCap file systems reported Truncated")
+	if len(atCap.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", atCap.TruncatedIDs)
 	}
 
 	overCap := w2EFSEnrich(t, &w2EFSPolicyFake{backupOff: backupOff}, ids...)
-	if !overCap.Truncated {
-		t.Error("EnrichmentCap+1 file systems did not report Truncated")
+	if len(overCap.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

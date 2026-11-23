@@ -386,11 +386,6 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		selected = 0
 	}
 
-	enrichTruncated := map[string]bool{}
-	if c.enrichmentTruncated != nil {
-		maps.Copy(enrichTruncated, c.enrichmentTruncated)
-	}
-
 	pagination := PaginationInfo{}
 	if ls.HasPagination {
 		pagination.HasMore = true
@@ -398,24 +393,23 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	}
 
 	return &ListBody{
-		Columns:             memo.columns,
-		Rows:                memo.rows,
-		Selected:            selected,
-		ScrollX:             ls.ScrollX,
-		Filter:              ls.Filter,
-		Sort:                SortSpec{Col: ls.SortCol, Dir: ls.SortDir},
-		AttentionOnly:       ls.AttentionOnly,
-		Loading:             ls.Loading,
-		Truncated:           ls.HasPagination,
-		Pagination:          pagination,
-		EnrichmentFindings:  c.listEnrichmentFindings(typeName),
-		EnrichmentTruncated: enrichTruncated,
-		IdentityCol:         memo.identityCol,
-		StatusCol:           memo.statusCol,
-		LoadingMore:         ls.LoadingMore,
-		Refreshing:          ls.Refreshing,
-		LastFetchError:      ls.LastFetchError,
-		LookupRegion:        c.listRegionLocked(ls),
+		Columns:            memo.columns,
+		Rows:               memo.rows,
+		Selected:           selected,
+		ScrollX:            ls.ScrollX,
+		Filter:             ls.Filter,
+		Sort:               SortSpec{Col: ls.SortCol, Dir: ls.SortDir},
+		AttentionOnly:      ls.AttentionOnly,
+		Loading:            ls.Loading,
+		Truncated:          ls.HasPagination,
+		Pagination:         pagination,
+		EnrichmentFindings: c.listEnrichmentFindings(typeName),
+		IdentityCol:        memo.identityCol,
+		StatusCol:          memo.statusCol,
+		LoadingMore:        ls.LoadingMore,
+		Refreshing:         ls.Refreshing,
+		LastFetchError:     ls.LastFetchError,
+		LookupRegion:       c.listRegionLocked(ls),
 	}
 }
 
@@ -508,8 +502,7 @@ func (c *Controller) listVisibleLocked(ls *ListState, typeName string) []resourc
 	// One resolution for both halves, the same pairing the off-lock build uses:
 	// the filter and the sort read the columns the rows are made of.
 	td, columns := c.listColumnsAndTypeLocked(typeName)
-	visible := applyListFiltersWith(ls, td, columns, c.listEnrichmentFindings(typeName),
-		c.listScreenResources(ls, typeName))
+	visible := applyListFiltersWith(ls, td, columns, c.listScreenResources(ls, typeName))
 	return listSortResources(columns, td, ls, visible)
 }
 
@@ -566,7 +559,7 @@ func (c *Controller) captureListBodyBuild(ls *ListState, typeName string, td *re
 // touches no controller state and holds no lock.
 func (b listBodyBuild) run() listBodyMemo {
 	// Apply filters (relatedIDSet -> text -> attention).
-	visible := applyListFiltersWith(b.ls, b.td, b.columns, b.findings, b.ls.Rows)
+	visible := applyListFiltersWith(b.ls, b.td, b.columns, b.ls.Rows)
 
 	// Sort over the same resolved set the cells come from, so a user-configured
 	// sort_key column resolves correctly and the
@@ -693,15 +686,14 @@ func (c *Controller) ListFrameTitle() string {
 // Per docs/attention-signals.md: the " !N" issue
 // suffix is UNCONDITIONAL — it renders after the count parentheses on any
 // list screen (top-level or ScreenChildList), on any renderer (TUI or web),
-// whenever N > 0 and the screen is not in attention-only mode. N is the
-// current list's issue count — aggregated the same way as the menu badge
-// (Controller.GetListIssueCount's algorithm, mirrored lock-free below since
-// buildListFrameTitle already runs under c.mu). N=0 renders no suffix. When
-// the Wave-2 enrichment issue count itself is a truncated lower bound
-// (c.enrichmentTruncated[typeName]), the suffix becomes " !N+" instead of
-// " !N". The suffix is OMITTED entirely in attention-only (ctrl+z) mode,
-// where the filtered count already IS the issue count and an " !N" suffix
-// would be redundant.
+// whenever IssueBadge.Text has a value and the screen is not in
+// attention-only mode. N is the current list's issue count — aggregated the
+// same way as the menu badge (Controller.GetListIssueCount's algorithm,
+// mirrored lock-free below since buildListFrameTitle already runs under
+// c.mu). An exact zero renders no suffix; a lower bound renders " !N+", zero
+// included. In
+// attention-only (ctrl+z) mode the filtered count already IS the issue count,
+// so the title carries "(F of T) [!]" in its place.
 func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListState) string {
 	typeName := ctx.ResourceType
 	name := typeName
@@ -751,15 +743,20 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	isAttention := ls.AttentionOnly
 	hasTextFilter := ls.Filter != "" && filtered != total
+	badge := c.listIssueBadge(ls, typeName)
 
 	var title string
 	switch {
-	case hasTextFilter && isAttention:
-		title = name + "(" + strconv.Itoa(filtered) + " of " + totalStr + ")"
+	case isAttention:
+		// The issues-only rows are the rows the badge counts, so they are a
+		// lower bound exactly when the badge is.
+		shown := IssueBadge{Count: filtered, Truncated: badge.Truncated}.Text()
+		if shown == "" {
+			shown = "0"
+		}
+		title = name + "(" + shown + " of " + totalStr + ")"
 	case hasTextFilter:
 		title = name + "(" + strconv.Itoa(filtered) + "/" + totalStr + ")"
-	case isAttention:
-		title = name + "(" + strconv.Itoa(filtered) + " of " + totalStr + ")"
 	default:
 		title = name + "(" + totalStr + ")"
 	}
@@ -768,11 +765,8 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 		title += ls.TitleSuffix
 	}
 	if !isAttention {
-		if issueCount := c.listIssueCount(ls, typeName); issueCount > 0 {
-			title += " !" + strconv.Itoa(issueCount)
-			if c.enrichmentTruncated[typeName] {
-				title += "+"
-			}
+		if text := badge.Text(); text != "" {
+			title += " !" + text
 		}
 	}
 	if isAttention {
@@ -835,6 +829,16 @@ func (c *Controller) GetListIssueCount() int {
 	return c.listIssueCount(ls, top.Ctx.ResourceType)
 }
 
+// The lower bound is read from the menu state: it is the one store of that
+// fact on this side.
+func (c *Controller) listIssueBadge(ls *ListState, typeName string) IssueBadge {
+	b := IssueBadge{Count: c.listIssueCount(ls, typeName), Truncated: c.menuIssueLowerBound(resource.CanonicalShortName(typeName))}
+	if td := c.typeDefForLocked(typeName); td != nil {
+		b.Hidden = !runtime.ShowsIssueBadge(*td)
+	}
+	return b
+}
+
 // listIssueCount is the lock-free core of GetListIssueCount. Callers MUST
 // already hold c.mu (e.g. buildListFrameTitle, which runs under c.mu) —
 // taking the lock again would self-deadlock the non-reentrant RWMutex.
@@ -844,50 +848,12 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	if tdp == nil {
 		return 0
 	}
-	td := *tdp
-	// The list-title suffix and the menu sync-back use the SAME
-	// aggregation as the menu badge — and the badge never counts types with
-	// ExcludeFromIssueBadge (e.g. ct-events, where "issue-colored" rows are
-	// historical events, not live problems). Without this, an excluded type
-	// would grow a title suffix and, via the app_stack sync-back, a forbidden
-	// menu badge after its list was visited.
-	if td.ExcludeFromIssueBadge {
-		return 0
-	}
 	// A related drill's badge counts the drill's own rows, through the same
 	// prefilter its count and its rows read (relatedIDSubset). Counting the
 	// screen's whole row set instead titles ten instances built from one AMI
 	// with the account's issue total, so the badge says more issues than the
 	// list has rows.
-	all := relatedIDSubset(ls, c.listScreenResources(ls, typeName))
-	findings := c.listEnrichmentFindings(typeName)
-	ic := 0
-	for _, r := range all {
-		switch {
-		case listHasBadgeFinding(r):
-			ic++
-		case td.ResolveColor(runtime.Wave1Only(r)).IsIssue():
-			// Per docs/attention-signals.md, a lone Wave-2 "~" warn
-			// must NOT bump the count — a warning is not an issue. runtime.Wave1Only
-			// strips merged Wave-2 findings before ResolveColor so this branch
-			// counts Wave-1 issue-colored rows only, matching the menu badge's
-			// unifiedIssueCount exactly (both call Wave1Only, so they cannot
-			// drift). Wave-2 "!"-severity findings are counted by the
-			// listHasBadgeFinding branch above and the findings-map branch below.
-			ic++
-		case len(r.Findings) == 0:
-			if fs, hasFinding := findings[r.ID]; hasFinding && len(fs) > 0 && domain.WorstSeverityFinding(fs).Severity == domain.SevBroken {
-				// Wave-2 findings bump the count only at "!" severity
-				// (docs/attention-signals.md). Wave-1
-				// yellow/red rows are already counted by the color branch above,
-				// matching the menu badge's probe-side aggregation. A resource
-				// may carry more than one independently-evaluated Wave-2
-				// condition; it counts once if ANY of them is SevBroken.
-				ic++
-			}
-		}
-	}
-	return ic
+	return runtime.IssueCount(*tdp, relatedIDSubset(ls, c.listScreenResources(ls, typeName)))
 }
 
 // GetListVisibleResources returns the visible (filtered+sorted) resource slice
@@ -1129,24 +1095,6 @@ func (c *Controller) foldRowFindings(typeName string, findings map[string][]doma
 	if typeName != canon {
 		c.core.AmendRows(typeName, amend)
 	}
-}
-
-// listHasBadgeFinding reports whether a row's own findings bump the issue
-// count. Wave-1 findings (fetcher-written, no "wave2:" Source prefix) count at
-// any issue severity — a Wave-1 warning IS the yellow row the menu badge
-// counts by color. Wave-2 findings count only at "!" severity
-// (docs/attention-signals.md), the same gate the enrichment-store branch
-// applies.
-func listHasBadgeFinding(r resource.Resource) bool {
-	for _, f := range r.Findings {
-		if f.Severity == domain.SevBroken {
-			return true
-		}
-		if f.Severity.IsIssue() && !f.IsWave2Sourced() {
-			return true
-		}
-	}
-	return false
 }
 
 // listUninspectedIDs returns the rows of typeName that the type's Wave-2

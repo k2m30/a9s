@@ -140,7 +140,7 @@ func TestEnrichECRRepository_OnlyAFinishedScanIsCounted(t *testing.T) {
 			t.Errorf("%s: vulnerability finding raised from a scan with no findings to count", repo)
 		}
 	}
-	if !result.Truncated {
-		t.Error("Truncated = false with repositories not inspected")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

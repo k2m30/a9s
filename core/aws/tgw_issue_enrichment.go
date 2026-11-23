@@ -44,7 +44,6 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 	if clients.EC2 == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
@@ -74,7 +73,6 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		if !complete {
 			mu.Lock()
 			defer mu.Unlock()
-			truncated = true
 			if lastErr != nil {
 				MarkSkipped(&result, r.ID, &failures, lastErr)
 			} else {
@@ -137,6 +135,5 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		}
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeTransitGatewayAttachments", failures, total))
 }

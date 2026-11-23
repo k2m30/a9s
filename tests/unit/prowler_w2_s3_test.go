@@ -370,12 +370,12 @@ func TestW2S3CapBoundary(t *testing.T) {
 	}
 
 	atCap := w2S3Run(t, &w2S3Posture{noLogging: noLog}, names[:awsclient.EnrichmentCap]...)
-	if atCap.Truncated {
-		t.Error("exactly EnrichmentCap buckets reported Truncated")
+	if len(atCap.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", atCap.TruncatedIDs)
 	}
 
 	overCap := w2S3Run(t, &w2S3Posture{noLogging: noLog}, names...)
-	if !overCap.Truncated {
-		t.Error("EnrichmentCap+1 buckets did not report Truncated")
+	if len(overCap.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }

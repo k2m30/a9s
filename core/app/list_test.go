@@ -946,15 +946,19 @@ func TestEnrichment_FindingsInBody(t *testing.T) {
 
 func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
 	c := newListController(t, "ec2")
+	// The Wave-2 fold writes a finding onto the row it names and into the
+	// enrichment store together; the issues-only filter reads the row.
+	degraded := domain.Finding{Code: "ec2.degraded", Phrase: "degraded", Severity: domain.SevBroken, Source: "wave2:ec2"}
 	resources := []resource.Resource{
 		{ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0aaa111111111111a", "state": "running"}},
 		{ID: "i-0bbb222222222222b", Name: "db-server", Type: "ec2",
-			Fields: map[string]string{"instance_id": "i-0bbb222222222222b", "state": "running"}},
+			Fields:   map[string]string{"instance_id": "i-0bbb222222222222b", "state": "running"},
+			Findings: []domain.Finding{degraded}},
 	}
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
-		"i-0bbb222222222222b": {{Code: "ec2.degraded", Phrase: "degraded", Severity: domain.SevWarn}},
+		"i-0bbb222222222222b": {degraded},
 	}, nil)
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 

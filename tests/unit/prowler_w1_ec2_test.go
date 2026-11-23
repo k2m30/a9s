@@ -606,7 +606,7 @@ func TestEC2_UserDataSecret_PerItemErrorMarksOnlyThatRow(t *testing.T) {
 }
 
 // TestEC2_UserDataSecret_CapBoundsTheWalk pins that EnrichmentCap+1 instances
-// leave the enricher Truncated: the user-data check emits "!" findings, so a
+// leave the instance past the cap marked: the user-data check emits "!" findings, so a
 // cut-short walk means the issue count is a lower bound.
 func TestEC2_UserDataSecret_CapBoundsTheWalk(t *testing.T) {
 	var instances []ec2types.Instance
@@ -618,8 +618,8 @@ func TestEC2_UserDataSecret_CapBoundsTheWalk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
-	if !res.Truncated {
-		t.Errorf("Truncated = false for %d instances; EnrichmentCap is %d", len(instances), awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if len(fake.attrCalls) > awsclient.EnrichmentCap {
 		t.Errorf("DescribeInstanceAttribute called %d times, cap is %d", len(fake.attrCalls), awsclient.EnrichmentCap)
@@ -637,8 +637,8 @@ func TestEC2_UserDataSecret_ExactlyCapIsNotTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
 	}
-	if res.Truncated {
-		t.Errorf("Truncated = true for exactly EnrichmentCap (%d) instances", awsclient.EnrichmentCap)
+	if len(res.TruncatedIDs) != 0 {
+		t.Errorf("rows marked not inspected: %v", res.TruncatedIDs)
 	}
 }
 

@@ -9,9 +9,8 @@ package unit
 // that forgets the half nobody sees: the rows it dropped. A row whose answer
 // sat on a page nobody read must render "not inspected", never
 // inspected-and-healthy.
-// The pins here hold the page cap to one owner, hold IssueEnricherResult's
-// Truncated flag to one writer that cannot lower a flag another pass raised,
-// and hold capRows' stored-count parse to the exact shape it writes.
+// The pins here hold the page cap to one owner and hold capRows' stored-count
+// parse to the exact shape it writes.
 
 import (
 	"context"
@@ -80,9 +79,6 @@ func TestPageCap_RowBeyondTheLastWalkedPageIsNotInspected(t *testing.T) {
 	if _, marked := result.TruncatedIDs[seen]; marked {
 		t.Errorf("row %q is marked uninspected although page 1 answered for it", seen)
 	}
-	if !result.Truncated {
-		t.Error("result.Truncated = false, want true — the walk was cut short and this enricher emits \"!\" findings")
-	}
 }
 
 // TestPageCap_CompletedWalkMarksNoRowUninspected is the negative half: a walk
@@ -107,28 +103,6 @@ func TestPageCap_CompletedWalkMarksNoRowUninspected(t *testing.T) {
 	}
 	if len(result.TruncatedIDs) != 0 {
 		t.Errorf("a complete walk marked %d row(s) uninspected: %v", len(result.TruncatedIDs), result.TruncatedIDs)
-	}
-	if result.Truncated {
-		t.Error("result.Truncated = true after a walk that reached the last page")
-	}
-}
-
-// TestSetTruncated_NeverLowersAFlagAlreadyRaised pins what the writer is for.
-// An enricher that caps its work list and then finishes its remaining batches
-// without a failure must still report the cut: Finish's zero-failure case, and
-// every later pass, compose with the flag rather than overwrite it.
-func TestSetTruncated_NeverLowersAFlagAlreadyRaised(t *testing.T) {
-	result := awsclient.IssueEnricherResult{TruncatedIDs: map[string]string{}}
-	awsclient.SetTruncated(&result, true)
-	awsclient.SetTruncated(&result, false)
-	if !result.Truncated {
-		t.Error("SetTruncated(result, false) lowered a flag an earlier pass raised")
-	}
-
-	fresh := awsclient.IssueEnricherResult{TruncatedIDs: map[string]string{}}
-	awsclient.SetTruncated(&fresh, false)
-	if fresh.Truncated {
-		t.Error("SetTruncated(result, false) raised the flag on an untouched result")
 	}
 }
 

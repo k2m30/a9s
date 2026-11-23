@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // warnOnlyFindings builds a Wave-2 findings map where every resource ID in
@@ -46,7 +47,7 @@ func TestController_ListIssueCount_TildeOnlyFindings_NoSuffix(t *testing.T) {
 	for i, r := range resources {
 		ids[i] = r.ID
 	}
-	c.ApplyEnrichmentState("ec2", 0, false, warnOnlyFindings(ids), nil)
+	c.Handle(messages.EnrichmentChecked{ResourceType: "ec2", Findings: warnOnlyFindings(ids)})
 
 	if gotCount := c.GetListIssueCount(); gotCount != 0 {
 		t.Errorf("GetListIssueCount() = %d, want 0 — SevWarn (\"~\") Wave-2 findings must NOT bump the issue count per docs/attention-signals.md S1", gotCount)
@@ -85,7 +86,7 @@ func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testi
 			}}
 		}
 	}
-	c.ApplyEnrichmentState("ec2", 2, false, findings, nil)
+	c.Handle(messages.EnrichmentChecked{ResourceType: "ec2", Findings: findings})
 
 	if gotCount := c.GetListIssueCount(); gotCount != 2 {
 		t.Errorf("GetListIssueCount() = %d, want 2 — only SevBroken (\"!\") Wave-2 findings should count; the 3 SevWarn (\"~\") findings must not", gotCount)
@@ -126,7 +127,7 @@ func TestController_ListIssueCount_TitleSuffixParity_MatchesMenuAggregation(t *t
 			}}
 		}
 	}
-	c.ApplyEnrichmentState("ec2", 3, false, findings, nil)
+	c.Handle(messages.EnrichmentChecked{ResourceType: "ec2", Findings: findings})
 
 	menuN := c.GetListIssueCount()
 	wantTitle := "ec2(7) !" + itoaParity(menuN)

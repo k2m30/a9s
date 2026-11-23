@@ -64,7 +64,6 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 	if clients.Glue == nil {
 		return result, nil
 	}
-	truncated := false
 	secConfigAPI, _ := clients.Glue.(GlueGetSecurityConfigurationAPI)
 	// Many jobs name one security configuration, so each name is read once.
 	var secConfigMu sync.Mutex
@@ -126,7 +125,6 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 		if err != nil {
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
@@ -150,6 +148,5 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	})
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("GetJobRuns", failures, n), AggregateFailures("GetSecurityConfiguration", cfgFailures, n))
 }

@@ -65,6 +65,11 @@ type ProbeStatusRecord struct {
 	AvailOutcome  string
 	AvailDuration time.Duration
 	AvailErr      string
+
+	// EnrichErrored is whether the Wave-2 answer folded into Outcome came
+	// back with an error, so a status re-derived from the marks alone keeps
+	// the partial that error caused.
+	EnrichErrored bool
 }
 
 // Session owns the in-memory orchestration state for the active
@@ -300,7 +305,6 @@ type Session struct {
 	// field directly outside enrichmentRanMu.
 	EnrichmentRan          map[string]bool
 	enrichmentRanMu        sync.Mutex
-	enrichmentCut          map[string]bool
 	EnrichmentTruncatedIDs map[string]map[string]string
 	// EnrichmentRowAnswered is the per-type set of rows a KindEnrichRow
 	// answered for since the type's last refresh. A sweep that was already in
@@ -912,37 +916,11 @@ func (s *Session) EnrichmentRanReset() {
 func (s *Session) EnrichmentRowsReset() {
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]string)
 	s.EnrichmentRowAnswered = make(map[string]map[string]struct{})
-	s.enrichmentRanMu.Lock()
-	defer s.enrichmentRanMu.Unlock()
-	s.enrichmentCut = nil
 }
 
 func (s *Session) EnrichmentRowsForget(rt string) {
 	delete(s.EnrichmentTruncatedIDs, rt)
 	delete(s.EnrichmentRowAnswered, rt)
-	s.enrichmentRanMu.Lock()
-	defer s.enrichmentRanMu.Unlock()
-	delete(s.enrichmentCut, rt)
-}
-
-// EnrichmentCutGet reports whether the type's last sweep said its walk was
-// cut in a way no row mark records (a page cap inside a row, a failed batch).
-// It is one input of the issue badge's lower bound, read from the save
-// goroutine as well as the handler loop, so it lives under enrichmentRanMu.
-func (s *Session) EnrichmentCutGet(rt string) bool {
-	s.enrichmentRanMu.Lock()
-	defer s.enrichmentRanMu.Unlock()
-	return s.enrichmentCut[rt]
-}
-
-// EnrichmentCutSet records the type's last sweep's cut flag.
-func (s *Session) EnrichmentCutSet(rt string, cut bool) {
-	s.enrichmentRanMu.Lock()
-	defer s.enrichmentRanMu.Unlock()
-	if s.enrichmentCut == nil {
-		s.enrichmentCut = make(map[string]bool)
-	}
-	s.enrichmentCut[rt] = cut
 }
 
 // Rotate rotates the session when the user switches profile or region. Every

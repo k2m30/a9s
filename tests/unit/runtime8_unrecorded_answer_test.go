@@ -41,17 +41,15 @@ import (
 const unrecordedReasonMarker = "// no finding:"
 
 // unrecordedRecorders are the calls that record something about the row: a
-// mark, a coverage flag, or a failure the aggregate will carry.
+// mark or a failure the aggregate will carry.
 var unrecordedRecorders = map[string]bool{
-	"MarkSkipped":           true,
-	"MarkUnusable":          true,
-	"markUninspected":       true,
-	"SetTruncated":          true,
-	"FailedCall":            true,
-	"FailedCallInRegion":    true,
-	"FailedOnPage":          true,
-	"UnusableAnswer":        true,
-	"MarkInformationalOnly": true,
+	"MarkSkipped":        true,
+	"MarkUnusable":       true,
+	"markUninspected":    true,
+	"FailedCall":         true,
+	"FailedCallInRegion": true,
+	"FailedOnPage":       true,
+	"UnusableAnswer":     true,
 }
 
 // unrecordedAnswerViolations reports every `if err != nil || <the answer is

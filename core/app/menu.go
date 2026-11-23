@@ -110,31 +110,28 @@ func menuVisibleItems(ms *MenuState, all []resource.ResourceTypeDef) []resource.
 	return result
 }
 
-// menuIsVisibleUnderIssueFilter determines whether a resource type is shown
-// when attention-only mode is active.
-//
-// item is the catalog entry; activeKey is the key under which intent data is
-// stored for this item (from menuActiveKey — may be an alias like "rds" for
-// the "dbi" type). mainmenu.go delegates to this via the controller snapshot.
+// menuIsVisibleUnderIssueFilter reports whether the issues-only menu lists
+// item: exactly when its badge has text, a counted number or a lower bound,
+// so every listed type shows on screen why it is there. Before any type is
+// probed every type that can draw a badge is listed. activeKey is the key the
+// intent data is stored under (menuActiveKey — may be an alias like "rds" for
+// "dbi").
 func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef, activeKey string) bool {
-	known := ms.IssueKnown != nil && ms.IssueKnown[activeKey]
-	// ExcludeFromIssueBadge types are never probed — hide them in attention mode,
-	// even at cold-start, UNLESS issue data was explicitly recorded for them (a
-	// real detected issue beats the exclusion). In production these types are
-	// never probed, so this is equivalent to an absolute exclusion; the
-	// conditional only matters for tests that inject issues directly.
-	if item.ExcludeFromIssueBadge && !known {
-		return false
+	if len(ms.IssueKnown) == 0 {
+		return runtime.ShowsIssueBadge(item)
 	}
-	// Unknown non-excluded type: visible only during true cold-start (no type
-	// probed anywhere); once any probe lands, unknown types hide.
-	if !known {
-		return len(ms.IssueKnown) == 0
+	return menuIssueBadge(ms, item, activeKey).Text() != ""
+}
+
+func menuIssueBadge(ms *MenuState, item resource.ResourceTypeDef, activeKey string) IssueBadge {
+	if !ms.IssueKnown[activeKey] {
+		return IssueBadge{}
 	}
-	if ms.IssueCounts != nil && ms.IssueCounts[activeKey] > 0 {
-		return true
+	return IssueBadge{
+		Count:     ms.IssueCounts[activeKey],
+		Truncated: ms.IssueTruncated[activeKey],
+		Hidden:    !runtime.ShowsIssueBadge(item),
 	}
-	return ms.IssueTruncated != nil && ms.IssueTruncated[activeKey]
 }
 
 // menuSkipUnavailable advances the cursor past confirmed-empty resource types.
@@ -265,6 +262,13 @@ func (c *Controller) menuIssueBadge(canon string) (issues int, known bool) {
 		return 0, false
 	}
 	return ms.IssueCounts[canon], true
+}
+
+// menuIssueLowerBound reports whether canon's issue count is a lower bound,
+// as the menu holds it. Caller must hold c.mu (at least read).
+func (c *Controller) menuIssueLowerBound(canon string) bool {
+	ms := c.rootMenuState()
+	return ms != nil && ms.IssueTruncated[canon]
 }
 
 // menuObservationOutranksStored reports whether an observation of origin may
@@ -489,23 +493,13 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 			cause = awsclient.RowWord(ms.ProbeCause[activeKey])
 		}
 
-		badge := IssueBadge{}
-		if ms.IssueKnown != nil && ms.IssueKnown[activeKey] {
-			cnt := 0
-			if ms.IssueCounts != nil {
-				cnt = ms.IssueCounts[activeKey]
-			}
-			trunc := ms.IssueTruncated != nil && ms.IssueTruncated[activeKey]
-			badge = IssueBadge{Count: cnt, Truncated: trunc}
-		}
-
 		entries = append(entries, MenuEntry{
 			ConfirmedEmpty: menuIsConfirmedEmpty(ms, item),
 			ShortName:      activeKey,
 			Display:        item.Name,
 			Alias:          alias,
 			Category:       item.Category,
-			IssueBadge:     badge,
+			IssueBadge:     menuIssueBadge(ms, item, activeKey),
 			Availability:   avail,
 			AvailKnown:     availKnown,
 			AvailTruncated: availTruncated,

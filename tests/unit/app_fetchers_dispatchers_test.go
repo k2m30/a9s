@@ -494,11 +494,10 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	// Stamp the live AvailabilityGen so the staleness guard accepts the
 	// message (AcceptZeroGen=false; session.New seeds AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
-		Entries:     map[string]int{"ec2": 7, "s3": 3},
-		Truncated:   map[string]bool{},
-		IssueCounts: map[string]int{"ec2": 1},
-		Gen:         m.Core().Session().AvailabilityGen,
-		Resources:   map[string][]resource.Resource{},
+		Entries:   map[string]int{"ec2": 7, "s3": 3},
+		Truncated: map[string]bool{},
+		Gen:       m.Core().Session().AvailabilityGen,
+		Resources: map[string][]resource.Resource{},
 	})
 	if cmd != nil {
 		_ = cmd() //nolint:ineffassign,staticcheck // verifying no panic

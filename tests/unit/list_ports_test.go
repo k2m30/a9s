@@ -298,16 +298,12 @@ func wave3IdentityColResources(td resource.ResourceTypeDef, n int) []resource.Re
 	return out
 }
 
-// A resource whose Wave-1 Color resolves Healthy and whose r.Findings is
-// empty is still shown under the attention filter when it carries a Wave-2
-// enrichment finding keyed by ID.
-
-func TestAttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
+// A Wave-2 "~" finding is a warning, not an issue (docs/attention-signals.md):
+// the issue count does not count it, so the issues-only filter, which shows
+// exactly the rows the count counts, hides a row whose only finding it is.
+func TestAttentionFilter_HidesResourcesWithOnlyAWave2Warning(t *testing.T) {
 	c := openListController(t, "s3")
 
-	// s3's Color always resolves Healthy regardless of Fields, so all three
-	// resources below fail the Wave-1 IsIssue() gate — only the Wave-2
-	// enrichment-map lookup can surface res-0 under the attention filter.
 	resources := []resource.Resource{
 		{ID: "res-0", Name: "bucket-alpha", Fields: map[string]string{"name": "bucket-alpha"}},
 		{ID: "res-1", Name: "bucket-beta", Fields: map[string]string{"name": "bucket-beta"}},
@@ -315,19 +311,31 @@ func TestAttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
 	}
 	c.ApplyResourcesLoaded("s3", resources, nil, false)
 
-	findings := map[string][]domain.Finding{
+	c.Handle(messages.EnrichmentChecked{ResourceType: "s3", Findings: map[string][]domain.Finding{
 		"res-0": {{Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevWarn, Source: "wave2:s3"}},
+	}})
+	if !rowCarriesCode(c.GetListAllResources(), "res-0", "s3.public.access.enabled") {
+		t.Fatal("precondition: the Wave-2 answer did not land on res-0")
 	}
-	c.ApplyEnrichmentState("s3", 1, false, findings, nil)
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
-	lb := *c.Snapshot().Body.List
-	if len(lb.Rows) != 1 {
-		t.Fatalf("attention filter with Wave-2-only finding: Rows count: got %d want 1", len(lb.Rows))
+	if rows := c.Snapshot().Body.List.Rows; len(rows) != 0 {
+		t.Errorf("attention filter shows %d row(s) whose only finding is a Wave-2 warning, want 0", len(rows))
 	}
-	if lb.Rows[0].ResourceID != "res-0" {
-		t.Errorf("attention filter must show res-0 (Wave-2 finding only, Wave-1 Color Healthy), got %q", lb.Rows[0].ResourceID)
+}
+
+func rowCarriesCode(rows []resource.Resource, id string, code domain.FindingCode) bool {
+	for _, r := range rows {
+		if r.ID != id {
+			continue
+		}
+		for _, f := range r.Findings {
+			if f.Code == code {
+				return true
+			}
+		}
 	}
+	return false
 }
 
 // Enabling the attention filter before Wave 2 lands still surfaces the
@@ -348,10 +356,9 @@ func TestAttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
 		t.Fatalf("precondition: attention filter with no findings yet should hide all healthy rows, got %d visible", got)
 	}
 
-	findings := map[string][]domain.Finding{
+	c.Handle(messages.EnrichmentChecked{ResourceType: "s3", Findings: map[string][]domain.Finding{
 		"b-0": {{Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevBroken, Source: "wave2:s3"}},
-	}
-	c.ApplyEnrichmentState("s3", 1, false, findings, nil)
+	}})
 
 	lb := *c.Snapshot().Body.List
 	if len(lb.Rows) != 1 {

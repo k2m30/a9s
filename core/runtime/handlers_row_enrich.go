@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"maps"
-	"slices"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -28,11 +27,13 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	if msg.Gen != c.session.EnrichmentGen || msg.TypeGen != c.session.EnrichmentTypeGenGet(canon) {
 		return nil, nil
 	}
-	// The same rule as the sweep's: a probe that came back with an error and
-	// nothing else answered for nobody. The row keeps its mark and what it
-	// renders, and the operator hears why (a marked, stale answer beats
-	// a confidently wrong clean one).
-	if msg.Err != nil && len(msg.Findings) == 0 && len(msg.FieldUpdates) == 0 && !msg.Uninspected {
+	// The row keeps its mark and what it renders, and the operator hears why
+	// (a marked, stale answer beats a confidently wrong clean one).
+	answer := awsclient.IssueEnricherResult{Findings: msg.Findings, FieldUpdates: msg.FieldUpdates}
+	if msg.Uninspected {
+		answer.TruncatedIDs = map[string]string{msg.ResourceID: msg.Check}
+	}
+	if answeredNobody(answer, msg.Err) {
 		_, region := c.session.CurrentPair()
 		return []UIIntent{FlashIntent{Text: failureLine("enrich "+canon, msg.Err, region), IsError: true}}, nil
 	}
@@ -76,9 +77,8 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 		return out
 	})
 
-	rows, _ := c.ProbeResources(canon)
-	unified := unifiedIssueCount(rows, *td)
-	truncated := issueLowerBound(canon, c.pageTruncated(canon), c.session.EnrichmentCutGet(canon), unified > 0 || slices.ContainsFunc(rows, func(r resource.Resource) bool { return rowHasWave2Finding(r.Findings) }), uncountedMarks(canon, rows, c.session.EnrichmentTruncatedIDs[canon]))
+	unified, truncated := c.issueBadge(canon)
+	c.rescoreScanStatus(canon)
 	// Saved the way the sweep's answer is, with the set as it now stands.
 	var tasks []TaskRequest
 	if save := c.snapshotRowStoreForSave(map[string]bool{canon: true}); save != nil {

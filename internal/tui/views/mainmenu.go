@@ -233,16 +233,11 @@ func buildRenderLinesFromEntries(entries []app.MenuEntry) []renderLine {
 }
 
 // entryIssueBadge renders the " issues:N" suffix for a controller-supplied
-// entry, only when the count is positive. A truncated count is a lower bound
-// (the list has unfetched pages, so more issue rows may exist) and gets a "+"
-// suffix — mirroring the availability "(N+)" marker and the web menu template.
+// entry; app.IssueBadge.Text decides whether there is one and its "+".
 func entryIssueBadge(e app.MenuEntry) string {
-	if e.IssueBadge.Count <= 0 {
+	text := e.IssueBadge.Text()
+	if text == "" {
 		return ""
 	}
-	suffix := " issues:" + strconv.Itoa(e.IssueBadge.Count)
-	if e.IssueBadge.Truncated {
-		suffix += "+"
-	}
-	return suffix
+	return " issues:" + text
 }

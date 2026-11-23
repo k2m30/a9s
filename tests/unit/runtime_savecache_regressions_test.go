@@ -420,7 +420,7 @@ func TestAvailabilityCacheLoaded_SeededRowMutation_DoesNotWriteThroughToStore(t 
 // SaveAvailabilityCache persists correctly. But the SAME execution also
 // calls saveProbeResourcesToTypeFiles, which independently recomputes
 // td.ExcludeFromIssueBadge-gated issues from the swept ROWS via
-// unifiedIssueCount — when those rows carry NO findings and no Wave-1 issue
+// IssueCount — when those rows carry NO findings and no Wave-1 issue
 // color, that second write must not clobber the first exact observation
 // down to 0. The final persisted tf.Issues must equal the exact 5 from
 // availabilityFromResourceCache, not 0.

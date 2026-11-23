@@ -173,8 +173,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, nil
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichTrail, Priority: 200},
-		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn", "latest_delivery_time", "org_trail"},
+		Wave2:                  IssueEnricher{Fn: EnrichTrail, Priority: 200},
+		FieldKeys:              []string{"trail_name", "s3_bucket", "home_region", "multi_region", "log_file_validation_enabled", "trail_arn", "org_trail"},
+		IssueEnricherFieldKeys: []string{"is_logging", "latest_delivery_error", "latest_delivery_time"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, Truncated: true},

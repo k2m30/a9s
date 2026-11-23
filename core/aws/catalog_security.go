@@ -244,11 +244,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMUsersPage(ctx, c.IAM, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichIAMUserMFA, Priority: 100},
-		FieldKeys: []string{
-			"user_name", "user_id", "path", "create_date", "password_last_used",
-			"has_console_password",
-		},
+		Wave2:                  IssueEnricher{Fn: EnrichIAMUserMFA, Priority: 100},
+		FieldKeys:              []string{"user_name", "user_id", "path", "create_date", "password_last_used"},
 		IssueEnricherFieldKeys: []string{"mfa", "risk", "has_console_password"},
 		Related: []domain.RelatedDef{
 			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false, Truncated: true, Mirror: true},

@@ -2,10 +2,7 @@ package unit
 
 // EnrichDBIMaintenance's account-wide
 // DescribePendingMaintenanceActions walk stops on Marker==nil/empty or after
-// EnrichmentCap pages, and hitting that cap leaves the aggregate Truncated
-// flag false: dbi emits only "~" (informational) findings, so a coverage gap
-// in the account-wide walk must never lower-bound the issue badge (cf.
-// issue_enrichment.go IssueEnricherResult.Truncated contract). The call
+// EnrichmentCap pages. The call
 // count (== EnrichmentCap) is what proves the walk was cut off.
 
 import (
@@ -51,8 +48,10 @@ func TestEnrichDBIMaintenance_NotTruncated(t *testing.T) {
 	if len(result.Findings) != 1 {
 		t.Errorf("len(Findings) = %d, want 1", len(result.Findings))
 	}
-	if result.Truncated {
-		t.Error("Truncated = true, want false (single page, no Marker)")
+	// No backup list is loaded, so the backup-coverage check marks the row;
+	// the single-page walk itself left nothing at its cap.
+	if got := result.TruncatedIDs["prod-db"]; got == awsclient.CheckCap {
+		t.Errorf("prod-db marked %q after a single-page walk", got)
 	}
 }
 
@@ -75,24 +74,17 @@ func (f *rdsUnboundedMaintenanceFake) DescribePendingMaintenanceActions(_ contex
 }
 
 // TestEnrichDBIMaintenance_PaginationCapDoesNotTruncateIssueBadge verifies
-// that when the account-wide DescribePendingMaintenanceActions pagination
-// walk never terminates on its own and must be cut off by EnrichmentCap, the
-// aggregate Truncated flag stays false — dbi only ever emits "~"
-// (informational) findings, so hitting the page cap never lower-bounds the
-// issue badge. The exact call count (== EnrichmentCap) is the only signal
-// that proves the walk was actually capped; dbi is account-wide, so there is
-// no single resource row to mark via TruncatedIDs for this coverage gap.
+// that the account-wide DescribePendingMaintenanceActions pagination walk,
+// which never terminates on its own, is cut off by EnrichmentCap: the exact
+// call count (== EnrichmentCap) proves the walk was capped.
 func TestEnrichDBIMaintenance_PaginationCapDoesNotTruncateIssueBadge(t *testing.T) {
 	fake := &rdsUnboundedMaintenanceFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
 	probeResources := []resource.Resource{{ID: "prod-db"}}
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
+	_, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.Truncated {
-		t.Error("Truncated = true, want false: dbi only emits \"~\" findings, so hitting EnrichmentCap on the account-wide pagination walk must not lower-bound the aggregate issue badge")
 	}
 	if fake.calls != awsclient.EnrichmentCap {
 		t.Errorf("DescribePendingMaintenanceActions called %d times, want exactly EnrichmentCap=%d", fake.calls, awsclient.EnrichmentCap)

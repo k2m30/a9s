@@ -166,7 +166,6 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// frame may never mix findings from two profile/region pairs.
 			c.enrichmentStore = nil
 			c.enrichmentDetails = nil
-			c.enrichmentTruncated = nil
 			c.enrichmentGen++
 
 		case runtime.PatchResourceList:

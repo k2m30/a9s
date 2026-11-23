@@ -303,8 +303,8 @@ func TestW2DDBFailureAloneRaisesTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected a composite error for the denied table")
 	}
-	if !res.Truncated {
-		t.Error("a failed item left Truncated false; the issue count is presented as complete when it is a lower bound")
+	if len(res.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 }
 

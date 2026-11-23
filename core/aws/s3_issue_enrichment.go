@@ -77,7 +77,6 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 	if clients.S3 == nil {
 		return result, nil
 	}
-	truncated := false
 	var failures []Failure
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	total := len(resources)
@@ -96,7 +95,6 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		mu.Lock()
 		defer mu.Unlock()
 		if p.unreachable != nil {
-			truncated = true
 			// Cross-region bucket or a bucket deleted between ListBuckets and
 			// this call: data incomplete, but neither is a failure to log.
 			markUninspected(&result, r.ID, checkOf(p.unreachable))
@@ -114,7 +112,6 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 				continue
 			}
 			seen[cause] = true
-			truncated = true
 			MarkSkipped(&result, r.ID, &failures, callErr)
 		}
 		for _, f := range p.findings {
@@ -125,7 +122,6 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		}
 	})
 
-	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("bucket posture", failures, total))
 }
 

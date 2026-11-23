@@ -63,7 +63,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			SetTruncated(&result, true)
 			MarkSkipped(&result, name, &failures, err)
 			return
 		}
@@ -85,7 +84,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		for _, project := range buildIDToProject {
 			MarkSkipped(&result, project, &batchFailures, err)
 		}
-		err = errors.Join(listErr, Finish(&result, batchFailures, len(buildIDToProject), "BatchGetBuilds"))
+		err = errors.Join(listErr, AggregateFailures("BatchGetBuilds", batchFailures, len(buildIDToProject)))
 		return result, err
 	}
 	returned := make(map[string]bool, len(builds.Builds))

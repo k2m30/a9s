@@ -67,12 +67,8 @@ type Controller struct {
 	// re-deriving it.
 	enrichmentDetails map[string]map[string]map[domain.FindingCode]domain.AttentionDetail
 
-	// enrichmentTruncated stores the truncation flag per resource type from
-	// ApplyEnrichmentState, parallel to enrichmentStore.
-	enrichmentTruncated map[string]bool
-
-	// enrichmentGen counts every mutation of enrichmentStore/enrichmentDetails/
-	// enrichmentTruncated: applyEnrichmentState's write and the profile/
+	// enrichmentGen counts every mutation of enrichmentStore/enrichmentDetails:
+	// applyEnrichmentState's write and the profile/
 	// region-rotation reset in intents.go's MenuClearAvailabilityIntent case.
 	// buildListBody's memo (list_body.go) includes this in its cache key
 	// because resolveListRowSeverity and the status-cell override read

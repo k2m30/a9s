@@ -154,8 +154,8 @@ func TestEnrichASGScalingActivities_NilClientReturnsEmptyFindingsNoError(t *test
 }
 
 // TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond verifies the
-// bounded-fan-out partial-error behavior: an API error for one ASG sets
-// Truncated=true and does not prevent processing subsequent ASGs. The overall
+// bounded-fan-out partial-error behavior: an API error for one ASG marks
+// that ASG not inspected and does not prevent processing subsequent ASGs. The overall
 // enricher surfaces a composite error containing the failing ID.
 func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.T) {
 	fake := &asgScalingActivitiesFake{
@@ -191,8 +191,8 @@ func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.
 	if errStr := err.Error(); !strings.Contains(errStr, "my-error-asg") {
 		t.Errorf("composite error must contain the failing ASG ID \"my-error-asg\", got: %q", errStr)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when at least one ASG API call failed")
+	if len(result.TruncatedIDs) == 0 {
+		t.Error("the cut marked no row not inspected")
 	}
 	if _, ok := result.Findings["my-ok-asg"]; !ok {
 		t.Error("second ASG with failed activity must still produce a finding even after first ASG errored")

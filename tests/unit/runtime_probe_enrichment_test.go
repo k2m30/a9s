@@ -42,7 +42,6 @@ func TestCoreProbeEnrichment_DispatchesRegisteredEnricher(t *testing.T) {
 	sentinelTruncatedIDs := map[string]string{"sentinel-res-1": ""}
 
 	sentinelResult := awsclient.IssueEnricherResult{
-		Truncated:        true,
 		TruncatedIDs:     sentinelTruncatedIDs,
 		Findings:         sentinelFindings,
 		AttentionDetails: sentinelAttentionDetails,
@@ -64,9 +63,6 @@ func TestCoreProbeEnrichment_DispatchesRegisteredEnricher(t *testing.T) {
 	}
 	if result.Err != nil {
 		t.Fatalf("ProbeEnrichment(...).Err = %v; want nil", result.Err)
-	}
-	if result.Truncated != sentinelResult.Truncated {
-		t.Errorf("ProbeEnrichment(...).Truncated = %v; want sentinel %v", result.Truncated, sentinelResult.Truncated)
 	}
 	if !reflect.DeepEqual(result.Findings, sentinelFindings) {
 		t.Errorf("ProbeEnrichment(...).Findings = %#v; want sentinel %#v", result.Findings, sentinelFindings)
