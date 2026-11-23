@@ -79,6 +79,7 @@ ec2:  # ec2types.Instance
   - MetadataOptions.HttpTokens
   - MetadataOptions.InstanceMetadataTags
   - MetadataOptions.State
+  - Monitoring.MetricCategoryIds[]
   - Monitoring.State
   - NetworkInterfaces[].Association.CarrierIp
   - NetworkInterfaces[].Association.CustomerOwnedIp
@@ -222,6 +223,7 @@ dbi:  # rdstypes.DBInstance
   - CopyTagsToSnapshot
   - CustomIamInstanceProfile
   - CustomerOwnedIpEnabled
+  - DBCapacityReservationIdentifier
   - DBClusterIdentifier
   - DBInstanceArn
   - DBInstanceAutomatedBackupsReplications[].DBInstanceAutomatedBackupsArn
@@ -297,6 +299,7 @@ dbi:  # rdstypes.DBInstance
   - PendingModifiedValues.AutomationMode
   - PendingModifiedValues.BackupRetentionPeriod
   - PendingModifiedValues.CACertificateIdentifier
+  - PendingModifiedValues.DBCapacityReservationIdentifier
   - PendingModifiedValues.DBInstanceClass
   - PendingModifiedValues.DBInstanceIdentifier
   - PendingModifiedValues.DBSubnetGroupName
@@ -323,6 +326,8 @@ dbi:  # rdstypes.DBInstance
   - PerformanceInsightsRetentionPeriod
   - PreferredBackupWindow
   - PreferredMaintenanceWindow
+  - PrimaryEndpoint.Address
+  - PrimaryEndpoint.HostedZoneId
   - ProcessorFeatures[].Name
   - ProcessorFeatures[].Value
   - PromotionTier
@@ -350,6 +355,7 @@ dbi:  # rdstypes.DBInstance
   - TdeCredentialArn
   - Timezone
   - UpgradeRolloutOrder
+  - VPCNetworkingEnabled
   - VpcSecurityGroups[].Status
   - VpcSecurityGroups[].VpcSecurityGroupId
 
@@ -472,6 +478,7 @@ dbc:  # docdbtypes.DBCluster
   - ReadReplicaIdentifiers[]
   - ReaderEndpoint
   - ReplicationSourceIdentifier
+  - ServerlessV2PlatformVersion
   - ServerlessV2ScalingConfiguration.MaxCapacity
   - ServerlessV2ScalingConfiguration.MinCapacity
   - Status
@@ -516,6 +523,7 @@ eks:  # ekstypes.Cluster
   - KubeSchedulerConfig.NodeResourcesFit.ScoringStrategy.Resources[].Weight
   - KubeSchedulerConfig.NodeResourcesFit.ScoringStrategy.Type
   - KubernetesNetworkConfig.ElasticLoadBalancing.Enabled
+  - KubernetesNetworkConfig.ElasticLoadBalancing.GatewayApi.Crds.Managed
   - KubernetesNetworkConfig.IpFamily
   - KubernetesNetworkConfig.ServiceIpv4Cidr
   - KubernetesNetworkConfig.ServiceIpv6Cidr
@@ -582,10 +590,14 @@ vpc:  # ec2types.Vpc
   - CidrBlockAssociationSet[].CidrBlockState.StatusMessage
   - DhcpOptionsId
   - EncryptionControl.Mode
+  - EncryptionControl.ResourceExclusions.ApiGatewayV2.State
+  - EncryptionControl.ResourceExclusions.ApiGatewayV2.StateMessage
   - EncryptionControl.ResourceExclusions.EgressOnlyInternetGateway.State
   - EncryptionControl.ResourceExclusions.EgressOnlyInternetGateway.StateMessage
   - EncryptionControl.ResourceExclusions.ElasticFileSystem.State
   - EncryptionControl.ResourceExclusions.ElasticFileSystem.StateMessage
+  - EncryptionControl.ResourceExclusions.GlobalAccelerator.State
+  - EncryptionControl.ResourceExclusions.GlobalAccelerator.StateMessage
   - EncryptionControl.ResourceExclusions.InternetGateway.State
   - EncryptionControl.ResourceExclusions.InternetGateway.StateMessage
   - EncryptionControl.ResourceExclusions.Lambda.State
@@ -614,6 +626,9 @@ vpc:  # ec2types.Vpc
   - Ipv6CidrBlockAssociationSet[].Ipv6Pool
   - Ipv6CidrBlockAssociationSet[].NetworkBorderGroup
   - IsDefault
+  - NetworkFirewallAssociations[].FirewallArn
+  - NetworkFirewallAssociations[].FirewallMode
+  - NetworkFirewallAssociations[].FirewallOnboardingStatus
   - OwnerId
   - State
   - Tags[].Key
@@ -733,6 +748,7 @@ subnet:  # ec2types.Subnet
   - Ipv6Native
   - MapCustomerOwnedIpOnLaunch
   - MapPublicIpOnLaunch
+  - NetworkFirewallConnectivityType
   - OutpostArn
   - OwnerId
   - PrivateDnsNameOptionsOnLaunch.EnableResourceNameDnsAAAARecord
@@ -765,6 +781,8 @@ rtb:  # ec2types.RouteTable
   - Routes[].DestinationPrefixListId
   - Routes[].EgressOnlyInternetGatewayId
   - Routes[].GatewayId
+  - Routes[].IgwFirewall.FirewallArn
+  - Routes[].IgwFirewall.Status
   - Routes[].InstanceId
   - Routes[].InstanceOwnerId
   - Routes[].IpAddress
@@ -828,6 +846,7 @@ igw:  # ec2types.InternetGateway
   - Tags[].Value
 
 lambda:  # lambdatypes.FunctionConfiguration
+  - AcceleratorConfig.AcceleratorMemorySize
   - Architectures[]
   - CapacityProviderConfig.LambdaManagedInstancesCapacityProviderConfig.CapacityProviderArn
   - CapacityProviderConfig.LambdaManagedInstancesCapacityProviderConfig.ExecutionEnvironmentMemoryGiBPerVCpu
@@ -874,6 +893,8 @@ lambda:  # lambdatypes.FunctionConfiguration
   - RevisionId
   - Role
   - Runtime
+  - RuntimeConfig.RuntimeAlias
+  - RuntimeConfig.RuntimeArn
   - RuntimeVersionConfig.Error.ErrorCode
   - RuntimeVersionConfig.Error.Message
   - RuntimeVersionConfig.RuntimeVersionArn
@@ -894,6 +915,9 @@ lambda:  # lambdatypes.FunctionConfiguration
   - VpcConfig.VpcId
 
 alarm:  # cwtypes.MetricAlarm
+  - ActionConfiguration.AlarmTagsPropagation.Enabled
+  - ActionConfiguration.AlarmTagsPropagation.ExcludedTagKeys[]
+  - ActionConfiguration.AlarmTagsPropagation.IncludedTagKeys[]
   - ActionsEnabled
   - AlarmActions[]
   - AlarmArn
@@ -1219,6 +1243,7 @@ cfn:  # cfntypes.Stack
   - CreationTime
   - StackName
   - StackStatus
+  - AliasName
   - Capabilities[]
   - ChangeSetId
   - DeletionMode
@@ -1265,6 +1290,7 @@ role:  # iamtypes.Role
   - AssumeRolePolicyDocument
   - Description
   - MaxSessionDuration
+  - MaxSigninSessionDuration
   - PermissionsBoundary.PermissionsBoundaryArn
   - PermissionsBoundary.PermissionsBoundaryType
   - RoleLastUsed.LastUsedDate
@@ -1287,6 +1313,7 @@ logs:  # cwlogstypes.LogGroup
   - LogGroupName
   - MetricFilterCount
   - RetentionInDays
+  - RetentionPolicyName
   - StoredBytes
 
 ssm:  # ssmtypes.ParameterMetadata
@@ -1315,6 +1342,7 @@ ddb:  # ddbtypes.TableDescription
   - BillingModeSummary.LastUpdateToPayPerRequestDateTime
   - CreationDateTime
   - DeletionProtectionEnabled
+  - DisassociationProtectionEnabled
   - GlobalSecondaryIndexes[].Backfilling
   - GlobalSecondaryIndexes[].IndexArn
   - GlobalSecondaryIndexes[].IndexName
@@ -1437,6 +1465,7 @@ eip:  # ec2types.Address
 acm:  # acmtypes.CertificateSummary
   - CertificateArn
   - CertificateKeyPairOrigin
+  - CertificateUsage
   - CreatedAt
   - DomainName
   - ExportOption
@@ -1453,6 +1482,7 @@ acm:  # acmtypes.CertificateSummary
   - NotBefore
   - RenewalEligibility
   - RevokedAt
+  - RootHierarchyType
   - Status
   - SubjectAlternativeNameSummaries[]
   - Type
@@ -1599,6 +1629,7 @@ ecs-task:  # ecstypes.Task
   - Containers[].Cpu
   - Containers[].ExitCode
   - Containers[].GpuIds[]
+  - Containers[].GpuSharingStrategy
   - Containers[].HealthStatus
   - Containers[].Image
   - Containers[].ImageDigest
@@ -1648,6 +1679,7 @@ ecs-task:  # ecstypes.Task
   - Overrides.ContainerOverrides[].MemoryReservation
   - Overrides.ContainerOverrides[].Name
   - Overrides.ContainerOverrides[].ResourceRequirements[].Type
+  - Overrides.ContainerOverrides[].ResourceRequirements[].SharingStrategy
   - Overrides.ContainerOverrides[].ResourceRequirements[].Value
   - Overrides.Cpu
   - Overrides.EphemeralStorage.SizeInGiB
@@ -1670,6 +1702,8 @@ ecs-task:  # ecstypes.Task
   - Tags[].Value
   - TaskArn
   - TaskDefinitionArn
+  - TrustedExecutionSummary.IsolationMode
+  - TrustedExecutionSummary.AttestationPolicyStatus
   - Version
 
 policy:  # iamtypes.Policy
@@ -2050,6 +2084,7 @@ cf:  # cftypes.DistributionSummary
   - Origins.Items[].CustomOriginConfig.HTTPSPort
   - Origins.Items[].CustomOriginConfig.OriginProtocolPolicy
   - Origins.Items[].CustomOriginConfig.IpAddressType
+  - Origins.Items[].CustomOriginConfig.OriginHttpVersion
   - Origins.Items[].CustomOriginConfig.OriginKeepaliveTimeout
   - Origins.Items[].CustomOriginConfig.OriginMtlsConfig.ClientCertificateArn
   - Origins.Items[].CustomOriginConfig.OriginReadTimeout
@@ -2063,6 +2098,7 @@ cf:  # cftypes.DistributionSummary
   - Origins.Items[].S3OriginConfig.OriginAccessIdentity
   - Origins.Items[].S3OriginConfig.OriginReadTimeout
   - Origins.Items[].VpcOriginConfig.VpcOriginId
+  - Origins.Items[].VpcOriginConfig.OriginHttpVersion
   - Origins.Items[].VpcOriginConfig.OriginKeepaliveTimeout
   - Origins.Items[].VpcOriginConfig.OriginReadTimeout
   - Origins.Items[].VpcOriginConfig.OwnerAccountId
@@ -2104,9 +2140,15 @@ r53:  # r53types.HostedZone
   - Id
   - Name
   - Config.Comment
+  - Config.HostedZoneTier
   - Config.PrivateZone
   - Features.AcceleratedRecoveryStatus
+  - Features.ChangeGuardrails[].Name
+  - Features.ChangeGuardrails[].Status
+  - Features.ChangeHistory.RetentionStartsAt
+  - Features.ChangeHistory.Status
   - Features.FailureReasons.AcceleratedRecovery
+  - Features.PublicDNSFallbackStatus
   - LinkedService.Description
   - LinkedService.ServicePrincipal
   - ResourceRecordSetCount
@@ -2114,6 +2156,8 @@ r53:  # r53types.HostedZone
 r53_records:  # r53types.ResourceRecordSet
   - Name
   - Type
+  - AZAffinity.LocationId
+  - AZAffinity.LocationType
   - AliasTarget.DNSName
   - AliasTarget.EvaluateTargetHealth
   - AliasTarget.HostedZoneId
@@ -2294,6 +2338,10 @@ waf:  # wafv2types.WebACLSummary
 
 glue:  # gluetypes.Job
   - AllocatedCapacity
+  - AutoUpgradeMetadata.AnalysisId
+  - AutoUpgradeMetadata.SourceVersion
+  - AutoUpgradeMetadata.Status
+  - AutoUpgradeMetadata.TargetVersion
   - CodeGenConfigurationNodes
   - Command.Name
   - Command.PythonVersion
@@ -2827,6 +2875,7 @@ kms:  # kmstypes.KeyMetadata
   - DeletionDate
   - Description
   - Enabled
+  - EncapsulationAlgorithms[]
   - EncryptionAlgorithms[]
   - ExpirationModel
   - KeyAgreementAlgorithms[]
@@ -2977,6 +3026,7 @@ ecs_tasks:  # ecstypes.Task
   - Containers[].Cpu
   - Containers[].ExitCode
   - Containers[].GpuIds[]
+  - Containers[].GpuSharingStrategy
   - Containers[].HealthStatus
   - Containers[].Image
   - Containers[].ImageDigest
@@ -3026,6 +3076,7 @@ ecs_tasks:  # ecstypes.Task
   - Overrides.ContainerOverrides[].MemoryReservation
   - Overrides.ContainerOverrides[].Name
   - Overrides.ContainerOverrides[].ResourceRequirements[].Type
+  - Overrides.ContainerOverrides[].ResourceRequirements[].SharingStrategy
   - Overrides.ContainerOverrides[].ResourceRequirements[].Value
   - Overrides.Cpu
   - Overrides.EphemeralStorage.SizeInGiB
@@ -3048,6 +3099,8 @@ ecs_tasks:  # ecstypes.Task
   - Tags[].Value
   - TaskArn
   - TaskDefinitionArn
+  - TrustedExecutionSummary.IsolationMode
+  - TrustedExecutionSummary.AttestationPolicyStatus
   - Version
 
 ecs_svc_logs:  # cwlogstypes.FilteredLogEvent
@@ -3162,6 +3215,10 @@ elb_listeners:  # elbv2types.Listener
   - ListenerArn
   - LoadBalancerArn
   - MutualAuthentication.AdvertiseTrustStoreCaNames
+  - MutualAuthentication.ClientCertificateIdentityFilters[].Action
+  - MutualAuthentication.ClientCertificateIdentityFilters[].Field
+  - MutualAuthentication.ClientCertificateIdentityFilters[].MatchType
+  - MutualAuthentication.ClientCertificateIdentityFilters[].Value
   - MutualAuthentication.IgnoreClientCertificateExpiry
   - MutualAuthentication.Mode
   - MutualAuthentication.TrustStoreArn
@@ -3562,6 +3619,7 @@ ebs:  # ec2types.Volume
   - VolumeType
 
 ebs-snap:  # ec2types.Snapshot
+  - AssociatedKmsKeys[].KmsKeyId
   - AvailabilityZone
   - CompletionDurationMinutes
   - CompletionTime
@@ -3639,6 +3697,13 @@ ami:  # ec2types.Image
   - RamdiskId
   - RootDeviceName
   - RootDeviceType
+  - ScanResults.CriticalFixAvailableSince
+  - ScanResults.FindingScanDate
+  - ScanResults.HighFixAvailableSince
+  - ScanResults.HighestFindingSeverityLabel
+  - ScanResults.InformationalFixAvailableSince
+  - ScanResults.LowFixAvailableSince
+  - ScanResults.MediumFixAvailableSince
   - SourceImageId
   - SourceImageRegion
   - SourceInstanceId
@@ -3765,6 +3830,7 @@ lt:  # awsclient.LTRaw
   - DefaultVersion.LaunchTemplateData.MetadataOptions.InstanceMetadataTags
   - DefaultVersion.LaunchTemplateData.MetadataOptions.State
   - DefaultVersion.LaunchTemplateData.Monitoring.Enabled
+  - DefaultVersion.LaunchTemplateData.Monitoring.MetricCategoryIds[]
   - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].AssociateCarrierIpAddress
   - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].AssociatePublicIpAddress
   - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].ConnectionTrackingSpecification.TcpEstablishedTimeout
@@ -3843,6 +3909,8 @@ mwaa:  # mwaatypes.Environment
   - EndpointManagement
   - EnvironmentClass
   - ExecutionRoleArn
+  - IdentityCenterConfiguration.IdentityStoreId
+  - IdentityCenterConfiguration.StartUrl
   - KmsKey
   - LastUpdate.CreatedAt
   - LastUpdate.Error.ErrorCode
@@ -3883,6 +3951,7 @@ mwaa:  # mwaatypes.Environment
   - StartupScriptS3Path
   - Status
   - Tags
+  - Teams
   - WebserverAccessMode
   - WebserverUrl
   - WebserverVpcEndpointService
@@ -3959,9 +4028,12 @@ vpc-peer:  # ec2types.VpcPeeringConnection
   - AccepterVpcInfo.PeeringOptions.AllowDnsResolutionFromRemoteVpc
   - AccepterVpcInfo.PeeringOptions.AllowEgressFromLocalClassicLinkToRemoteVpc
   - AccepterVpcInfo.PeeringOptions.AllowEgressFromLocalVpcToRemoteClassicLink
+  - AccepterVpcInfo.PeeringOptions.AllowMultipathResilience
+  - AccepterVpcInfo.PeeringOptions.MultipathResilienceMode
   - AccepterVpcInfo.Region
   - AccepterVpcInfo.VpcId
   - ExpirationTime
+  - MultipathResilienceStatus
   - RequesterVpcInfo.CidrBlock
   - RequesterVpcInfo.CidrBlockSet[].CidrBlock
   - RequesterVpcInfo.Ipv6CidrBlockSet[].Ipv6CidrBlock
@@ -3969,6 +4041,8 @@ vpc-peer:  # ec2types.VpcPeeringConnection
   - RequesterVpcInfo.PeeringOptions.AllowDnsResolutionFromRemoteVpc
   - RequesterVpcInfo.PeeringOptions.AllowEgressFromLocalClassicLinkToRemoteVpc
   - RequesterVpcInfo.PeeringOptions.AllowEgressFromLocalVpcToRemoteClassicLink
+  - RequesterVpcInfo.PeeringOptions.AllowMultipathResilience
+  - RequesterVpcInfo.PeeringOptions.MultipathResilienceMode
   - RequesterVpcInfo.Region
   - RequesterVpcInfo.VpcId
   - Status.Code

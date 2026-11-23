@@ -396,7 +396,7 @@ func serviceRouter(req *http.Request) (int, string) {
 	}
 
 	// Fallback: empty 200
-	return 200, `{}`
+	return 200, WireEmptyBody(req, []byte(bodyStr))
 }
 
 // buildMockClients creates a *ServiceClients backed by a mock HTTP transport

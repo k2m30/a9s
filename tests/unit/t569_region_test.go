@@ -29,6 +29,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/session"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 const (
@@ -91,10 +92,7 @@ func (w *t569World) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
 		body, _ = io.ReadAll(req.Body) //nolint:errcheck // an unreadable body decodes as an empty request
 	}
-	target := req.Header.Get("X-Amz-Target")
-	_, op, _ := strings.Cut(target, ".")
-	var in map[string]any
-	_ = json.Unmarshal(body, &in)           //nolint:errcheck // a query or empty body is read below
+	op, in := unit.WireRequest(req, body)
 	form, _ := url.ParseQuery(string(body)) //nolint:errcheck // a JSON body parses as no form
 	names := t569Data[region]
 
@@ -102,9 +100,9 @@ func (w *t569World) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch {
 	case service == "codepipeline" && op == "GetPipeline":
 		name, _ := in["name"].(string)
-		resp = w.getPipeline(region, name)
+		resp = w.getPipeline(req, region, name)
 	case service == "codebuild" && op == "ListProjects":
-		resp = rwJSON(map[string]any{"projects": names["cb"]})
+		resp = unit.WireAnswer(req, map[string]any{"projects": names["cb"]})
 	case service == "codebuild" && op == "BatchGetProjects":
 		var projects []map[string]any
 		for _, n := range names["cb"] {
@@ -114,7 +112,7 @@ func (w *t569World) RoundTrip(req *http.Request) (*http.Response, error) {
 				"serviceRole": "arn:aws:iam::" + t569Account + ":role/acme-codebuild",
 			})
 		}
-		resp = rwJSON(map[string]any{"projects": projects})
+		resp = unit.WireAnswer(req, map[string]any{"projects": projects})
 	case service == "ecr" && op == "DescribeRepositories":
 		var repos []map[string]any
 		for _, n := range names["ecr"] {
@@ -178,7 +176,7 @@ func (w *t569World) RoundTrip(req *http.Request) (*http.Response, error) {
 	if n, ok := in["name"].(string); ok {
 		subject = n
 	}
-	w.record(service, region, op+form.Get("Action"), subject)
+	w.record(service, region, op, subject)
 	return resp, nil
 }
 
@@ -202,16 +200,16 @@ func t569Action(name, category, provider, region string, config map[string]strin
 	return a
 }
 
-func (w *t569World) getPipeline(region, name string) *http.Response {
+func (w *t569World) getPipeline(req *http.Request, region, name string) *http.Response {
 	actions, ok := w.pipelines[name]
 	if !ok {
-		return rwJSONError(400, "PipelineNotFoundException", "Account '"+t569Account+"' does not have a pipeline with name '"+name+"'")
+		return unit.WireError(req, 400, "PipelineNotFoundException", "Account '"+t569Account+"' does not have a pipeline with name '"+name+"'")
 	}
 	var stages []map[string]any
 	for i, a := range actions {
 		stages = append(stages, map[string]any{"name": "Stage" + strconv.Itoa(i+1), "actions": []map[string]any{a}})
 	}
-	return rwJSON(map[string]any{"pipeline": map[string]any{
+	return unit.WireAnswer(req, map[string]any{"pipeline": map[string]any{
 		"name":          name,
 		"roleArn":       "arn:aws:iam::" + t569Account + ":role/acme-codepipeline",
 		"version":       3,
