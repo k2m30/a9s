@@ -157,9 +157,6 @@ func TestEnrichCodeArtifactRepository_NoPolicyProducesFindingSevTilde(t *testing
 	}
 }
 
-// TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang verifies that when
-// repo-1 has a policy with Principal:"*" (public access), a finding with severity "!"
-// and a summary containing "public access" is produced for repo-1 only.
 func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *testing.T) {
 	fake := &codeArtifactPermPolicyFake{
 		results: map[string]*codeartifacttypes.ResourcePolicy{
@@ -182,8 +179,8 @@ func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *test
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(strings.ToLower(f.Phrase), "public access") {
-		t.Errorf("summary %q must contain \"public access\"", f.Phrase)
+	if !strings.Contains(strings.ToLower(f.Phrase), "open to anyone") {
+		t.Errorf("summary %q must contain \"open to anyone\"", f.Phrase)
 	}
 	if _, ok := result.Findings[caRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — it has a specific principal")

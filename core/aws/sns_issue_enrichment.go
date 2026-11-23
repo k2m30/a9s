@@ -13,16 +13,16 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // sns canonical FindingCodes.
 const (
-	snsCodeNoSubscribers domain.FindingCode = "sns.no-subscribers"
-	snsCodeAllPending    domain.FindingCode = "sns.all-pending-confirmation"
-	snsCodePublicPolicy  domain.FindingCode = "sns.public-policy"
-	snsCodeNoKMS         domain.FindingCode = "sns.no-kms"
+	snsCodeNoSubscribers      domain.FindingCode = "sns.no-subscribers"
+	snsCodeAllPending         domain.FindingCode = "sns.all-pending-confirmation"
+	snsCodePublicPolicy       domain.FindingCode = "sns.public-policy"
+	snsCodeCrossAccountPolicy domain.FindingCode = "sns.cross-account-policy"
+	snsCodeNoKMS              domain.FindingCode = "sns.no-kms"
 )
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
@@ -135,14 +135,7 @@ func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *Issue
 		MarkSkipped(result, topicARN, failures, err)
 		return
 	}
-	if policy := out.Attributes["Policy"]; policy != "" {
-		doc, parseErr := iampolicy.Parse(policy)
-		if parseErr != nil {
-			MarkSkipped(result, topicARN, failures, parseErr)
-		} else if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
-			setWave2Finding(result, topicARN, snsCodePublicPolicy, publicPolicyRows(ex))
-		}
-	}
+	readPolicy("sns", out.Attributes["Policy"], ownAccount, topicARN).raise(result, topicARN)
 	// AWS omits the attribute entirely for an unencrypted topic and returns
 	// it empty in some responses; both are the same fact.
 	if out.Attributes["KmsMasterKeyId"] == "" {

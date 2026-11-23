@@ -394,7 +394,7 @@ func TestLambda_PublicPolicy_FunctionURLAuthTypeNoneIsPublic(t *testing.T) {
 	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 }
 
 // With AWS_IAM a caller in another account needs "permissions granted to them
@@ -406,5 +406,5 @@ func TestLambda_PublicPolicy_FunctionURLAuthTypeIAMIsPublic(t *testing.T) {
 	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "AWS_IAM")}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 }

@@ -13,12 +13,16 @@ import (
 // Secrets carrying the resource-policy findings. Every other demo secret
 // has no resource policy attached at all, which is the healthy default.
 const (
-	// SecretPublicPolicy has a resource policy granting a wildcard principal
-	// — secrets.public-policy.
+	// SecretPublicPolicy has a resource policy granting every action but
+	// DeleteSecret to a wildcard principal — secrets.public-policy written
+	// with NotAction, so the finding has no Actions row.
 	SecretPublicPolicy = "prod/partner/shared-import-token"
 	// SecretCrossAccountPolicy names a principal in a second account —
 	// secrets.cross-account-policy.
 	SecretCrossAccountPolicy = "prod/partner/analytics-readonly"
+	// SecretUnreadablePolicy has a resource policy that does not parse, so
+	// the row is not inspected.
+	SecretUnreadablePolicy = "prod/partner/vendor-bridge-key"
 )
 
 // KafkaSASLSecretARN is the ARN of the prod/kafka/sasl-password secret, fixed
@@ -313,6 +317,7 @@ var sharedSecretsFixtures = shared(func() *SecretsFixtures {
 	const (
 		publicPolicySecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + SecretPublicPolicy + "-PbLcAn"
 		crossAcctSecretARN    = "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + SecretCrossAccountPolicy + "-XaCcTn"
+		unreadableSecretARN   = "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + SecretUnreadablePolicy + "-UnReAd"
 	)
 	secrets = append(secrets,
 		// Resource policy open to every AWS principal.
@@ -337,9 +342,20 @@ var sharedSecretsFixtures = shared(func() *SecretsFixtures {
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
 			CreatedDate:      aws.Time(time.Now().AddDate(0, 0, -180)),
 		},
+		smtypes.SecretListEntry{
+			Name:             aws.String(SecretUnreadablePolicy),
+			ARN:              aws.String(unreadableSecretARN),
+			Description:      aws.String("API key for the vendor bridge"),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -1)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -30)),
+			RotationEnabled:  aws.Bool(true),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
+			CreatedDate:      aws.Time(time.Now().AddDate(0, 0, -140)),
+		},
 	)
 
-	publicPolicyDoc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["secretsmanager:GetSecretValue"],"Resource":"*"}]}`
+	unreadablePolicyDoc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"secretsmanager:GetSecretValue"`
+	publicPolicyDoc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","NotAction":"secretsmanager:DeleteSecret","Resource":"*"}]}`
 	crossAcctPolicyDoc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-analytics-reader"},"Action":["secretsmanager:GetSecretValue"],"Resource":"*"}]}`
 
 	for i := range 18 {
@@ -378,6 +394,8 @@ var sharedSecretsFixtures = shared(func() *SecretsFixtures {
 			publicPolicySecretARN:    publicPolicyDoc,
 			SecretCrossAccountPolicy: crossAcctPolicyDoc,
 			crossAcctSecretARN:       crossAcctPolicyDoc,
+			SecretUnreadablePolicy:   unreadablePolicyDoc,
+			unreadableSecretARN:      unreadablePolicyDoc,
 		},
 	}
 })
@@ -387,5 +405,5 @@ func NewSecretsFixtures() *SecretsFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "secrets", Rows: 38, Issues: 20, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "secrets", Rows: 39, Issues: 20, CoverageGaps: []string{"dim"}})
 }

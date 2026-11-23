@@ -521,7 +521,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCEndpointsPage(ctx, c.EC2, continuationToken)
 		}),
-		FieldKeys: []string{"vpce_id", "service_name", "type", "state", "vpc_id", "policy_exposure"},
+		FieldKeys: []string{"vpce_id", "service_name", "type", "state", "vpc_id"},
 		Related: []domain.RelatedDef{
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkVPCESubnet, NeedsTargetCache: false, Mirror: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkVPCESG, NeedsTargetCache: false},
@@ -550,8 +550,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The connection request was never answered and has lapsed, so the endpoint is dead and its traffic has nowhere to go. Delete it, and raise a new request once the service owner is ready to accept.", States: []string{"expired"}, Class: catalog.LifecycleFailedLive},
 			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint works in only some of the Availability Zones it was created for, so traffic from the others fails while the endpoint itself looks present. Check which subnets are missing an interface, and whether the service is offered in those zones.", States: []string{"partial"}, Class: catalog.LifecycleFailedLive},
 			{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
-			{Code: CodeVPCEPolicyOpen, Phrase: VPCEPolicyOpenPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach."},
 		},
+		Policy: &catalog.PolicyDecl{Kind: catalog.PolicyEndpoint, Noun: "endpoint", Subject: "endpoint", Public: CodeVPCEPolicyOpen, PublicSeverity: domain.SevWarn, Unread: CodeVPCEPolicyUnread, Source: "wave1"},
 	},
 	{
 		Name:          "Transit Gateways",

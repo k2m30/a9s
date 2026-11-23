@@ -129,6 +129,9 @@ const (
 	EFSUnencrypted = "fs-0unencrypted00001"
 	// EFSPublicPolicy has a file system policy with a wildcard principal.
 	EFSPublicPolicy = "fs-0publicpolicy0001"
+	// EFSCrossAccountPolicy has a file system policy granting a role in the
+	// partner account 210987654321.
+	EFSCrossAccountPolicy = "fs-0crossaccount0001"
 	// EFSNoBackupPolicy has AWS Backup's automatic daily backups turned off.
 	EFSNoBackupPolicy = "fs-0nobackuppolicy01"
 )
@@ -152,6 +155,18 @@ var sharedEFSFixtures = shared(func() *EFSFixtures {
       "Principal": {"AWS": "*"},
       "Action": ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"],
       "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/` + EFSPublicPolicy + `"
+    }
+  ]
+}`,
+			EFSCrossAccountPolicy: `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PartnerMount",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::210987654321:role/acme-partner-ingest"},
+      "Action": "elasticfilesystem:ClientMount",
+      "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/` + EFSCrossAccountPolicy + `"
     }
   ]
 }`,
@@ -386,6 +401,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 		deleted,
 		efsPostureWitness(EFSUnencrypted, "unencrypted-legacy-efs", false),
 		efsPostureWitness(EFSPublicPolicy, "public-policy-efs", true),
+		efsPostureWitness(EFSCrossAccountPolicy, "partner-share-efs", true),
 		noBackupPolicy,
 	}
 }
@@ -605,7 +621,8 @@ func buildEFSAccessPoints() map[string][]efstypes.AccessPointDescription {
 }
 
 func init() {
-	// efs issues counts Wave-1 findings only: fs-0healthymtdown001 and
-	// fs-0publicpolicy0001 raise Wave-2 findings alone.
-	Register(Pin{ShortName: "efs", Rows: 13, Issues: 8})
+	// efs issues counts Wave-1 findings only: fs-0healthymtdown001,
+	// fs-0publicpolicy0001 and fs-0crossaccount0001 raise Wave-2 findings
+	// alone.
+	Register(Pin{ShortName: "efs", Rows: 14, Issues: 8})
 }

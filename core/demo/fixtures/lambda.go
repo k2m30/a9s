@@ -52,6 +52,9 @@ const (
 	// LambdaPublicPolicy is the only function whose resource policy allows a
 	// wildcard principal.
 	LambdaPublicPolicy = "image-thumbnail-gen"
+	// LambdaCrossAccountPolicy is the only function whose resource policy
+	// grants a role in the partner account 210987654321.
+	LambdaCrossAccountPolicy = "acme-partner-callback"
 	// LambdaFunctionURLPublic is the only function with a function URL whose
 	// AuthType is NONE.
 	LambdaFunctionURLPublic = "cloudwatch-slack-notifier"
@@ -88,7 +91,8 @@ var sharedLambdaFixtures = shared(func() *LambdaFixtures {
 			LambdaPublicPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPublicInvoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:image-thumbnail-gen"}]}`,
 			// A healthy counterpart: the same grant scoped to one service
 			// principal, which the enricher reads as not public.
-			lambdaProcessOrders: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowSQS","Effect":"Allow","Principal":{"Service":"sqs.amazonaws.com"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:process-orders"}]}`,
+			lambdaProcessOrders:      `{"Version":"2012-10-17","Statement":[{"Sid":"AllowSQS","Effect":"Allow","Principal":{"Service":"sqs.amazonaws.com"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:process-orders"}]}`,
+			LambdaCrossAccountPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPartnerInvoke","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-partner-caller"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:` + LambdaCrossAccountPolicy + `"}]}`,
 		},
 		FunctionURLConfigs: map[string][]lambdatypes.FunctionUrlConfig{
 			// Raises lambda.function-url-public: AuthType NONE with a
@@ -729,6 +733,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		{"db-backup-trigger", "Starts the nightly database backup"},
 		{"daily-report-generator", "Generates and emails the daily ops report"},
 		{"rotate-api-key", "Rotates the prod/app API key secret"},
+		{LambdaCrossAccountPolicy, "Receives order callbacks from the partner account"},
 	} {
 		fns = append(fns, lambdatypes.FunctionConfiguration{
 			FunctionName:     aws.String(fn.name),
@@ -813,5 +818,5 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 }
 
 func init() {
-	Register(Pin{ShortName: "lambda", Rows: 43, Issues: 13})
+	Register(Pin{ShortName: "lambda", Rows: 44, Issues: 13})
 }

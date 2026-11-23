@@ -189,7 +189,7 @@ func TestLambda_PublicPolicy_WildcardPrincipal(t *testing.T) {
 	res := pw1EnrichLambda(t, fake, name)
 
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 	rows := pw1Rows(res, name, pw1LambdaCodePublicPolicy)
 	pw1RequireRow(t, rows, "Principal", "*")
 	pw1RequireRow(t, rows, "Actions", "lambda:InvokeFunction")
@@ -215,7 +215,7 @@ func TestLambda_PublicPolicy_SingleStatementObject(t *testing.T) {
 	fake := &pw1LambdaPostureFake{policies: map[string]string{name: doc}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 }
 
 // TestLambda_PublicPolicy_URLEncodedDocument pins that a URL-encoded policy
@@ -231,7 +231,7 @@ func TestLambda_PublicPolicy_URLEncodedDocument(t *testing.T) {
 	}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 }
 
 // TestLambda_PublicPolicy_CrossAccountGrantIsNotPublic pins that naming
@@ -281,7 +281,7 @@ func TestLambda_PublicPolicy_ErrorMarksOnlyThatFunction(t *testing.T) {
 		t.Errorf("TruncatedIDs missing %s after a failed GetPolicy", bad)
 	}
 	pw1RequireFinding(t, res.Findings[good], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 	if _, marked := res.TruncatedIDs[good]; marked {
 		t.Errorf("healthy neighbour %s wrongly marked truncated", good)
 	}
@@ -415,7 +415,7 @@ func TestLambda_PolicyAndURLAreTwoFindings(t *testing.T) {
 	}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodeURLPublic,
 		"function endpoint open without authentication", domain.SevBroken, "wave2")
 	if len(pw1Rows(res, name, pw1LambdaCodePublicPolicy)) == 0 {

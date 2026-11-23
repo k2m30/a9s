@@ -91,6 +91,9 @@ const (
 	// path-carrying ARN — one such role can match by a coincidence
 	// of its own spelling, two cannot.
 	RoleScopedWildcardTrust = "acme-partner-integration-role"
+	// RoleUnreadableTrust carries a trust policy that does not parse, so its row
+	// reads "trust policy not inspected" and its Trust column reads unknown.
+	RoleUnreadableTrust = "acme-unreadable-trust-role"
 	// RoleAdminAttached carries the AWS-managed AdministratorAccess policy —
 	// role.admin-attached.
 	RoleAdminAttached = "acme-break-glass-role"
@@ -378,6 +381,16 @@ func buildIAMRoles() []iamtypes.Role {
 			// blank status rather than the dormant-role warning every other
 			// demo role carries.
 			RoleLastUsed: &iamtypes.RoleLastUsed{LastUsedDate: aws.Time(time.Now().AddDate(0, 0, -3))},
+		},
+		iamtypes.Role{
+			RoleName:                 aws.String(RoleUnreadableTrust),
+			RoleId:                   aws.String("AROAEXAMPLEUNREADTR1"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RoleUnreadableTrust),
+			Path:                     aws.String("/"),
+			CreateDate:               aws.Time(time.Date(2025, 7, 9, 10, 0, 0, 0, time.UTC)),
+			Description:              aws.String("Role whose trust policy document is cut off mid-statement"),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole"`),
+			RoleLastUsed:             &iamtypes.RoleLastUsed{LastUsedDate: aws.Time(time.Now().AddDate(0, 0, -5))},
 		},
 		iamtypes.Role{
 			RoleName:                 aws.String(RoleAdminAttached),
@@ -1161,7 +1174,7 @@ func buildIAMRelations(f *IAMFixtures) {
 }
 
 func init() {
-	Register(Pin{ShortName: "role", Rows: 55, Issues: 4, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "role", Rows: 56, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "policy", Rows: 29, Issues: 1, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-user", Rows: 12, Issues: 0, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-group", Rows: 5, Issues: 0, CoverageGaps: []string{"broken", "dim"}})

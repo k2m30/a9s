@@ -86,6 +86,12 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
+- **Signal**: access `Policy` admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the topic's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: `KmsMasterKeyId` absent on sensitive topic → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **API call**: `GetTopicAttributes` — one call per topic (same call as above; no added cost).
@@ -112,6 +118,9 @@ One row per signal from §3:
 | all subscriptions unconfirmed | 2 | Warning | `~` | S2, S3, S4, S5 | `all pending confirmation` |
 | `KmsMasterKeyId` absent or empty | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
 | access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `topic policy open to anyone` |
+| access `Policy` admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `topic policy grants another account` |
+
+A policy document that does not parse says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse`. An answer with no policy is no policy, and raises nothing.
 
 ## 4.1 UX review
 
@@ -169,8 +178,9 @@ sns — MESSAGING. Status key: `state` — the column naming it is the status co
 | --- | --- | --- | --- | --- |
 | sns.no-subscribers | topic has no subscribers | warn | wave2 | Nothing is subscribed to this topic, so every message published to it is discarded on arrival. Either subscribe the endpoint that was meant to receive them, or delete the topic and whatever still publishes to it. |
 | sns.all-pending-confirmation | all pending confirmation | warn | wave2 | Every subscription on this topic is still waiting for its endpoint to confirm, so no message is being delivered to anyone. Confirm the subscriptions from their endpoints, or remove the ones that were never wanted. |
-| sns.public-policy | topic policy open to anyone | broken | wave2 | The topic's access policy grants publish or subscribe to every AWS principal, so anyone can read what this topic broadcasts or inject messages its subscribers will trust. Scope the policy's Principal to the accounts and roles that actually use the topic. |
 | sns.no-kms | not encrypted with KMS | warn | wave2 | The topic has no key for server-side encryption, so message bodies are not encrypted with a key you control. The storage underneath is encrypted by AWS regardless, so this is about custody rather than about plaintext on a disk. Attach a KMS key when the messages carry data whose key access you need to grant, revoke and audit. |
+| sns.public-policy | topic policy open to anyone | broken | wave2 | The topic policy allows any principal, so anyone can use this topic, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| sns.cross-account-policy | topic policy grants another account | warn | wave2 | The topic policy admits a caller from another AWS account, so that account can use this topic, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the topic policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

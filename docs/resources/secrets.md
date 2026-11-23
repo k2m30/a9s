@@ -144,7 +144,7 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: Resource policy names a principal in another account.
+- **Signal**: Resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
   - **Own account**: principals of the owning account are not foreign. When STS cannot name the session's account, the owning account is the one the resource's ARN names; only when neither does is the row marked not inspected.
   - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
   - **State bucket**: Warning.
@@ -177,7 +177,7 @@ One row per signal from §3:
 | `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rotation not enabled` |
 | the secret's value has not changed in over 365 days | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `value unchanged in over 365 days` |
 | Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
-| Resource policy names a principal in another account | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
+| Resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | rotation failing for more than two full intervals, `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |
 | `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` |
 | the lifecycle is neither active (no `DeletedDate`) nor deleted | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
@@ -187,6 +187,8 @@ Formatting notes applied:
 - No banned words appear in S4 / S5.
 - No bare state keyword stands alone — every List text pairs a condition with a cause.
 - Healthy rows are intentionally absent from the table.
+
+A policy document that does not parse says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse`. An answer with no policy is no policy, and raises nothing.
 
 ## 4.1 UX review (two sentences)
 
@@ -237,8 +239,8 @@ secrets — SECRETS & CONFIG. Status key: `status` — the key the status cell r
 | secrets.state.dormant | dormant | warn | wave1 | Nothing has read this secret in a long time, so it is either unused or read by something you have lost track of. Confirm which through CloudTrail, then delete it or record its owner — a live credential nobody watches is the one that leaks unnoticed. |
 | secrets.rotation.disabled | rotation not enabled | warn | wave1 | The value never changes on a schedule, so a leaked copy stays valid until somebody notices and rotates it by hand. Turn on rotation with a function that can change the credential at its source. |
 | secrets.value.stale | value unchanged in over 365 days | warn | wave1 | The value has not changed in over a year, so anyone who has ever held a copy still holds a working credential. Rotate it, and set up scheduled rotation so the next year does not look the same. |
-| secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "*" principal from the resource policy, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
-| secrets.cross-account-policy | resource policy grants another account | warn | wave2 | The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise. |
+| secrets.public-policy | resource policy open to anyone | broken | wave2 | The resource policy allows any principal, so anyone can use this secret, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| secrets.cross-account-policy | resource policy grants another account | warn | wave2 | The resource policy admits a caller from another AWS account, so that account can use this secret, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the resource policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

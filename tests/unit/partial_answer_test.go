@@ -148,7 +148,7 @@ func TestPartialLambda_OneFailedCheckKeepsTheOtherOne(t *testing.T) {
 			urlErr: partialAccessDenied(),
 		})
 		w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.public-policy",
-			"invokable by anyone", domain.SevBroken, "wave2")
+			"resource policy open to anyone", domain.SevBroken, "wave2")
 		partialAssertUninspected(t, res, partialLambdaFn)
 	})
 

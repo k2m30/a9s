@@ -412,12 +412,13 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			unrecognisedStateDef(CodeDDBUnrecognisedStatus, "<status>", "wave1", "DynamoDB reports a table status a9s does not recognise, so a9s cannot tell whether the table serves requests. Check the table in the AWS console before relying on it."),
 			{Code: ddbCodePITROff, Phrase: "point-in-time recovery disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "Point-in-time recovery is off, so there is no way to roll this table back to a moment before a bad write and only explicit backups exist. Turn it on — it keeps a rolling 35-day window with no change to the table."},
 			{Code: CodeDDBDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step."},
-			{Code: ddbCodeCrossAccountPolicy, Phrase: "resource policy grants another account", Severity: domain.SevWarn, Source: "wave2", Detail: "The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest."},
-			{Code: ddbCodePublicPolicy, Phrase: "resource policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access."},
 			{Code: CodeDDBNotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2", Detail: "No backup plan backs up this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by its ARN or by the DynamoDB table resource type; a plan that takes it in only by tag, by service name or by selecting everything backs it up only once DynamoDB is opted in under this Region's AWS Backup service opt-in."},
 			DetailsDeniedFindingDef("ddb", ""),
 			DetailsUnavailableFindingDef("ddb"),
 		},
+		// GetResourcePolicy answers a table with no resource policy with
+		// PolicyNotFoundException (Amazon DynamoDB API Reference).
+		Policy: &catalog.PolicyDecl{Noun: "resource", Subject: "table", Public: ddbCodePublicPolicy, Cross: ddbCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
 	},
 	{
 		Name:           "OpenSearch Domains",
@@ -461,7 +462,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"deleted", "processing", "upgrade_processing",
 			"service_software_update_available", "encryption_at_rest_enabled",
 			"automated_update_date", "current_version", "new_version",
-			"access_policy_public", "degraded_finding", "enforce_https", "name", "node_to_node_encryption_enabled", "vpc_enabled",
+			"degraded_finding", "enforce_https", "name", "node_to_node_encryption_enabled", "vpc_enabled",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true, Truncated: true},
@@ -494,6 +495,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DetailsDeniedFindingDef("opensearch", ""),
 			DetailsUnavailableFindingDef("opensearch"),
 		},
+		Policy: &catalog.PolicyDecl{Noun: "access", Subject: "domain", Unread: opensearchCodePolicyUnread, Source: "wave1"},
 	},
 	{
 		Name:          "Redshift Clusters",
@@ -633,9 +635,11 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeEFSDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
 			unrecognisedStateDef(CodeEFSUnrecognised, "<state>", "wave1", "EFS reports a file system state a9s does not recognise, so a9s cannot tell whether it can be mounted. Check the file system in the AWS console before relying on it."),
 			{Code: CodeEFSUnencrypted, Phrase: "not encrypted", Severity: domain.SevWarn, Source: "wave1", Detail: "File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across."},
-			{Code: efsCodePublicPolicy, Phrase: "file system policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access."},
 			{Code: efsCodeNoBackupPolicy, Phrase: "automatic backups off", Severity: domain.SevWarn, Source: "wave2", Detail: "AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on."},
 		},
+		// DescribeFileSystemPolicy answers a file system with the default policy
+		// with PolicyNotFound (Amazon EFS API Reference, DescribeFileSystemPolicy).
+		Policy: &catalog.PolicyDecl{Noun: "file system", Subject: "file system", Public: efsCodePublicPolicy, Cross: efsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
 	},
 	{
 		Name:          "DB Instance Snapshots",

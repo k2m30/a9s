@@ -36,6 +36,13 @@ type ECRFixtures struct {
 const (
 	// ECRPublicPolicy — repository policy grants a wildcard principal.
 	ECRPublicPolicy = "acme/public-mirror"
+	// ECRCrossAccountPolicy — repository policy grants the partner account
+	// 210987654321.
+	ECRCrossAccountPolicy = "acme/partner-sync"
+	// ECRPolicyMissing — GetRepositoryPolicy answers without a document.
+	// ECR answers a repository with no policy with an error, so the row is
+	// not inspected.
+	ECRPolicyMissing = "acme/partner-archive"
 	// ECRScanOnPushOff — no registry scan-on-push filter matches it, so its
 	// pushed images are not scanned.
 	ECRScanOnPushOff = "acme/base-images"
@@ -169,6 +176,34 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 			},
 			CreatedAt: aws.Time(mustParseECRTime("2025-08-14T09:30:00+00:00")),
 		},
+		// ECRCrossAccountPolicy: healthy but for the repository policy that
+		// lets the partner account pull.
+		{
+			RepositoryName:             aws.String(ECRCrossAccountPolicy),
+			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRCrossAccountPolicy),
+			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRCrossAccountPolicy),
+			RegistryId:                 aws.String("123456789012"),
+			ImageTagMutability:         ecrtypes.ImageTagMutabilityImmutable,
+			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
+			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+				EncryptionType: ecrtypes.EncryptionTypeKms,
+				KmsKey:         aws.String(prodKMSKeyID),
+			},
+			CreatedAt: aws.Time(mustParseECRTime("2025-09-02T10:00:00+00:00")),
+		},
+		{
+			RepositoryName:             aws.String(ECRPolicyMissing),
+			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRPolicyMissing),
+			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRPolicyMissing),
+			RegistryId:                 aws.String("123456789012"),
+			ImageTagMutability:         ecrtypes.ImageTagMutabilityImmutable,
+			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
+			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+				EncryptionType: ecrtypes.EncryptionTypeKms,
+				KmsKey:         aws.String(prodKMSKeyID),
+			},
+			CreatedAt: aws.Time(mustParseECRTime("2025-09-10T10:00:00+00:00")),
+		},
 		// The healthy repository: immutable tags, scanned on push by the
 		// registry rule rather than its own setting (ECRRegistryScanned), a
 		// lifecycle policy, no resource policy and no vulnerable images. Demo
@@ -260,8 +295,10 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 	}
 
 	policies := map[string]string{
-		ECRPublicPolicy:    `{"Version":"2012-10-17","Statement":[{"Sid":"AnyonePull","Effect":"Allow","Principal":"*","Action":["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}`,
-		"acme/api-service": `{"Version":"2012-10-17","Statement":[{"Sid":"AllowCIPull","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/` + APIServiceRepoPolicyRoleName + `"},"Action":["ecr:GetDownloadUrlForLayer","ecr:BatchGetImage","ecr:BatchCheckLayerAvailability"]}]}`,
+		ECRPublicPolicy:       `{"Version":"2012-10-17","Statement":[{"Sid":"AnyonePull","Effect":"Allow","Principal":"*","Action":["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}`,
+		"acme/api-service":    `{"Version":"2012-10-17","Statement":[{"Sid":"AllowCIPull","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/` + APIServiceRepoPolicyRoleName + `"},"Action":["ecr:GetDownloadUrlForLayer","ecr:BatchGetImage","ecr:BatchCheckLayerAvailability"]}]}`,
+		ECRCrossAccountPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPartnerPull","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:root"},"Action":["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}`,
+		ECRPolicyMissing:      "",
 	}
 
 	// Every repository but ECRNoLifecycle expires its untagged layers.
@@ -273,6 +310,8 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 		ECRPublicPolicy:        expireUntagged,
 		"acme/internal-tools":  expireUntagged,
 		ECRHighVulnerabilities: expireUntagged,
+		ECRCrossAccountPolicy:  expireUntagged,
+		ECRPolicyMissing:       expireUntagged,
 	}
 	for _, name := range ecsServiceRepos {
 		lifecyclePolicies[name] = expireUntagged
@@ -299,7 +338,7 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 // acme/internal-* is the one wildcard filter.
 func ecrDemoScanOnPushFilters() []ecrtypes.ScanningRepositoryFilter {
 	var filters []ecrtypes.ScanningRepositoryFilter
-	for _, f := range []string{"acme/internal-*", "api-service", "frontend", "reporting", "batch-", "public-mirror", "order-worker", "degraded", "stalled"} {
+	for _, f := range []string{"acme/internal-*", "api-service", "frontend", "reporting", "batch-", "public-mirror", "partner-sync", "partner-archive", "order-worker", "degraded", "stalled"} {
 		filters = append(filters, ecrtypes.ScanningRepositoryFilter{Filter: aws.String(f), FilterType: ecrtypes.ScanningRepositoryFilterTypeWildcard})
 	}
 	return filters
@@ -314,5 +353,5 @@ func NewECRFixtures() *ECRFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "ecr", Rows: 12, Issues: 1, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ecr", Rows: 14, Issues: 1, CoverageGaps: []string{"dim"}})
 }

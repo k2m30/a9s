@@ -19,6 +19,7 @@ const (
 	opensearchCodeUpdateForced   domain.FindingCode = "opensearch.update-forced"
 	opensearchCodeEncryptionOff  domain.FindingCode = "opensearch.encryption-off"
 	opensearchCodePublic         domain.FindingCode = "opensearch.public"
+	opensearchCodePolicyUnread   domain.FindingCode = "opensearch.policy-not-inspected"
 	opensearchCodeHTTPSNotForced domain.FindingCode = "opensearch.https-not-enforced"
 	opensearchCodeN2NOff         domain.FindingCode = "opensearch.node-to-node-tls-off"
 )

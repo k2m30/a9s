@@ -29,6 +29,10 @@ const (
 	// every session of the role SNSDeployRoleID names: a healthy topic.
 	SNSRoleSessionsPolicyARN = "arn:aws:sns:us-east-1:123456789012:deploy-notifications"
 	SNSDeployRoleID          = "AROAEXAMPLEDEPLOY0001"
+
+	// SNSCrossAccountPolicyARN grants publish to the partner account
+	// 210987654321 (sns.cross-account-policy).
+	SNSCrossAccountPolicyARN = "arn:aws:sns:us-east-1:123456789012:acme-partner-events"
 )
 
 // SNSDemoKMSKeyID is the at-rest key every demo topic but SNSNoKMS carries.
@@ -92,6 +96,7 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		// rotation notify (cloudwatch.go and siblings).
 		{TopicArn: aws.String(OpsAlertsTopicARN)},
 		{TopicArn: aws.String(OpsCriticalTopicARN)},
+		{TopicArn: aws.String(SNSCrossAccountPolicyARN)},
 	}
 
 	subscriptions := []snstypes.Subscription{
@@ -180,6 +185,7 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 	subsByTopic[BackupAlertsSNSTopicARN] = minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com")
 	subsByTopic[OpsAlertsTopicARN] = minimalSubscriptions(OpsAlertsTopicARN, "email", "ops@acme-corp.com")
 	subsByTopic[OpsCriticalTopicARN] = minimalSubscriptions(OpsCriticalTopicARN, "email", "oncall@acme-corp.com")
+	subsByTopic[SNSCrossAccountPolicyARN] = minimalSubscriptions(SNSCrossAccountPolicyARN, "sqs", "arn:aws:sqs:us-east-1:123456789012:"+SQSCrossAccountPolicy)
 
 	// TopicAttributes — required for the sns:kms and sns:role related-panel
 	// pivots (checkSNSKMS / checkSNSRole via GetTopicAttributes). The
@@ -205,6 +211,9 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		SNSRoleSessionsPolicyARN: {
 			"Policy": `{"Version":"2012-10-17","Statement":[{"Sid":"DeployRoleSessions","Effect":"Allow","Principal":"*","Action":"sns:Publish","Resource":"` + SNSRoleSessionsPolicyARN + `","Condition":{"StringLike":{"aws:userid":"` + SNSDeployRoleID + `:*"}}}]}`,
 		},
+		SNSCrossAccountPolicyARN: {
+			"Policy": `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPartnerPublisher","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:root"},"Action":"sns:Publish","Resource":"` + SNSCrossAccountPolicyARN + `"}]}`,
+		},
 	}
 
 	// Every real topic returns GetTopicAttributes with at least these common
@@ -222,9 +231,10 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		BackupAlertsSNSTopicARN: "Backup Vault Alerts",
 		"arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts":       "Staging Deploy Alerts",
 		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": "Webhook Integration (Pending)",
-		SNSPublicPolicyARN:  "Public Order Events",
-		OpsAlertsTopicARN:   "Ops Alerts",
-		OpsCriticalTopicARN: "Ops Critical",
+		SNSPublicPolicyARN:       "Public Order Events",
+		OpsAlertsTopicARN:        "Ops Alerts",
+		OpsCriticalTopicARN:      "Ops Critical",
+		SNSCrossAccountPolicyARN: "Partner Events",
 	}
 	for arn, displayName := range topicDisplayNames {
 		confirmed, pending, deleted := 0, 0, 0
@@ -285,6 +295,6 @@ func minimalSubscriptions(topicARN, protocol, endpoint string) []snstypes.Subscr
 }
 
 func init() {
-	Register(Pin{ShortName: "sns", Rows: 12, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sns", Rows: 13, Issues: 0, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "sns-sub", Rows: 7, Issues: 2, CoverageGaps: []string{"broken"}})
 }

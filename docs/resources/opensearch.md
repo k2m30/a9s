@@ -122,6 +122,10 @@ One bullet per distinct signal.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
   - **Cost shape**: hybrid.
 
+- **Signal**: `DomainStatus.AccessPolicies` does not parse, so whether anyone can reach the domain cannot be judged.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `DomainStatus.DomainEndpointOptions.EnforceHTTPS` not true.
   - **State bucket**: Warning.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
@@ -183,6 +187,7 @@ One row per signal from §3:
 | `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` |
 | `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
 | No `VPCOptions` AND access policy allows any principal | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `reachable outside a VPC` |
+| `AccessPolicies` does not parse | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `access policy not inspected` |
 | `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `HTTPS not enforced` |
 | `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `node-to-node encryption off` |
 | `DescribeDomains` was denied for this domain | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
@@ -190,6 +195,8 @@ One row per signal from §3:
 | `DomainProcessingStatus == Creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
 | `DomainProcessingStatus` is Modifying, UpgradingEngineVersion or UpdatingServiceSoftware | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `processing: config change in flight` |
 | `DomainProcessingStatus` is a value the SDK enum does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
+
+An access policy that does not parse never reads as closed: the row reads `access policy not inspected` in yellow, and no `reachable outside a VPC` signal is raised for it.
 
 ## 4.1 UX review
 
@@ -247,6 +254,7 @@ opensearch — DATABASES & STORAGE. Status key: `status` — the key the status 
 | opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave1 | Traffic between the domain's own nodes is unencrypted, so documents and queries cross the network in the clear while shards replicate and requests fan out. On OpenSearch and on Elasticsearch 6.7 or later, turn on node-to-node encryption in the domain's security configuration; an older Elasticsearch domain needs a new domain with it on and a data migration. |
 | opensearch.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | opensearch.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
+| opensearch.policy-not-inspected | access policy not inspected | warn | wave1 | The access policy document AWS returned does not parse, so a9s cannot say whether it opens this domain to anyone. Read the document in the detail view and judge its grants by hand. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -39,7 +39,7 @@ var pw1ComputeDefs = []pw1DefExpectation{
 	{"ecs-task", "ecs-task.writable-root", "writable root filesystem", domain.SevWarn, "wave2"},
 	{"ecs-task", "ecs-task.no-logging", "container without log driver", domain.SevWarn, "wave2"},
 	{"ecs-task", "ecs-task.env-secret", "credential in container environment", domain.SevBroken, "wave2"},
-	{"lambda", "lambda.public-policy", "invokable by anyone", domain.SevBroken, "wave2"},
+	{"lambda", "lambda.public-policy", "resource policy open to anyone", domain.SevBroken, "wave2"},
 	{"lambda", "lambda.function-url-public", "function endpoint open without authentication", domain.SevBroken, "wave2"},
 	{"lambda", "lambda.env-secret", "credential in environment variables", domain.SevBroken, "wave1"},
 	{"asg", "asg.launch-config.legacy", "uses a launch configuration", domain.SevWarn, "wave1"},

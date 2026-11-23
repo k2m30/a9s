@@ -68,8 +68,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   finding.
 
 - The menu issue count for ECR, launch templates and Transfer Family no longer includes the scan-on-push, IMDSv1, volume-encryption and security-policy warnings. These checks now need an extra read, and warnings from those reads colour the row without raising the menu count, as for every other type.
+- A KMS key, SQS queue, SNS topic, Lambda function, ECR repository, EFS file
+  system or CodeArtifact repository whose policy names a principal in another
+  AWS account now shows a `~` "… policy grants another account" warning with
+  an `Accounts` row, as secrets and DynamoDB tables already did. When the
+  session cannot tell which account is yours and the ARN names none, the row
+  reads "not inspected: own account unknown".
+- A grant to `"*"` or to a service principal that a condition scopes to one
+  account (`aws:PrincipalAccount`, `aws:SourceAccount`, `aws:SourceOwner`,
+  or the account in `aws:SourceArn` / `aws:PrincipalArn`) is a share with
+  that account: when it is not yours, the row shows "… policy grants another
+  account" with that account in `Accounts`. A queue that a topic in another
+  account delivers to is an example.
+- Every policy finding reads the same way on every type: "<document> policy
+  open to anyone" and "<document> policy grants another account". A Lambda
+  function now reads `resource policy open to anyone` (was `invokable by
+  anyone`), a role `trust policy open to anyone` (was `anyone can assume this
+  role`) and a CodeArtifact repository `repository policy open to anyone` (was
+  `public access policy`).
+- Every "open to anyone" finding shows the same rows: `Principal`, `Actions`,
+  `Condition` and `Deny when`, in the colour of the finding. A role's
+  `trust policy open to anyone` finding now shows `Principal` and `Actions`
+  too. A grant written with `NotAction` has no `Actions` row instead of an
+  empty one.
+- The detail sentence of each policy finding says what the policy grants
+  ("depending on the actions allowed") instead of naming a consequence a9s
+  did not check, such as decrypting, reading the credential or pulling
+  images.
+- The OpenSearch `access_policy_public`, VPC endpoint `policy_exposure` and
+  role `trust_wildcard` fields are removed; the policy verdict is the row's
+  finding. A view column you added on one of these keys reads empty.
+- A KMS key, ECR repository, EFS file system, Lambda function, DynamoDB table or CodeArtifact
+  repository whose policy read succeeds but carries no document reads "not
+  inspected: no policy document returned". These services answer a missing
+  policy with an error, or always have one, so an empty answer is not a
+  verdict.
 
 ### Fixed
+
+- A policy that does not parse is never shown as private. A queue, topic,
+  key, secret, table, file system, function, repository or REST API row reads "not inspected: policy does not parse" and the type
+  returns no error; before, the type logged a failed call. An OpenSearch
+  domain, IAM role or VPC endpoint whose policy does not parse shows a yellow
+  `access policy not inspected`, `trust policy not inspected` or `endpoint
+  policy not inspected` row instead of a healthy one, and the role's Trust
+  column reads `unknown`.
 
 - A resource, trust or VPC endpoint policy that grants to every principal is no longer read as
   scoped by a condition value that still matches anyone. A value with `*` or `?` anywhere (for

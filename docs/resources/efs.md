@@ -148,6 +148,12 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
+- **Signal**: File system policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the file system's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: AWS Backup policy status not `ENABLED`.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
@@ -177,6 +183,7 @@ One row per signal from §3:
 | `Encrypted` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted` |
 | any mount target `LifeCycleState != available` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `mount target down` |
 | File system policy allows any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `file system policy open to anyone` |
+| File system policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `file system policy grants another account` |
 | AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `automatic backups off` |
 | `LifeCycleState == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 | `LifeCycleState` outside `LifeCycleState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
@@ -186,6 +193,8 @@ Rules for filling list and detail text:
 - Banned words (internal jargon must never appear here): `Wave 1`, `Wave 2`, `Wave 3`, `finding`, `enrichment`, `probe`, `truncated`, `lower bound`, `bucket`, `severity`.
 - A bare state keyword in the List text column is unacceptable unless it is itself readable AWS status language (`creating`, `updating`, `deleting`, `error`) — in EFS those words are the cause the operator would read on the list.
 - Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
+
+A policy document that does not parse, or a policy read that answers without a document, says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse` or `no policy document returned`.
 
 ## 4.1 UX review (two sentences)
 
@@ -235,8 +244,9 @@ efs — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | efs.deleted | deleted | dim | wave1 | — |
 | efs.warn.unrecognised\_state | <state> (unrecognised) | warn | wave1 | EFS reports a file system state a9s does not recognise, so a9s cannot tell whether it can be mounted. Check the file system in the AWS console before relying on it. |
 | efs.unencrypted | not encrypted | warn | wave1 | File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across. |
-| efs.public-policy | file system policy open to anyone | broken | wave2 | The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access. |
 | efs.no-backup-policy | automatic backups off | warn | wave2 | AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on. |
+| efs.public-policy | file system policy open to anyone | broken | wave2 | The file system policy allows any principal, so anyone can use this file system, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| efs.cross-account-policy | file system policy grants another account | warn | wave2 | The file system policy admits a caller from another AWS account, so that account can use this file system, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the file system policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

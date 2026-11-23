@@ -21,9 +21,13 @@ type CodeArtifactFixtures struct {
 	// response. Backs EnrichCodeArtifactRepository's Wave-2 issue checks: a
 	// missing entry surfaces as ResourceNotFoundException ("no permissions
 	// policy" — "~"); a policy document containing "Principal":"*" surfaces
-	// as "public access policy" ("!").
+	// as "repository policy open to anyone" ("!").
 	PermissionsPolicies map[string]*codeartifacttypes.ResourcePolicy
 }
+
+// CodeArtifactCrossAccountPolicy is the repository whose permissions policy
+// grants a role in the partner account 210987654321.
+const CodeArtifactCrossAccountPolicy = "acme-partner-libs"
 
 func mustParseCATime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
@@ -76,6 +80,15 @@ var sharedCodeArtifactFixtures = shared(func() *CodeArtifactFixtures {
 				AdministratorAccount: aws.String("123456789012"),
 				CreatedTime:          aws.Time(mustParseCATime("2025-04-01T09:45:00+00:00")),
 			},
+			{
+				Name:                 aws.String(CodeArtifactCrossAccountPolicy),
+				DomainName:           aws.String("acme-artifacts"),
+				DomainOwner:          aws.String("123456789012"),
+				Arn:                  aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/" + CodeArtifactCrossAccountPolicy),
+				Description:          aws.String("Packages shared with the partner build account"),
+				AdministratorAccount: aws.String("123456789012"),
+				CreatedTime:          aws.Time(mustParseCATime("2025-04-02T10:00:00+00:00")),
+			},
 		},
 		Domains: map[string]codeartifacttypes.DomainDescription{
 			"acme-artifacts": {
@@ -103,6 +116,10 @@ var sharedCodeArtifactFixtures = shared(func() *CodeArtifactFixtures {
 				ResourceArn: aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/acme-docker"),
 				Document:    aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"codeartifact:ReadFromRepository","Resource":"*"}]}`),
 			},
+			CodeArtifactCrossAccountPolicy: {
+				ResourceArn: aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/" + CodeArtifactCrossAccountPolicy),
+				Document:    aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-partner-build"},"Action":"codeartifact:ReadFromRepository","Resource":"*"}]}`),
+			},
 		},
 	}
 })
@@ -112,5 +129,5 @@ func NewCodeArtifactFixtures() *CodeArtifactFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "codeartifact", Rows: 4, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "codeartifact", Rows: 5, Issues: 0, CoverageGaps: []string{"dim"}})
 }

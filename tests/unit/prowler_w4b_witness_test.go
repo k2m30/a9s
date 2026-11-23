@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
@@ -75,11 +76,23 @@ func TestW4bScopedWildcardTrustWitnessIsClean(t *testing.T) {
 	if got := td.ResolveColor(r); got != domain.ColorHealthy {
 		t.Errorf("color = %v, want Healthy", got)
 	}
-	if got := r.Fields["trust_wildcard"]; got != "false" {
-		t.Errorf("trust_wildcard = %q, want %q", got, "false")
+	for _, code := range []domain.FindingCode{"role.trust.wildcard-principal", "role.trust.policy-not-inspected"} {
+		if _, ok := w4FindingByCode(t, r.Findings, code); ok {
+			t.Errorf("witness carries %s", code)
+		}
 	}
-	if got := r.Fields["trust_summary"]; got != "" {
-		t.Errorf("trust_summary = %q, want empty: the Trust cell reads blank", got)
+	ctrl := newTestController(t)
+	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "role"})
+	ctrl.ApplyResourcesLoaded("role", rows, nil, false)
+	body := ctrl.Snapshot().Body.List
+	trustCol := slices.IndexFunc(body.Columns, func(c app.ColumnDef) bool { return c.Title == "Trust" })
+	if trustCol < 0 {
+		t.Fatal("the role list has no Trust column")
+	}
+	for _, row := range body.Rows {
+		if row.ResourceID == r.ID && strings.TrimSpace(row.Cells[trustCol]) != "" {
+			t.Errorf("Trust cell = %q, want blank", row.Cells[trustCol])
+		}
 	}
 }
 
@@ -311,7 +324,7 @@ func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 		}
 	}
 
-	const wantWitnessed = 17
+	const wantWitnessed = 18
 	if singles != wantWitnessed {
 		t.Errorf("%d witness-backed wave-2 codes on the bench, want %d — a witness was added or lost "+
 			"without this count moving with it; codes seen: %v", singles, wantWitnessed, codes)

@@ -30,7 +30,7 @@ func TestRoleColor(t *testing.T) {
 
 	wildcardTrust := []domain.Finding{{
 		Code:     "role.trust.wildcard-principal",
-		Phrase:   "anyone can assume this role",
+		Phrase:   "trust policy open to anyone",
 		Severity: domain.SevBroken,
 		Source:   "wave1",
 	}}

@@ -121,7 +121,7 @@ func extractIAMPolicyARN(r resource.Resource) (string, bool) {
 }
 
 // parsePolicyDoc runs a decoded policy document through the one policy
-// engine. FetchManagedPolicyDocument hands back the unmarshalled document, so
+// parse. FetchManagedPolicyDocument hands back the unmarshalled document, so
 // the round trip keeps every question about it — admin, privilege
 // escalation — on iampolicy, which accepts both a Statement array and the
 // bare Statement object AWS allows.
@@ -133,7 +133,7 @@ func parsePolicyDoc(doc any) (iampolicy.Document, bool) {
 	if err != nil {
 		return iampolicy.Document{}, false
 	}
-	parsed, err := iampolicy.Parse(string(raw))
+	parsed, err := parsePolicy(string(raw))
 	if err != nil {
 		return iampolicy.Document{}, false
 	}

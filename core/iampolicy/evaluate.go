@@ -23,9 +23,11 @@ type Exposure struct {
 	// reaches every caller outside a restrictive scope. False whenever
 	// Public.
 	Conditioned bool
-	// CrossAccount: sorted, de-duplicated account IDs named as principals
-	// that differ from ownAccount and keep an action no unconditional Deny
-	// takes from them. ownAccount "" reports every account.
+	// CrossAccount: sorted, de-duplicated account IDs a grant admits that
+	// differ from ownAccount and keep an action no unconditional Deny takes
+	// from them: an AWS principal's account, and for a Principal "*" or
+	// service-principal grant the accounts its condition confines it to
+	// (conditionAccounts). ownAccount "" reports every account.
 	CrossAccount []string
 	// PublicActions: sorted, de-duplicated actions that made Public true.
 	// nil when !Public.
@@ -138,9 +140,22 @@ func evaluate(doc Document, ownAccount string, keys []scopingKey) Exposure {
 				conditioned = true
 			}
 		}
+		admitted := conditionAccounts(st.Condition, keys)
 		for _, p := range st.principals() {
-			if p.Kind == "AWS" && p.Account != "" && p.Account != ownAccount && doc.grants(st, p) {
-				accounts[p.Account] = struct{}{}
+			if !doc.grants(st, p) {
+				continue
+			}
+			named := admitted
+			switch p.Kind {
+			case "AWS":
+				named = []string{p.Account}
+			case "Federated":
+				named = nil
+			}
+			for _, a := range named {
+				if a != "" && a != ownAccount {
+					accounts[a] = struct{}{}
+				}
 			}
 		}
 	}
@@ -624,6 +639,31 @@ func isRestrictive(cond map[string]map[string][]string, keys []scopingKey) bool 
 		}
 	}
 	return false
+}
+
+// conditionAccounts returns the accounts a condition confines a grant to: the
+// account ID, or the account field of an ARN, that a scoping key of keys is
+// compared with under an operator that can narrow the caller (see
+// isRestrictive). A Principal "*" or service-principal grant under it admits
+// those accounts and no other. An organization or a VPC names no account.
+func conditionAccounts(cond map[string]map[string][]string, keys []scopingKey) []string {
+	var out []string
+	for op, block := range cond {
+		if !isPositiveOperator(op) || hasSetPrefix(op, "ForAllValues:") {
+			continue
+		}
+		for key, vals := range block {
+			if !slices.ContainsFunc(keys, func(k scopingKey) bool { return strings.EqualFold(k.Key, key) }) {
+				continue
+			}
+			for _, v := range vals {
+				if a := accountID(v); a != "" {
+					out = append(out, a)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // OpenCIDR reports whether c reaches every address of its family: a prefix

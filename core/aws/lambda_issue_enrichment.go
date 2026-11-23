@@ -17,14 +17,14 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // lambda Wave-2 canonical FindingCodes.
 const (
-	lambdaCodePublicPolicy      domain.FindingCode = "lambda.public-policy"
-	lambdaCodeFunctionURLPublic domain.FindingCode = "lambda.function-url-public"
+	lambdaCodePublicPolicy       domain.FindingCode = "lambda.public-policy"
+	lambdaCodeCrossAccountPolicy domain.FindingCode = "lambda.cross-account-policy"
+	lambdaCodeFunctionURLPublic  domain.FindingCode = "lambda.function-url-public"
 )
 
 // EnrichLambdaPosture asks, per function (capped at EnrichmentCap), GetPolicy
@@ -66,7 +66,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		r := targets[i]
 		// Every read runs here, on this row's own goroutine; the mutex below
 		// only records results, so no row waits on another's round trip.
-		policyRows, policyPublic, policyErr := lambdaPolicyExposure(ctx, api, r.ID, ownAccount)
+		policy, policyErr := lambdaPolicy(ctx, api, r.ID)
 		urlRows, urlPublic, urlErr := lambdaFunctionURLExposure(ctx, api, r.ID)
 		cfg, getErr := lambdaGetConfiguration(ctx, api, r.ID)
 
@@ -93,8 +93,8 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 				setWave2Finding(&result, r.ID, CodeLambdaLastUpdateFailed, nil)
 			}
 		}
-		if policyPublic && catalog.Applies(lambdaCodePublicPolicy, class, state) {
-			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, policyRows)
+		if policyErr == nil {
+			readPolicy("lambda", policy, ownAccount, r.Fields["arn"]).raiseIn(&result, r.ID, class, state)
 		}
 		if urlPublic && catalog.Applies(lambdaCodeFunctionURLPublic, class, state) {
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
@@ -125,25 +125,17 @@ func lambdaGetConfiguration(ctx context.Context, api LambdaGetFunctionAPI, name 
 	return out.Configuration, nil
 }
 
-// lambdaPolicyExposure evaluates the function's resource policy through the
-// shared iampolicy engine. A missing policy is the healthy answer.
-func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, ownAccount string) ([]domain.DetailRow, bool, error) {
+// lambdaPolicy reads the function's resource policy. A missing policy is the
+// healthy answer, returned as ResourceNotFoundException.
+func lambdaPolicy(ctx context.Context, api LambdaGetPolicyAPI, name string) (string, error) {
 	out, err := api.GetPolicy(ctx, &lambda.GetPolicyInput{FunctionName: aws.String(name)})
 	if err != nil {
-		return nil, false, err
+		return "", err
 	}
-	if out == nil || out.Policy == nil || *out.Policy == "" {
-		return nil, false, UnusableAnswerErr{Call: "GetPolicy", Field: "policy"}
+	if out == nil {
+		return "", nil
 	}
-	doc, parseErr := iampolicy.Parse(*out.Policy)
-	if parseErr != nil {
-		return nil, false, parseErr
-	}
-	ex := iampolicy.Evaluate(doc, ownAccount)
-	if !ex.Public {
-		return nil, false, nil
-	}
-	return publicPolicyRows(ex), true, nil
+	return aws.ToString(out.Policy), nil
 }
 
 // lambdaFunctionURLExposure reports a function URL whose AuthType is NONE.

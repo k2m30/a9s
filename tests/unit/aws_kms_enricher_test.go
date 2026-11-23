@@ -51,7 +51,7 @@ var _ awsclient.KMSAPI = (*kmsFake)(nil)
 func makeKMSResources(ids ...string) []resource.Resource {
 	rs := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
-		rs = append(rs, resource.Resource{ID: id, Name: id})
+		rs = append(rs, resource.Resource{ID: id, Name: id, Fields: map[string]string{"arn": "arn:aws:kms:us-east-1:123456789012:key/" + id}})
 	}
 	return rs
 }

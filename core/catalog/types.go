@@ -222,6 +222,9 @@ type ResourceTypeDef struct {
 
 	// Findings is the declarative table of finding codes for this type.
 	Findings []FindingDef
+	// Policy declares the policy document attached to this type's resources.
+	// nil means the type reads none.
+	Policy *PolicyDecl
 
 	// StateEnum is every value AWS can report in this type's lifecycle field
 	// (Fields[StatusKey()]): the SDK enum's Values() or the documented list.
@@ -232,6 +235,40 @@ type ResourceTypeDef struct {
 	StateEnum    []string
 	NormalStates []string
 	UnknownState domain.FindingCode
+}
+
+// PolicyKind is how a policy document is evaluated: as a resource or trust
+// policy, which governs who may call the resource, or as a VPC endpoint
+// policy, which governs what the endpoint may reach.
+type PolicyKind int
+
+const (
+	PolicyResource PolicyKind = iota
+	PolicyEndpoint
+)
+
+// PolicyDecl is what a type reads from the policy attached to its resources.
+// The FindingDefs of Public and Cross are built from it, never written by
+// hand, so every policy finding has one wording.
+type PolicyDecl struct {
+	Kind PolicyKind
+	// Noun names the document ("key" reads "key policy") and Subject the
+	// resource it is attached to ("this key").
+	Noun, Subject string
+	// Public is raised for a grant to anyone and Cross for a grant to another
+	// AWS account; "" declares no such finding.
+	Public, Cross  domain.FindingCode
+	PublicSeverity domain.Severity
+	// Unread is raised by a Wave 1 type when the document does not parse. A
+	// Wave 1 row has no not-inspected mark, so this finding is the only place
+	// the operator sees that the policy could not be judged.
+	Unread domain.FindingCode
+	// Source is the provenance of the findings, "wave1" or "wave2".
+	Source string
+	// Required declares that a successful read always carries a document:
+	// AWS answers "no policy" with an error, or every resource has one. An
+	// answer without a document is then unknown, not "no policy".
+	Required bool
 }
 
 // CloudTrailQualifier is how a row of a parent-scoped type is told from its

@@ -30,7 +30,7 @@ const (
 	w4CodeRoleInlinePrivEsc  domain.FindingCode = "role.inline-privilege-escalation"
 	w4CodeRoleAdminAttached  domain.FindingCode = "role.admin-attached"
 
-	w4PhraseRoleWildcardTrust  = "anyone can assume this role"
+	w4PhraseRoleWildcardTrust  = "trust policy open to anyone"
 	w4PhraseRoleConfusedDeputy = "service can assume without source scoping"
 	w4PhraseRoleAdminAttached  = "has an administrator policy"
 

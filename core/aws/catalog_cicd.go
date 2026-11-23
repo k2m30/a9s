@@ -287,11 +287,13 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Findings: []catalog.FindingDef{
 			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2", Detail: "Images in this repository carry findings at critical severity, and anything deployed from them is running that code today. Rebuild on a patched base image, push it, and roll the deployments that reference the affected tags forward."},
 			{Code: ecrCodeHighVulnerabilities, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave2", Detail: "Scanning found high-severity findings in this repository's images, so the workloads running them carry known, already-published weaknesses. Rebuild on an updated base image and move the tags forward as part of the next routine deployment."},
-			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2", Detail: "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."},
 			{Code: CodeECRScanOnPushOff, Phrase: "pushed images not scanned", Severity: domain.SevWarn, Source: "wave2", Detail: "No registry scanning rule matches this repository; once the registry has rules, a repository no rule matches is not scanned on push whatever its own setting says, and without rules its own scan on push is off. An image is not scanned as it arrives, so a known vulnerability in a base layer can reach production without anyone being told. Add a scan-on-push or continuous rule whose filter matches this repository to the registry's scanning configuration."},
 			{Code: CodeECRMutableTags, Phrase: "tags are mutable", Severity: domain.SevWarn, Source: "wave1", Detail: "An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from."},
 		},
+		// GetRepositoryPolicy answers a repository with no policy with
+		// RepositoryPolicyNotFoundException (Amazon ECR API Reference).
+		Policy: &catalog.PolicyDecl{Noun: "repository", Subject: "repository", Public: ecrCodePublicPolicy, Cross: ecrCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
 	},
 	{
 		Name:          "CodeArtifact Repos",
@@ -352,8 +354,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: codeartifactCodeNoPermissionsPolicy, Phrase: "no permissions policy", Severity: domain.SevWarn, Source: "wave2", Detail: "The repository has no resource policy, so who may read and publish depends entirely on the IAM policies attached to each caller and there is no single place to see or restrict it. Attach a repository policy naming the accounts and roles allowed to pull, and the smaller set allowed to publish."},
-			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 		},
+		// GetRepositoryPermissionsPolicy answers a repository with no policy
+		// with ResourceNotFoundException (CodeArtifact API Reference).
+		Policy: &catalog.PolicyDecl{Noun: "repository", Subject: "repository", Public: codeartifactCodePublicAccessPolicy, Cross: codeartifactCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
 	},
 }
 

@@ -14,15 +14,15 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // sqs canonical FindingCodes.
 const (
-	sqsCodeMissingDLQ   domain.FindingCode = "sqs.missing-dlq"
-	sqsCodeNoKMS        domain.FindingCode = "sqs.no-kms"
-	sqsCodePublicPolicy domain.FindingCode = "sqs.public-policy"
+	sqsCodeMissingDLQ         domain.FindingCode = "sqs.missing-dlq"
+	sqsCodeNoKMS              domain.FindingCode = "sqs.no-kms"
+	sqsCodePublicPolicy       domain.FindingCode = "sqs.public-policy"
+	sqsCodeCrossAccountPolicy domain.FindingCode = "sqs.cross-account-policy"
 )
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
@@ -93,14 +93,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			!strings.EqualFold(out.Attributes["SqsManagedSseEnabled"], "true") {
 			setWave2Finding(&result, r.ID, sqsCodeNoKMS, nil)
 		}
-		if policy := out.Attributes["Policy"]; policy != "" {
-			doc, parseErr := iampolicy.Parse(policy)
-			if parseErr != nil {
-				MarkSkipped(&result, r.ID, &failures, parseErr)
-			} else if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
-				setWave2Finding(&result, r.ID, sqsCodePublicPolicy, publicPolicyRows(ex))
-			}
-		}
+		readPolicy("sqs", out.Attributes["Policy"], ownAccount, r.Fields["arn"]).raise(&result, r.ID)
 	})
 
 	return result, errors.Join(loopErr, AggregateFailures("GetQueueAttributes", failures, total))

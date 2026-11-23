@@ -16,7 +16,6 @@ import (
 	apigatewayv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -259,39 +258,28 @@ func apigwRESTAuthorizerFindings(ctx context.Context, api apigwV1API, result *Is
 		MarkSkipped(result, apiID, failures, err)
 		return
 	}
-	var policyErr error
-	if len(authorizers) == 0 {
-		endpoint := strings.ToLower(r.Fields["endpoint"])
-		// A method with no IAM authorization admits an anonymous caller only
-		// when the resource policy grants it and no Deny matches, so the API
-		// is scoped unless an unscoped wildcard grant survives.
-		scoped := false
-		if policy := apigwRESTPolicy(r); policy != "" {
-			var doc iampolicy.Document
-			if doc, policyErr = iampolicy.Parse(policy); policyErr == nil {
-				scoped = !iampolicy.Evaluate(doc, ownAccount).Public
-			}
-		}
-		switch {
-		case policyErr != nil:
-			// A policy that cannot be read leaves the exposure unknown.
-		case scoped:
-			// guarded by the policy — no finding
-		case endpoint == "":
-			// The endpoint type is unknown, and the common contract's nil rule
-			// makes an unread field unknown rather than misconfigured.
-		case endpoint == "private":
-			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{
-				{Label: "Authorizers", Value: "0", Tier: "~"},
-				{Label: "Endpoint", Value: endpoint, Tier: "~"}})
-		default:
-			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizerPublic, []domain.DetailRow{
-				{Label: "Authorizers", Value: "0", Tier: "!"},
-				{Label: "Endpoint", Value: endpoint, Tier: "!"}})
-		}
+	if len(authorizers) > 0 {
+		return
 	}
-	if policyErr != nil {
-		MarkSkipped(result, apiID, failures, policyErr)
+	endpoint := strings.ToLower(r.Fields["endpoint"])
+	// A method with no IAM authorization admits an anonymous caller only
+	// when the resource policy grants it and no Deny matches, so the API is
+	// scoped unless it has no policy or an unscoped wildcard grant survives.
+	policy := readPolicy("apigw", apigwRESTPolicy(r), ownAccount, "")
+	switch {
+	case policy.markUnread(result, apiID):
+	case !policy.absent() && !policy.public():
+	case endpoint == "":
+		// The endpoint type is unknown, and the common contract's nil rule
+		// makes an unread field unknown rather than misconfigured.
+	case endpoint == "private":
+		setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{
+			{Label: "Authorizers", Value: "0", Tier: "~"},
+			{Label: "Endpoint", Value: endpoint, Tier: "~"}})
+	default:
+		setWave2Finding(result, apiID, CodeAPIGWNoAuthorizerPublic, []domain.DetailRow{
+			{Label: "Authorizers", Value: "0", Tier: "!"},
+			{Label: "Endpoint", Value: endpoint, Tier: "!"}})
 	}
 }
 

@@ -74,9 +74,9 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing has read this secret in a long time, so it is either unused or read by something you have lost track of. Confirm which through CloudTrail, then delete it or record its owner — a live credential nobody watches is the one that leaks unnoticed."},
 			{Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The value never changes on a schedule, so a leaked copy stays valid until somebody notices and rotates it by hand. Turn on rotation with a function that can change the credential at its source."},
 			{Code: CodeSecretStaleValue, Phrase: "value unchanged in over 365 days", Severity: domain.SevWarn, Source: "wave1", Detail: "The value has not changed in over a year, so anyone who has ever held a copy still holds a working credential. Rotate it, and set up scheduled rotation so the next year does not look the same."},
-			{Code: secretsCodePublicPolicy, Phrase: "resource policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the \"*\" principal from the resource policy, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
-			{Code: secretsCodeCrossAccountPolicy, Phrase: "resource policy grants another account", Severity: domain.SevWarn, Source: "wave2", Detail: "The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise."},
 		},
+		// GetResourcePolicy omits ResourcePolicy for a secret with none.
+		Policy: &catalog.PolicyDecl{Noun: "resource", Subject: "secret", Public: secretsCodePublicPolicy, Cross: secretsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2"},
 	},
 	{
 		Name:           "SSM Parameters",
@@ -165,7 +165,9 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeKMSAccessDenied, Phrase: "access denied (kms:DescribeKey)", Severity: domain.SevBroken, Source: "wave1", Detail: "This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key."},
 			DetailsUnavailableFindingDef("kms"),
 			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it."},
-			{Code: kmsCodePublicPolicy, Phrase: "key policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Add a condition that requires the caller's account or role to equal one you expect, and keep any condition limiting which service the request may come through: that one narrows the path but not the caller, so it bounds the exposure without closing it."},
 		},
+		// "Every KMS key must have exactly one key policy" (AWS KMS Developer
+		// Guide, Key policies in AWS KMS).
+		Policy: &catalog.PolicyDecl{Noun: "key", Subject: "key", Public: kmsCodePublicPolicy, Cross: kmsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
 	},
 }

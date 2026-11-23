@@ -123,6 +123,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `PolicyDocument` does not parse, so whether the endpoint is open cannot be judged (not on a deleting/deleted endpoint).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: `State == deleted` → Dim.
   - **State bucket**: Dim.
   - **How obtained**: `State` field on the list-response endpoint.
@@ -162,8 +166,11 @@ sentence would restate it. Their S5 cell reads `—`.
 | `State == expired` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expired` |
 | `State == partial` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `partial` |
 | One `PolicyDocument` statement grants a wildcard action — `*` or a service-wide `s3:*` — on `Resource: "*"` to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `endpoint policy open to anyone` |
+| `PolicyDocument` does not parse (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `endpoint policy not inspected` |
 | `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 | `State` outside the documented list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
+
+A `PolicyDocument` that does not parse never reads as scoped: the row reads `endpoint policy not inspected` in yellow, and no `endpoint policy open to anyone` signal is raised for it.
 
 Note: S4 cells pair the state with a cause per the "state keywords are not explanations" rule; bare `Pending` or `Failed` would be insufficient. When `LastError.Message` is present for a `Failed` row, it replaces the generic `failed` cause at render time. Truncate `LastError.Message` at 40 chars for the list view — the full sentence is available in the detail view's field block (which is always rendered for any resource and is not an S5 enrichment line).
 
@@ -228,7 +235,8 @@ vpce — NETWORKING. Status key: `state` — the key the status cell reads, and 
 | vpce.state.expired | expired | broken | wave1 | The connection request was never answered and has lapsed, so the endpoint is dead and its traffic has nowhere to go. Delete it, and raise a new request once the service owner is ready to accept. |
 | vpce.state.partial | partial | broken | wave1 | The endpoint works in only some of the Availability Zones it was created for, so traffic from the others fails while the endpoint itself looks present. Check which subnets are missing an interface, and whether the service is offered in those zones. |
 | vpce.state.deleted | deleted | dim | wave1 | — |
-| vpce.policy-open | endpoint policy open to anyone | warn | wave1 | The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach. |
+| vpce.policy-open | endpoint policy open to anyone | warn | wave1 | The endpoint policy allows any principal, so anyone can use this endpoint, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| vpce.policy-not-inspected | endpoint policy not inspected | warn | wave1 | The endpoint policy document AWS returned does not parse, so a9s cannot say whether it opens this endpoint to anyone. Read the document in the detail view and judge its grants by hand. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

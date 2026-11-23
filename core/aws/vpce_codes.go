@@ -17,8 +17,6 @@ const (
 
 	// CodeVPCEPolicyOpen marks an endpoint whose policy grants full access to
 	// every principal — the policy AWS attaches when none is supplied.
-	CodeVPCEPolicyOpen domain.FindingCode = "vpce.policy-open"
+	CodeVPCEPolicyOpen   domain.FindingCode = "vpce.policy-open"
+	CodeVPCEPolicyUnread domain.FindingCode = "vpce.policy-not-inspected"
 )
-
-// VPCEPolicyOpenPhrase is the status phrase for CodeVPCEPolicyOpen.
-const VPCEPolicyOpenPhrase = "endpoint policy open to anyone"

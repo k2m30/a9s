@@ -16,6 +16,10 @@ const SQSPublicPolicy = "sqs-public-policy"
 // organization perimeter.
 const SQSOrgPerimeterPolicy = "order-processing-queue"
 
+// SQSCrossAccountPolicy names the queue whose access policy grants a role in
+// the partner account 210987654321 (sqs.cross-account-policy).
+const SQSCrossAccountPolicy = "acme-partner-intake"
+
 // sqsPublicPolicyQueueURL is the same queue addressed the way
 // GetQueueAttributes wants it; the row itself is keyed by queue name.
 const sqsPublicPolicyQueueURL = "https://sqs.us-east-1.amazonaws.com/123456789012/" + SQSPublicPolicy
@@ -130,6 +134,20 @@ var sharedSQSFixtures = shared(func() *SQSFixtures {
 					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sqs:ReceiveMessage","sqs:SendMessage"],"Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSPublicPolicy + `","Condition":{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::acme-*"}}}]}`,
 				},
 			},
+			// SQSCrossAccountPolicy: encrypted and with a redrive policy, so the
+			// grant to the partner account's role is the one finding it trips.
+			{
+				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + SQSCrossAccountPolicy,
+				QueueName: SQSCrossAccountPolicy,
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "7",
+					"ApproximateNumberOfMessagesNotVisible": "0",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + SQSCrossAccountPolicy,
+					"RedrivePolicy":                         `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
+					"SqsManagedSseEnabled":                  "true",
+					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPartnerProducer","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-partner-producer"},"Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSCrossAccountPolicy + `"}]}`,
+				},
+			},
 			// SQSManagedSSE: encrypted by SQS with an AWS-owned key. A
 			// redrive policy keeps it off the missing-DLQ finding, so the only
 			// thing this queue demonstrates is that managed encryption is
@@ -190,5 +208,5 @@ func NewSQSFixtures() *SQSFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "sqs", Rows: 11, Issues: 2, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sqs", Rows: 12, Issues: 2, CoverageGaps: []string{"dim"}})
 }

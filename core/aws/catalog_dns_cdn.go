@@ -232,12 +232,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Findings: []catalog.FindingDef{
 			{Code: apigwCodeNoDeployedStages, Phrase: "no deployed stages", Severity: domain.SevWarn, Source: "wave2", Detail: "This gateway has no deployed stage, so its routes exist in the definition and answer nothing — callers get a not-found from an endpoint that looks configured. Deploy it to a stage, or delete it if it was abandoned."},
 			{Code: apigwCodeStageConfigIssues, Phrase: "stage configuration issues", Severity: domain.SevWarn, Source: "wave2", Detail: "A stage on this endpoint runs with no request throttle, or with access logging switched off, so it either absorbs whatever load arrives or leaves no record of who called it. Set a default throttle on the stage and point its access logs at a log group."},
-			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2", Detail: "Anyone on the internet can call every route this gateway exposes, because nothing checks the caller's identity. Attach an authorizer, or scope the resource policy to the callers that should reach it."},
-			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call every route. Attach an authorizer."},
+			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2", Detail: "Nothing checks the caller's identity and no resource policy scopes the caller, so anyone on the internet can call the routes this gateway exposes. Attach an authorizer, or scope the resource policy to the callers that should reach it."},
+			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call the routes it exposes. Attach an authorizer."},
 			{Code: CodeAPIGWNoAccessLogs, Phrase: "no access logs", Severity: domain.SevWarn, Source: "wave2", Detail: "The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group."},
 			{Code: CodeAPIGWTracingOff, Phrase: "X-Ray tracing off", Severity: domain.SevWarn, Source: "wave2", Detail: "Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage."},
 			{Code: CodeAPIGWStageVariableSecret, Phrase: "credential in stage variables", Severity: domain.SevBroken, Source: "wave2", Detail: "A stage variable holds what looks like a credential, and stage variables are readable by anyone who can read the gateway's configuration. Move the value into Secrets Manager and reference it from the integration."},
 		},
+		Policy: &catalog.PolicyDecl{},
 	},
 }
 

@@ -108,10 +108,17 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
   - **API call**: `GetKeyRotationStatus` — one per key that can rotate automatically (`KeySpec=SYMMETRIC_DEFAULT`, `Origin=AWS_KMS`, no custom key store). A customer key that cannot rotate automatically gets the signal without the call.
   - **Cost shape**: per-resource.
 
-- **Signal**: Default key policy allows a wildcard principal with no restrictive condition.
+- **Signal**: Key policy allows a wildcard principal with no restrictive condition.
   - **Explicit Deny**: a Deny statement that takes the grant from every caller on every granted resource clears the signal, and so do Deny statements that together fence both AWS service principals and every other caller to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. A conditional Deny that spares AWS service principals, or that names only part of the granted resources, does not clear it and is shown in the `Deny when` row. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: Key policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the key's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
+  - **State bucket**: Warning.
+  - **API call**: `GetKeyPolicy` — the same read as the wildcard-principal signal.
   - **Cost shape**: per-resource.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
@@ -138,7 +145,8 @@ One row per signal from §3:
 | `DescribeKey` was denied for this key | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `access denied (kms:DescribeKey)` |
 | `DescribeKey` failed for this key for any reason but a denial | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S2, S3, S4, S5 | `key rotation disabled` |
-| Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `key policy open to anyone` |
+| Key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `key policy open to anyone` |
+| Key policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `key policy grants another account` |
 
 Rules for filling list and detail text:
 
@@ -146,6 +154,8 @@ Rules for filling list and detail text:
 - A bare state keyword (`Disabled`, `PendingDeletion`, `Unavailable`) in the List text column is not acceptable. Pair it with a cause the operator can act on (`disabled: admin off`, `pending deletion`, `unavailable: custom key store offline`).
 - For signals that legitimately have no operator-actionable cause (pure `Enabled` Healthy), omit the row from this table entirely; §3 still describes it.
 - Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
+
+A policy document that does not parse, or a policy read that answers without a document, says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse` or `no policy document returned`.
 
 ## 4.1 UX review (two sentences)
 
@@ -186,7 +196,8 @@ kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key. |
 | kms.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 | The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it. |
-| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Add a condition that requires the caller's account or role to equal one you expect, and keep any condition limiting which service the request may come through: that one narrows the path but not the caller, so it bounds the exposure without closing it. |
+| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows any principal, so anyone can use this key, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| kms.cross-account-policy | key policy grants another account | warn | wave2 | The key policy admits a caller from another AWS account, so that account can use this key, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the key policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

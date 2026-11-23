@@ -649,9 +649,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			unrecognisedStateDef(CodeLambdaUnrecognisedState, "<state>", "wave2", "Lambda reports a function state a9s does not recognise, so a9s cannot tell whether the function can be invoked. Check the function in the AWS console before relying on it."),
 			{Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1", Detail: "Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed."},
 			{Code: CodeLambdaEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1", Detail: "A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one."},
-			{Code: lambdaCodePublicPolicy, Phrase: "invokable by anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it."},
 			{Code: lambdaCodeFunctionURLPublic, Phrase: "function endpoint open without authentication", Severity: domain.SevBroken, Source: "wave2", Detail: "The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it."},
 		},
+		// GetPolicy answers a function with no resource policy with
+		// ResourceNotFoundException (AWS Lambda API Reference, GetPolicy).
+		Policy: &catalog.PolicyDecl{Noun: "resource", Subject: "function", Public: lambdaCodePublicPolicy, Cross: lambdaCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
 	},
 	{
 		Name:           "Auto Scaling Groups",

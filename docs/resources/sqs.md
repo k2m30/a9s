@@ -110,6 +110,12 @@ A queue whose `GetQueueAttributes` fails is KEPT name-only: `details denied` (Wa
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
+- **Signal**: access `Policy` admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the queue's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: `ApproximateNumberOfMessages` > threshold → Warning (queue backlog). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **API call**: `GetQueueAttributes(AttributeNames=[All])` — one call per queue.
@@ -154,10 +160,13 @@ One row per signal from §3:
 | `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S3, S4, S5 | `no DLQ configured` |
 | `KmsMasterKeyId` unset and `SqsManagedSseEnabled` off | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
 | access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `queue policy open to anyone` |
+| access `Policy` admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `queue policy grants another account` |
 | `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` |
 | `ApproximateNumberOfMessages rising unbounded` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S2, S4, S5 | `backlog growing: <N> msgs` |
 | `ApproximateAgeOfOldestMessage > VisibilityTimeout × 5` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `oldest msg age: <D>` |
 | `is-DLQ with messages` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `DLQ has <N> msgs` |
+
+A policy document that does not parse says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse`. An answer with no policy is no policy, and raises nothing.
 
 ## 4.1 UX review
 
@@ -217,9 +226,10 @@ sqs — MESSAGING. Status key: `state` — the column naming it is the status co
 | --- | --- | --- | --- | --- |
 | sqs.missing-dlq | no DLQ configured | warn | wave2 | Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue. |
 | sqs.no-kms | not encrypted with KMS | warn | wave2 | The queue has neither the AWS-managed queue encryption nor a KMS key, so message bodies are held without server-side encryption. Turn on the managed queue encryption, which costs nothing and needs no key policy, or attach a KMS key when you need to control and audit the key yourself. |
-| sqs.public-policy | queue policy open to anyone | broken | wave2 | The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue. |
 | sqs.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | sqs.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
+| sqs.public-policy | queue policy open to anyone | broken | wave2 | The queue policy allows any principal, so anyone can use this queue, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| sqs.cross-account-policy | queue policy grants another account | warn | wave2 | The queue policy admits a caller from another AWS account, so that account can use this queue, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the queue policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

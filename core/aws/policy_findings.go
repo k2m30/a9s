@@ -3,19 +3,23 @@
 // policy_findings.go owns the vocabulary every policy-derived finding shares:
 // the one definition of "an AWS-managed policy that hands out
 // administrator-equivalent power" (so the role, user and group
-// ListAttached*Policies sweeps can never disagree), and the supporting rows
-// a public or cross-account resource policy renders.
+// ListAttached*Policies sweeps can never disagree), and the one reader of a
+// policy attached to a resource: its parse, its evaluation, and the findings,
+// marks, verdict words and rows it yields.
 package aws
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
+	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 )
@@ -135,37 +139,241 @@ func adminAttachedRows(policyName string) []domain.DetailRow {
 	return []domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "~"}}
 }
 
-// publicPolicyRows renders the supporting rows for a "policy is open to
-// anyone" finding, shared by every resource-policy check so the KMS key, the
-// secret and the next one all describe the exposure identically.
-func publicPolicyRows(ex iampolicy.Exposure) []domain.DetailRow {
-	rows := []domain.DetailRow{{Label: "Principal", Value: "*", Tier: "!"}}
-	if len(ex.PublicActions) > 0 {
-		rows = append(rows, domain.DetailRow{
-			Label: "Actions", Value: strings.Join(ex.PublicActions, ", "), Tier: "!",
+// parsePolicy is the one parse of a policy document in core/aws. A policy
+// attached to a resource is read through readPolicy; an identity policy, read
+// for its privileges, comes here and is asked its questions through
+// core/iampolicy's named methods, so every reader of a document that does not
+// parse gets the same error.
+func parsePolicy(document string) (iampolicy.Document, error) {
+	return iampolicy.Parse(document)
+}
+
+// ownAccountOf is the account a policy attached to a resource is judged
+// against: the session's, or the one the resource's ARN names when STS has
+// not answered.
+func ownAccountOf(sessionAccount, resourceARN string) string {
+	return cmp.Or(sessionAccount, iampolicy.AccountFromARN(resourceARN))
+}
+
+// grantedPrincipalRefs returns the IAM principal ARNs of kind ("role/",
+// "user/", "group/") that policy grants once its explicit Deny statements are
+// applied, in every account: the resolver leaves out another account's. ok is
+// false when the policy does not parse.
+func grantedPrincipalRefs(policy, kind string) (refs []string, ok bool) {
+	doc, err := parsePolicy(policy)
+	if err != nil {
+		return nil, false
+	}
+	for _, p := range iampolicy.AllowedPrincipals(doc, "") {
+		if a, isIAM := ARNForService(p.Value, "iam"); p.Kind == "AWS" && isIAM && strings.HasPrefix(a.Resource, kind) {
+			refs = append(refs, p.Value)
+		}
+	}
+	return refs, true
+}
+
+// CheckPolicyUnreadable is what a row records when the policy attached to it
+// does not parse, and CheckPolicyMissing when a read that always carries a
+// document (catalog.PolicyDecl.Required) answered without one: nothing about
+// who the policy grants can be read, so the policy checks did not run.
+// Nothing refused, so neither is a failed call.
+const (
+	CheckPolicyUnreadable = "policy does not parse"
+	CheckPolicyMissing    = "no policy document returned"
+)
+
+// policyDeclOf is the declaration of short. A type that reads a policy
+// without declaring one is a programming error, caught by the tests that
+// drive every reader.
+func policyDeclOf(short string) catalog.PolicyDecl {
+	if td := catalog.FindAny(short); td != nil && td.Policy != nil {
+		return *td.Policy
+	}
+	if testing.Testing() {
+		panic("readPolicy: type " + short + " declares no catalog Policy")
+	}
+	return catalog.PolicyDecl{}
+}
+
+// policyReading is one read of a policy attached to a resource: a resource,
+// key, queue, topic or repository policy, a role's trust policy, a domain's
+// access policy, an endpoint policy. Every finding, mark and verdict word
+// read from such a document comes from it, so "a document nobody could read
+// is never clean", the own-account fallback and the rows of the finding hold
+// for every type at once.
+type policyReading struct {
+	decl    catalog.PolicyDecl
+	present bool
+	parsed  bool
+	own     string
+	doc     iampolicy.Document
+	ex      iampolicy.Exposure
+}
+
+// readPolicy reads the policy of a resource of type short, the way its
+// declaration says. resourceARN is "" for a type whose ARN names no account.
+// An empty document and the JSON null both carry no policy.
+func readPolicy(short, document, ownAccount, resourceARN string) policyReading {
+	p := policyReading{decl: policyDeclOf(short)}
+	document = strings.TrimSpace(document)
+	p.present = document != "" && document != "null"
+	if !p.present {
+		return p
+	}
+	doc, err := parsePolicy(document)
+	if err != nil {
+		return p
+	}
+	p.parsed, p.doc, p.own = true, doc, ownAccountOf(ownAccount, resourceARN)
+	if p.decl.Kind == catalog.PolicyEndpoint {
+		p.ex = endpointExposure(doc)
+	} else {
+		p.ex = iampolicy.Evaluate(doc, p.own)
+	}
+	return p
+}
+
+// endpointExposure reads a VPC endpoint policy, which is public only when a
+// wildcard principal, a wildcard action and a wildcard resource meet in ONE
+// statement no Deny closes: that combination, and only it, is the full-access
+// policy AWS attaches when the endpoint is created without one. Each Allow is
+// evaluated beside the document's Deny statements on its own, because the
+// aggregate Exposure merges the actions of every public statement, so one
+// statement granting "*" on a bucket and another granting s3:GetObject on "*"
+// would read as a full-access policy neither of them is.
+func endpointExposure(doc iampolicy.Document) iampolicy.Exposure {
+	var denies []iampolicy.Statement
+	for _, st := range doc.Statement {
+		if st.Effect == "Deny" {
+			denies = append(denies, st)
+		}
+	}
+	for _, st := range doc.Statement {
+		if st.Effect != "Allow" || !slices.Contains(st.Resource, "*") {
+			continue
+		}
+		ex := iampolicy.EvaluateEndpoint(iampolicy.Document{Statement: append([]iampolicy.Statement{st}, denies...)})
+		if ex.Public && slices.ContainsFunc(ex.PublicActions, isWildcardAction) {
+			return ex
+		}
+	}
+	return iampolicy.Exposure{}
+}
+
+// isWildcardAction reports whether an IAM action string grants every action
+// the endpoint can reach. An endpoint only ever fronts one service, so
+// "s3:*" withholds nothing that "*" would have granted through it.
+func isWildcardAction(action string) bool {
+	_, verb, hasService := strings.Cut(action, ":")
+	if hasService {
+		return verb == "*"
+	}
+	return action == "*"
+}
+
+func (p policyReading) unreadCheck() string {
+	switch {
+	case p.present && !p.parsed:
+		return CheckPolicyUnreadable
+	case !p.present && p.decl.Required:
+		return CheckPolicyMissing
+	}
+	return ""
+}
+
+func (p policyReading) unread() bool { return p.unreadCheck() != "" }
+
+func (p policyReading) absent() bool { return !p.present }
+
+func (p policyReading) public() bool { return p.ex.Public }
+
+// word is the Wave 1 verdict a row shows for its policy: unknown when the
+// document could not be read, so a row never reads private or scoped on a
+// policy nobody could read.
+func (p policyReading) word(public, closed string) string {
+	switch {
+	case p.unread():
+		return "unknown"
+	case p.public():
+		return public
+	}
+	return closed
+}
+
+// withUnread is the Wave 1 form of "this policy could not be read": the
+// type's declared Unread finding, since a fetcher row has no not-inspected
+// mark to carry it.
+func (p policyReading) withUnread(findings []domain.Finding) []domain.Finding {
+	if p.unread() && p.decl.Unread != "" {
+		return append(findings, wave1Finding(p.decl.Unread))
+	}
+	return findings
+}
+
+// servicePrincipalsWithoutSourceScope is the confused-deputy reading of a
+// trust policy: the services it trusts with no source condition.
+func (p policyReading) servicePrincipalsWithoutSourceScope() []string {
+	if !p.parsed {
+		return nil
+	}
+	return p.doc.HasServicePrincipalWithoutSourceScope()
+}
+
+// detail is the Attention block of the public finding: who, which actions,
+// the conditions the grant carries and the conditional Denies that did not
+// close it. Neither condition scopes the caller, so together they say what
+// the grant is still open to (every AWS service, whoever presents an external
+// ID, whoever calls over TLS); a Deny row reads "Deny when" because IAM
+// applies the Deny when its condition matches. A NotAction grant lists no
+// actions, so it has no Actions row.
+func (p policyReading) detail() domain.AttentionDetail {
+	tier := tierOf(p.decl.Public)
+	rows := []domain.DetailRow{{Label: "Principal", Value: "*", Tier: tier}}
+	add := func(label string, items []string, sep string) {
+		if len(items) > 0 {
+			rows = append(rows, domain.DetailRow{Label: label, Value: strings.Join(items, sep), Tier: tier})
+		}
+	}
+	add("Actions", p.ex.PublicActions, ", ")
+	add("Condition", p.ex.PublicConditions, "; ")
+	add("Deny when", p.ex.PublicDenyConditions, "; ")
+	return domain.AttentionDetail{Rows: rows}
+}
+
+// markUnread marks the row not inspected when its policy could not be read,
+// and reports whether it did. The policy it could not read may grant anyone,
+// a "!" finding, so the issue count becomes a lower bound.
+func (p policyReading) markUnread(result *IssueEnricherResult, id string) bool {
+	check := p.unreadCheck()
+	if check != "" {
+		markUninspected(result, id, check)
+		SetTruncated(result, true)
+	}
+	return check != ""
+}
+
+func (p policyReading) raise(result *IssueEnricherResult, id string) {
+	p.raiseIn(result, id, catalog.LifecycleNormal, "")
+}
+
+// raiseIn is raise for a row whose lifecycle the enricher read itself: each
+// code stands only in the classes it declares. A grant to another account is
+// judged only against a known own account: without one every principal reads
+// as foreign, which would report the account's own roles as an outside share.
+func (p policyReading) raiseIn(result *IssueEnricherResult, id string, class catalog.LifecycleClass, state string) {
+	d := p.decl
+	switch {
+	case p.markUnread(result, id):
+	case p.public():
+		if catalog.Applies(d.Public, class, state) {
+			setWave2Finding(result, id, d.Public, p.detail().Rows)
+		}
+	case d.Cross == "" || len(p.ex.CrossAccount) == 0:
+	case p.own == "":
+		markUninspected(result, id, CheckOwnAccountUnknown)
+	case catalog.Applies(d.Cross, class, state):
+		setWave2Finding(result, id, d.Cross, []domain.DetailRow{
+			{Label: "Accounts", Value: strings.Join(p.ex.CrossAccount, ", "), Tier: tierOf(d.Cross)},
 		})
 	}
-	return append(rows, publicConditionRows(ex, "!")...)
-}
-
-// publicConditionRows states the conditions a public grant carries and the
-// conditional Denies that did not close it: neither scopes the caller, so
-// together they say what the grant is still open to (every AWS service,
-// whoever presents an external ID, whoever calls over TLS). A Deny row reads
-// "Deny when" because IAM applies the Deny when its condition matches.
-func publicConditionRows(ex iampolicy.Exposure, tier string) []domain.DetailRow {
-	var rows []domain.DetailRow
-	if len(ex.PublicConditions) > 0 {
-		rows = append(rows, domain.DetailRow{Label: "Condition", Value: strings.Join(ex.PublicConditions, "; "), Tier: tier})
-	}
-	if len(ex.PublicDenyConditions) > 0 {
-		rows = append(rows, domain.DetailRow{Label: "Deny when", Value: strings.Join(ex.PublicDenyConditions, "; "), Tier: tier})
-	}
-	return rows
-}
-
-// crossAccountPolicyRows renders the supporting rows for a "policy grants
-// another account" finding.
-func crossAccountPolicyRows(ex iampolicy.Exposure) []domain.DetailRow {
-	return []domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: "~"}}
 }

@@ -50,6 +50,11 @@ const WarnKMSDetailsUnavailableID = "d0e1f2a3-b4c5-4789-a1de-aabbccddeeff"
 // either has no policy fixture or names concrete principals.
 const KMSPublicPolicy = "c9d0e1f2-a3b4-6789-01cd-ffaabbccddee"
 
+// KMSCrossAccountPolicy is the key raising kms.cross-account-policy: its key
+// policy grants a role in the partner account 210987654321. Its rotation is
+// on, so the share is the only thing the row reports.
+const KMSCrossAccountPolicy = "3e4f5a6b-7c8d-4e9f-a0b1-c2d3e4f5a6b7"
+
 // SSMDefaultKeyID is the AWS-managed key the alias "alias/aws/ssm" points at —
 // the key SSM encrypts a SecureString parameter with when none is named
 // (/acme/legacy/db/password in ssm.go). Like every AWS-managed key it is not a
@@ -65,8 +70,9 @@ const AWSManagedS3KeyID = "0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0"
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
 var sharedKMSFixtures = shared(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
-		// Rotation enabled (see RotationEnabled below) → the only demo CMK for
-		// which EnrichKMSRotation raises no kms.rotation-disabled finding.
+		// Rotation enabled (see RotationEnabled below) → with
+		// KMSCrossAccountPolicy, the demo CMKs for which EnrichKMSRotation
+		// raises no kms.rotation-disabled finding.
 		{
 			KeyId:                aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -318,6 +324,20 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		{
+			KeyId:                aws.String(KMSCrossAccountPolicy),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSCrossAccountPolicy),
+			Description:          aws.String("Partner export key shared with the acme-partner account"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 4, 2, 9, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			KeySpec:              kmstypes.KeySpecSymmetricDefault,
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 		// EFS prod-app-data encryption key — required for efs→kms related-panel pivot.
 		// The prod-efs-app-data filesystem sets KmsKeyId = ProdEFSKmsKeyARN; the
 		// checker strips the ARN to the bare key ID and looks it up here.
@@ -446,6 +466,11 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 			TargetKeyId: aws.String(KMSPublicPolicy),
 		},
 		{
+			AliasName:   aws.String("alias/acme-partner-export"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-partner-export"),
+			TargetKeyId: aws.String(KMSCrossAccountPolicy),
+		},
+		{
 			AliasName:   aws.String("alias/no-rotation-cmk"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/no-rotation-cmk"),
 			TargetKeyId: aws.String("f6a7b8c9-def0-3456-789a-ccddeeff0011"),
@@ -539,12 +564,13 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 	keyPolicies := map[string]string{
 		"a1b2c3d4-5678-90ab-cdef-111111111111": `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowKeyUseByEC2InstanceRole","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ec2-instance-profile"},"Action":["kms:Decrypt","kms:GenerateDataKey"],"Resource":"*"}]}`,
 		KMSPublicPolicy:                        `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowAnyoneToDecrypt","Effect":"Allow","Principal":"*","Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
+		KMSCrossAccountPolicy:                  `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowPartnerDecrypt","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-partner-reader"},"Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
 	}
 
-	// RotationEnabled — the primary production key has rotation on; every
-	// other key defaults to false via the map zero value.
+	// A key with no entry reports false, as a real CMK ships with rotation off.
 	rotationEnabled := map[string]bool{
 		"a1b2c3d4-5678-90ab-cdef-111111111111": true,
+		KMSCrossAccountPolicy:                  true,
 	}
 
 	return &KMSFixtures{KeyList: keyMetadata, Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies, RotationEnabled: rotationEnabled}
@@ -557,5 +583,5 @@ func NewKMSFixtures() *KMSFixtures {
 func init() {
 	// dim: no kms state finding is Dim — Disabled is declared Warning — and
 	// docs/resources/kms.md documents no Dim-producing signal.
-	Register(Pin{ShortName: "kms", Rows: 23, Issues: 10, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "kms", Rows: 24, Issues: 10, CoverageGaps: []string{"dim"}})
 }

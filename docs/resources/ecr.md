@@ -118,6 +118,12 @@ One bullet per distinct signal.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
+- **Signal**: the repository policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the repository's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
+  - **State bucket**: Warning.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+
 - **Signal**: `GetLifecyclePolicy` reports no policy.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
@@ -146,6 +152,7 @@ One row per signal from §3:
 | latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
 | latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S3, S4, S5 | `<N> high vulnerabilities` |
 | the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `repository policy open to anyone` |
+| the repository policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `repository policy grants another account` |
 | `GetLifecyclePolicy` reports no policy | 2 | Warning | `~` | S2, S3, S4, S5 | `no lifecycle policy` |
 
 Rules applied:
@@ -155,6 +162,8 @@ Rules applied:
 - `CRITICAL>0` is a Wave 2 Broken finding; the row is repainted red and the full cause appears in S4/S5. S1 counts this `!` finding.
 - `CRITICAL>0` and `HIGH>0` are two findings, because they are two tiers and a code declares one severity: `ecr.vulnerabilities` is Broken and counts both severities, `ecr.vulnerabilities-high` is a Warning naming the high count alone. Both reach the menu count.
 - When multiple signals fire on the same repo, the highest-severity bucket wins the row color (Broken > Warning) and S4 shows the Broken cause; secondary causes go to S5.
+
+A policy document that does not parse, or a policy read that answers without a document, says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse` or `no policy document returned`.
 
 ## 4.1 UX review (two sentences)
 
@@ -212,10 +221,11 @@ ecr — CI/CD. Status key: `state` — the column naming it is the status column
 | --- | --- | --- | --- | --- |
 | ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 | Images in this repository carry findings at critical severity, and anything deployed from them is running that code today. Rebuild on a patched base image, push it, and roll the deployments that reference the affected tags forward. |
 | ecr.vulnerabilities-high | <N> high vulnerabilities | warn | wave2 | Scanning found high-severity findings in this repository's images, so the workloads running them carry known, already-published weaknesses. Rebuild on an updated base image and move the tags forward as part of the next routine deployment. |
-| ecr.public-policy | repository policy open to anyone | broken | wave2 | The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained. |
 | ecr.scan-on-push-off | pushed images not scanned | warn | wave2 | No registry scanning rule matches this repository; once the registry has rules, a repository no rule matches is not scanned on push whatever its own setting says, and without rules its own scan on push is off. An image is not scanned as it arrives, so a known vulnerability in a base layer can reach production without anyone being told. Add a scan-on-push or continuous rule whose filter matches this repository to the registry's scanning configuration. |
 | ecr.mutable-tags | tags are mutable | warn | wave1 | An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from. |
+| ecr.public-policy | repository policy open to anyone | broken | wave2 | The repository policy allows any principal, so anyone can use this repository, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| ecr.cross-account-policy | repository policy grants another account | warn | wave2 | The repository policy admits a caller from another AWS account, so that account can use this repository, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the repository policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -13,14 +13,14 @@ import (
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // kms canonical FindingCodes.
 const (
-	kmsCodeRotationDisabled domain.FindingCode = "kms.rotation-disabled"
-	kmsCodePublicPolicy     domain.FindingCode = "kms.public-policy"
+	kmsCodeRotationDisabled   domain.FindingCode = "kms.rotation-disabled"
+	kmsCodePublicPolicy       domain.FindingCode = "kms.public-policy"
+	kmsCodeCrossAccountPolicy domain.FindingCode = "kms.cross-account-policy"
 )
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -53,16 +53,17 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		if keyID == "" {
 			return
 		}
-		ex, public, policyErr := kmsKeyPolicyIsPublic(ctx, keyPolicyAPI, r, ownAccount)
-		mu.Lock()
-		switch {
-		case policyErr != nil:
-			MarkSkipped(&result, keyID, &failures, policyErr)
-		case public:
-			setWave2Finding(&result, keyID, kmsCodePublicPolicy, publicPolicyRows(ex))
-
+		// AWS owns an AWS-managed key's policy and the operator cannot change it.
+		if keyPolicyAPI != nil && !kmsKeyIsAWSManaged(r) {
+			policy, policyErr := kmsKeyPolicy(ctx, keyPolicyAPI, keyID)
+			mu.Lock()
+			if policyErr != nil {
+				MarkSkipped(&result, keyID, &failures, policyErr)
+			} else {
+				readPolicy("kms", policy, ownAccount, r.Fields["arn"]).raise(&result, keyID)
+			}
+			mu.Unlock()
 		}
-		mu.Unlock()
 		if !kmsKeyCanAutoRotate(r) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -93,33 +94,18 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	return result, errors.Join(loopErr, AggregateFailures("key policy and rotation", failures, n))
 }
 
-// kmsKeyPolicyIsPublic reads a key's default policy and returns the exposure
-// when it grants a wildcard principal. AWS-managed keys are skipped: AWS
-// owns their policy and the operator cannot change it. A policy that cannot
-// be read or parsed leaves the key unknown, never healthy; the error that made
-// it unknown is returned so the caller can record it.
-func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resource.Resource, ownAccount string) (ex iampolicy.Exposure, public bool, err error) {
-	if api == nil || kmsKeyIsAWSManaged(r) {
-		return ex, false, nil
-	}
+func kmsKeyPolicy(ctx context.Context, api KMSGetKeyPolicyAPI, keyID string) (string, error) {
 	out, err := api.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
-		KeyId:      aws.String(r.ID),
+		KeyId:      aws.String(keyID),
 		PolicyName: aws.String("default"),
 	})
 	if err != nil {
-		return ex, false, err
+		return "", err
 	}
-	if out == nil || out.Policy == nil {
-		// Every KMS key has exactly one key policy, so an answer without it
-		// has said nothing about who may use the key.
-		return ex, false, UnusableAnswerErr{Call: "GetKeyPolicy", Field: "policy"}
+	if out == nil {
+		return "", nil
 	}
-	doc, perr := iampolicy.Parse(*out.Policy)
-	if perr != nil {
-		return ex, false, perr
-	}
-	ex = iampolicy.Evaluate(doc, ownAccount)
-	return ex, ex.Public, nil
+	return aws.ToString(out.Policy), nil
 }
 
 // kmsKeyCanAutoRotate reports whether GetKeyRotationStatus has a schedule to

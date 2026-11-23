@@ -21,6 +21,7 @@ const (
 	// roleCodeWildcardTrust — the trust policy lets any AWS principal assume
 	// the role with nothing scoping the grant.
 	roleCodeWildcardTrust domain.FindingCode = "role.trust.wildcard-principal"
+	roleCodeTrustUnread   domain.FindingCode = "role.trust.policy-not-inspected"
 	// roleCodeConfusedDeputy — an AWS service can assume the role without an
 	// aws:SourceAccount / aws:SourceArn / aws:SourceOrgID condition.
 	roleCodeConfusedDeputy domain.FindingCode = "role.trust.confused-deputy"
@@ -35,39 +36,33 @@ const (
 )
 
 // roleTrustAnalysis is one parse of a role's trust policy: the Findings it
-// yields, their supporting Attention rows, and the trust_wildcard /
-// trust_summary display fields. The Findings list, the Trust column and the
-// row color all read this single verdict.
+// yields, their supporting Attention rows, and the trust_summary display
+// field. The Findings list, the Trust column and the row color all read this
+// single verdict.
 type roleTrustAnalysis struct {
 	findings []domain.Finding
 	details  map[domain.FindingCode]domain.AttentionDetail
-	wildcard string
 	summary  string
 }
 
 func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
-	out := roleTrustAnalysis{wildcard: "false"}
-	doc, err := iampolicy.Parse(assumeRolePolicyDoc)
-	if err != nil {
-		return out
-	}
+	trust := readPolicy("role", assumeRolePolicyDoc, "", "")
+	// The summary is a9s's own verdict on the trust policy, not a value IAM
+	// returned, so it is written in the words the Trust column and the detail
+	// row render rather than in the shape of an SDK constant.
+	out := roleTrustAnalysis{summary: trust.word("wildcard", "")}
 	out.details = map[domain.FindingCode]domain.AttentionDetail{}
-	if ex := iampolicy.Evaluate(doc, ""); ex.Public {
-		// The summary is a9s's own verdict on the trust policy, not a value
-		// IAM returned, so it is written in the words the Trust column and the
-		// detail row render rather than in the shape of an SDK constant.
-		out.wildcard, out.summary = "true", "wildcard"
+	if trust.public() {
 		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust))
-		if rows := publicConditionRows(ex, "!"); rows != nil {
-			out.details[roleCodeWildcardTrust] = domain.AttentionDetail{Rows: rows}
-		}
+		out.details[roleCodeWildcardTrust] = trust.detail()
 	}
-	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {
+	if svcs := unscopedServicePrincipals(trust.servicePrincipalsWithoutSourceScope(), path); len(svcs) > 0 {
 		out.findings = append(out.findings, wave1Finding(roleCodeConfusedDeputy))
 		out.details[roleCodeConfusedDeputy] = domain.AttentionDetail{Rows: []domain.DetailRow{
 			{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
 		}}
 	}
+	out.findings = trust.withUnread(out.findings)
 	if len(out.details) == 0 {
 		out.details = nil
 	}
@@ -79,11 +74,10 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 // excluded (AWS owns the document), and so is a role trusted only by
 // ec2.amazonaws.com: an EC2 instance profile is assumed by the instance
 // itself, so there is no third-party caller to scope.
-func unscopedServicePrincipals(doc iampolicy.Document, path string) []string {
+func unscopedServicePrincipals(svcs []string, path string) []string {
 	if strings.HasPrefix(path, awsServiceRolePathPrefix) {
 		return nil
 	}
-	svcs := doc.HasServicePrincipalWithoutSourceScope()
 	if len(svcs) == 1 && svcs[0] == "ec2" {
 		return nil
 	}
@@ -167,7 +161,6 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 				"create_date":                 createDate,
 				"description":                 description,
 				"assume_role_policy_document": assumeRolePolicyDoc,
-				"trust_wildcard":              trust.wildcard,
 				"trust_summary":               trust.summary,
 			},
 			Findings:         findings,
@@ -319,7 +312,6 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 			"create_date":                 createDate,
 			"description":                 description,
 			"assume_role_policy_document": assumeRolePolicyDoc,
-			"trust_wildcard":              trust.wildcard,
 			"trust_summary":               trust.summary,
 		},
 		Findings:         findings,
@@ -385,7 +377,7 @@ func scanRoleInlinePolicies(
 				UnusableAnswer(roleName, "GetRolePolicy returned no document for "+policyName))
 			continue
 		}
-		parsed, perr := iampolicy.Parse(*getOut.PolicyDocument)
+		parsed, perr := parsePolicy(*getOut.PolicyDocument)
 		if perr != nil {
 			scan.failures = append(scan.failures, UnusableAnswer(roleName, "unreadable inline policy "+policyName))
 			continue

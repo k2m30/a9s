@@ -4,7 +4,6 @@
 package aws
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"sync"
@@ -13,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -23,16 +21,8 @@ const (
 	secretsCodeCrossAccountPolicy domain.FindingCode = "secrets.cross-account-policy"
 )
 
-// EnrichSecretsPolicy calls GetResourcePolicy per secret (cap EnrichmentCap)
-// and classifies the attached resource policy through iampolicy.
-//
-// Findings:
-//   - Exposure.Public → "!" finding "resource policy open to anyone"
-//   - Exposure.CrossAccount non-empty and not public → "~" finding
-//     "resource policy grants another account"
-//
-// A secret with no resource policy attached (ResourcePolicy nil) is the
-// normal case and yields nothing. Skip when clients.SecretsManager == nil.
+// EnrichSecretsPolicy raises nothing for a secret with no resource policy
+// attached (ResourcePolicy nil), which is the normal case.
 func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -70,25 +60,10 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
-		if out == nil || aws.ToString(out.ResourcePolicy) == "" {
+		if out == nil {
 			return
 		}
-		doc, perr := iampolicy.Parse(aws.ToString(out.ResourcePolicy))
-		if perr != nil {
-			MarkSkipped(&result, r.ID, &failures, perr)
-			return
-		}
-		own := cmp.Or(ownAccount, iampolicy.AccountFromARN(r.Fields["arn"]))
-		ex := iampolicy.Evaluate(doc, own)
-		switch {
-		case ex.Public:
-			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, publicPolicyRows(ex))
-
-		case len(ex.CrossAccount) > 0 && own == "":
-			markUninspected(&result, r.ID, CheckOwnAccountUnknown)
-		case len(ex.CrossAccount) > 0:
-			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, crossAccountPolicyRows(ex))
-		}
+		readPolicy("secrets", aws.ToString(out.ResourcePolicy), ownAccount, r.Fields["arn"]).raise(&result, r.ID)
 	})
 	err := errors.Join(loopErr, Finish(&result, failures, n, "secrets-policy"))
 	return result, err

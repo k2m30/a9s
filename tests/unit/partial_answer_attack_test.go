@@ -64,7 +64,7 @@ func TestPartialAttackLambda_BothConditionsOnOneFunction(t *testing.T) {
 		urlAuth: lambdatypes.FunctionUrlAuthTypeNone,
 	})
 	w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.public-policy",
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 	w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.function-url-public",
 		"function endpoint open without authentication", domain.SevBroken, "wave2")
 	partialAssertInspected(t, res, partialLambdaFn)

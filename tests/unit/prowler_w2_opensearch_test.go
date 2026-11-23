@@ -130,13 +130,13 @@ func TestW2OpenSearchPublicNeedsBothNoVPCAndOpenPolicy(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-search-vpc"], w2OSCodePublic)
 	w2AssertNoCode(t, res.Findings["acme-search-safe"], w2OSCodePublic)
 
-	// The checks can only see what the fetcher wrote; pin the two fields they
-	// depend on.
+	// The VPC placement is a field the fetcher writes; the policy verdict is
+	// the finding itself.
 	if got := fields["acme-search"].Fields["vpc_enabled"]; got != "false" {
 		t.Errorf("acme-search vpc_enabled = %q, want \"false\"", got)
 	}
-	if got := fields["acme-search"].Fields["access_policy_public"]; got != "true" {
-		t.Errorf("acme-search access_policy_public = %q, want \"true\"", got)
+	if !hasCode(res.Findings["acme-search"], w2OSCodePublic) {
+		t.Errorf("acme-search findings %v lack %s", res.Findings["acme-search"], w2OSCodePublic)
 	}
 	if got := fields["acme-search-vpc"].Fields["vpc_enabled"]; got != "true" {
 		t.Errorf("acme-search-vpc vpc_enabled = %q, want \"true\"", got)
@@ -149,12 +149,9 @@ func TestW2OpenSearchConditionedPolicyIsNotOpen(t *testing.T) {
 	d.VPCOptions = nil
 	d.AccessPolicies = aws.String(w2OSCondPolicy)
 
-	fields, res := w2OSRun(t, d)
+	_, res := w2OSRun(t, d)
 
 	w2AssertNoCode(t, res.Findings["acme-search-cond"], w2OSCodePublic)
-	if got := fields["acme-search-cond"].Fields["access_policy_public"]; got != "false" {
-		t.Errorf("access_policy_public = %q on a conditioned policy, want \"false\"", got)
-	}
 }
 
 func TestW2OpenSearchHTTPSNotEnforced(t *testing.T) {

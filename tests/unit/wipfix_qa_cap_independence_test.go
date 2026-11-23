@@ -239,6 +239,10 @@ func wipfixEFSRows(ids ...string) []resource.Resource {
 				"life_cycle_state": "available",
 				"mount_targets":    "1",
 			},
+			RawStruct: efstypes.FileSystemDescription{
+				FileSystemId:  aws.String(id),
+				FileSystemArn: aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/" + id),
+			},
 		})
 	}
 	return out

@@ -16,7 +16,6 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -27,9 +26,8 @@ const (
 	// because it is a separate severity, and a code declares one.
 	ecrCodeHighVulnerabilities domain.FindingCode = "ecr.vulnerabilities-high"
 
-	// ecrCodePublicPolicy — the repository's resource policy grants a
-	// wildcard principal (GetRepositoryPolicy, evaluated by iampolicy).
-	ecrCodePublicPolicy domain.FindingCode = "ecr.public-policy"
+	ecrCodePublicPolicy       domain.FindingCode = "ecr.public-policy"
+	ecrCodeCrossAccountPolicy domain.FindingCode = "ecr.cross-account-policy"
 
 	// ecrCodeNoLifecyclePolicy — GetLifecyclePolicy reports no policy.
 	ecrCodeNoLifecyclePolicy domain.FindingCode = "ecr.no-lifecycle-policy"
@@ -230,7 +228,14 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		// The two policy reads are issued before the lock is taken: holding it
 		// across a network call would serialise the whole page behind one
 		// repository and undo ForEachParallel.
-		exposure, policyErr := ecrRepositoryExposure(ctx, clients.ECR, repoName, ownAccount)
+		var (
+			policy    string
+			hasPolicy bool
+			policyErr error
+		)
+		if policyAPI, ok := clients.ECR.(ECRGetRepositoryPolicyAPI); ok {
+			policy, hasPolicy, policyErr = ecrRepositoryPolicy(ctx, policyAPI, repoName)
+		}
 		noLifecyclePolicy, lifecycleErr := ecrLifecyclePolicyMissing(ctx, clients.ECR, repoName)
 
 		mu.Lock()
@@ -242,8 +247,8 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			// repository nobody could read is private.
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, policyErr)
-		case exposure.Public:
-			setWave2Finding(&result, r.ID, ecrCodePublicPolicy, publicPolicyRows(exposure))
+		case hasPolicy:
+			readPolicy("ecr", policy, ownAccount, r.Fields["arn"]).raise(&result, r.ID)
 		}
 		switch {
 		case lifecycleErr != nil:
@@ -324,30 +329,22 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	return result, errors.Join(registryErr, loopErr, AggregateFailures("repository posture", failures, total))
 }
 
-// ecrRepositoryExposure evaluates a repository's resource policy through the
-// shared policy engine. A repository with no policy at all is a definite
-// answer — the default, and the safe one — so it reports no exposure and no
-// failure. Anything else that stops the read leaves the repository unknown.
-func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount string) (iampolicy.Exposure, error) {
-	policyAPI, ok := api.(ECRGetRepositoryPolicyAPI)
-	if !ok {
-		return iampolicy.Exposure{}, nil
-	}
-	out, err := policyAPI.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
+// ecrRepositoryPolicy reads a repository's resource policy. A repository with
+// no policy at all is a definite answer — the default, and the safe one — so
+// it reports no policy and no failure. Anything else that stops the read
+// leaves the repository unknown.
+func ecrRepositoryPolicy(ctx context.Context, api ECRGetRepositoryPolicyAPI, repoName string) (policy string, found bool, err error) {
+	out, err := api.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
 	if err != nil {
 		if _, notFound := errors.AsType[*ecrtypes.RepositoryPolicyNotFoundException](err); notFound {
-			return iampolicy.Exposure{}, nil
+			return "", false, nil
 		}
-		return iampolicy.Exposure{}, err
+		return "", false, err
 	}
-	if out.PolicyText == nil {
-		return iampolicy.Exposure{}, UnusableAnswerErr{Call: "GetRepositoryPolicy", Field: "policy text"}
+	if out == nil {
+		return "", true, nil
 	}
-	doc, perr := iampolicy.Parse(*out.PolicyText)
-	if perr != nil {
-		return iampolicy.Exposure{}, perr
-	}
-	return iampolicy.Evaluate(doc, ownAccount), nil
+	return aws.ToString(out.PolicyText), true, nil
 }
 
 // ecrLifecyclePolicyMissing reports whether the repository keeps images

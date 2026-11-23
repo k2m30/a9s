@@ -4,10 +4,8 @@
 package aws
 
 import (
-	"cmp"
 	"context"
 	"errors"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,7 +13,6 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -93,10 +90,8 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	return result, errors.Join(tagErr, loopErr, pitrErr, err)
 }
 
-// enrichDDBResourcePolicies reads each table's resource policy (cap
-// EnrichmentCap) and classifies it through the shared policy engine: a
-// wildcard principal is the "!" row, a named foreign account the "~" row.
-// A table with no policy at all is the common case and is not a finding.
+// enrichDDBResourcePolicies raises nothing for a table with no policy at all,
+// which is the common case.
 func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	// GetResourcePolicy takes the ARN only DescribeTable returns, so a table
@@ -135,35 +130,11 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
-		if out == nil || aws.ToString(out.Policy) == "" {
-			// No document is the same answer as PolicyNotFoundException above,
-			// and reading it as a parse failure would report a check that
-			// never failed.
-			return
+		var policy string
+		if out != nil {
+			policy = aws.ToString(out.Policy)
 		}
-		doc, parseErr := iampolicy.Parse(aws.ToString(out.Policy))
-		if parseErr != nil {
-			MarkSkipped(result, r.ID, &failures, parseErr)
-			return
-		}
-		own := cmp.Or(ownAccount, iampolicy.AccountFromARN(r.Fields["arn"]))
-		ex := iampolicy.Evaluate(doc, own)
-		if ex.Public {
-			setWave2Finding(result, r.ID, ddbCodePublicPolicy, append([]domain.DetailRow{
-				{Label: "Principal", Value: "*", Tier: "!"},
-				{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-			}, publicConditionRows(ex, "")...))
-
-			return
-		}
-		// Without an own-account ID every principal reads as foreign, which
-		// would report the account's own roles as an outside grant.
-		switch {
-		case len(ex.CrossAccount) > 0 && own == "":
-			markUninspected(result, r.ID, CheckOwnAccountUnknown)
-		case len(ex.CrossAccount) > 0:
-			setWave2Finding(result, r.ID, ddbCodeCrossAccountPolicy, []domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: tierOf(ddbCodeCrossAccountPolicy)}})
-		}
+		readPolicy("ddb", policy, ownAccount, r.Fields["arn"]).raise(result, r.ID)
 	})
 	return errors.Join(loopErr, Finish(result, failures, n, "GetResourcePolicy"))
 }

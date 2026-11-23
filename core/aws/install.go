@@ -86,7 +86,7 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 	all = append(all, cicdTypes...)
 	all = append(all, dataTypes...)
 	all = append(all, backupTypes...)
-	return all
+	return withPolicyFindings(all)
 }
 
 // allChildTypes concatenates the per-category child-type catalog slices into

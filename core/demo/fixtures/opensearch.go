@@ -105,6 +105,9 @@ const WarnOpenSearchDetailsUnavailableID = "warn-os-details-unavailable"
 const (
 	// OpenSearchPublic sits outside a VPC behind an open access policy.
 	OpenSearchPublic = "acme-public-search"
+	// OpenSearchUnreadablePolicy sits outside a VPC behind an access policy
+	// that does not parse, so whether anyone can reach it is unknown.
+	OpenSearchUnreadablePolicy = "acme-unreadable-search"
 	// OpenSearchHTTPSOff accepts plaintext HTTP.
 	OpenSearchHTTPSOff = "acme-http-search"
 	// OpenSearchN2NOff leaves traffic between its own nodes unencrypted.
@@ -128,6 +131,10 @@ var sharedOpenSearchFixtures = shared(func() *OpenSearchFixtures {
 			osPostureWitness(OpenSearchPublic, func(d *ostypes.DomainStatus) {
 				d.VPCOptions = nil
 				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-east-1:123456789012:domain/` + OpenSearchPublic + `/*"}]}`)
+			}),
+			osPostureWitness(OpenSearchUnreadablePolicy, func(d *ostypes.DomainStatus) {
+				d.VPCOptions = nil
+				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*"`)
 			}),
 			osPostureWitness(OpenSearchHTTPSOff, func(d *ostypes.DomainStatus) {
 				d.DomainEndpointOptions = &ostypes.DomainEndpointOptions{EnforceHTTPS: aws.Bool(false)}
@@ -408,5 +415,5 @@ func init() {
 	// details_denied: DescribeDomains is one batched call, so a denial degrades
 	// every listed domain at once and cannot stand beside healthy rows. The
 	// demo shows the absent-from-response case (details_unavailable) instead.
-	Register(Pin{ShortName: "opensearch", Rows: 14, Issues: 11, CoverageGaps: []string{"opensearch.warn.details_denied"}})
+	Register(Pin{ShortName: "opensearch", Rows: 15, Issues: 12, CoverageGaps: []string{"opensearch.warn.details_denied"}})
 }

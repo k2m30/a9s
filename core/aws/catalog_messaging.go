@@ -214,10 +214,11 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Findings: []catalog.FindingDef{
 			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2", Detail: "Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue."},
 			{Code: sqsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2", Detail: "The queue has neither the AWS-managed queue encryption nor a KMS key, so message bodies are held without server-side encryption. Turn on the managed queue encryption, which costs nothing and needs no key policy, or attach a KMS key when you need to control and audit the key yourself."},
-			{Code: sqsCodePublicPolicy, Phrase: "queue policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue."},
 			DetailsDeniedFindingDef("sqs", ""),
 			DetailsUnavailableFindingDef("sqs"),
 		},
+		// GetQueueAttributes returns the Policy attribute only when one is set.
+		Policy: &catalog.PolicyDecl{Noun: "queue", Subject: "queue", Public: sqsCodePublicPolicy, Cross: sqsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2"},
 	},
 	{
 		Name:      "SNS Topics",
@@ -267,9 +268,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Findings: []catalog.FindingDef{
 			{Code: snsCodeNoSubscribers, Phrase: "topic has no subscribers", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing is subscribed to this topic, so every message published to it is discarded on arrival. Either subscribe the endpoint that was meant to receive them, or delete the topic and whatever still publishes to it."},
 			{Code: snsCodeAllPending, Phrase: "all pending confirmation", Severity: domain.SevWarn, Source: "wave2", Detail: "Every subscription on this topic is still waiting for its endpoint to confirm, so no message is being delivered to anyone. Confirm the subscriptions from their endpoints, or remove the ones that were never wanted."},
-			{Code: snsCodePublicPolicy, Phrase: "topic policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The topic's access policy grants publish or subscribe to every AWS principal, so anyone can read what this topic broadcasts or inject messages its subscribers will trust. Scope the policy's Principal to the accounts and roles that actually use the topic."},
 			{Code: snsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2", Detail: "The topic has no key for server-side encryption, so message bodies are not encrypted with a key you control. The storage underneath is encrypted by AWS regardless, so this is about custody rather than about plaintext on a disk. Attach a KMS key when the messages carry data whose key access you need to grant, revoke and audit."},
 		},
+		Policy: &catalog.PolicyDecl{Noun: "topic", Subject: "topic", Public: snsCodePublicPolicy, Cross: snsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2"},
 	},
 	{
 		Name:          "SNS Subscriptions",

@@ -40,14 +40,14 @@ func TestT1aDev_StateWitnessesAfterTheSweep(t *testing.T) {
 		"dbi":        {59, 36},
 		"dbc":        {24, 22},
 		"ddb":        {14, 11},
-		"efs":        {13, 10},
+		"efs":        {14, 10},
 		"ebs":        {11, 7},
 		"eb":         {12, 5},
-		"kms":        {23, 11},
-		"lambda":     {43, 18},
+		"kms":        {24, 11},
+		"lambda":     {44, 18},
 		"redshift":   {36, 30},
 		"vpc":        {9, 2},
-		"opensearch": {14, 11},
+		"opensearch": {15, 12},
 		"ecs-task":   {21, 11},
 	} {
 		got, ok := counts[short]

@@ -358,8 +358,8 @@ func TestVPCEPolicyOpen_BucketScopedWildcardIsNotFullAccess(t *testing.T) {
 		t.Errorf("got %s (%q) for a bucket-scoped wildcard grant, want no finding\n"+
 			"finding 7: the check reads Principal and Action but never Resource", f.Code, f.Phrase)
 	}
-	if got := rows[0].Fields["policy_exposure"]; got != "scoped" {
-		t.Errorf("policy_exposure = %q, want %q", got, "scoped")
+	if _, ok := w3FindingByCode(rows[0].Findings, domain.FindingCode("vpce.policy-not-inspected")); ok {
+		t.Errorf("a policy that parses read as not inspected")
 	}
 }
 

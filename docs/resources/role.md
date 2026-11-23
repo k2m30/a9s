@@ -96,6 +96,10 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: the trust policy does not parse, so neither trust signal can be judged.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 - **Signal**: an inline policy grants a known privilege-escalation action combination.
   - **Explicit Deny**: an action an unconditional Deny covers is not granted; a Deny with `NotAction` covers every action no listed entry overlaps, so Deny NotAction [`s3:*`, `logs:*`] removes every `iam:` action. A conditioned Deny removes nothing.
   - **State bucket**: Broken.
@@ -129,11 +133,14 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `anyone can assume this role` |
+| trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `trust policy open to anyone` |
+| the trust policy does not parse | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `trust policy not inspected` |
 | an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping compared against a concrete value | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `service can assume without source scoping` |
 | an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inline policy allows privilege escalation` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S2, S3, S4, S5 | `dormant role (>90d)` |
 | `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+
+A trust policy that does not parse raises neither trust signal: the row reads `trust policy not inspected` in yellow, and the Trust column reads `unknown` rather than claiming no wildcard.
 
 Rules for filling list and detail text:
 
@@ -143,7 +150,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `anyone can assume this role` is actionable on sight (name the accounts or the organization), and a yellow row reading `dormant role (>90d)` tells the operator this role is a candidate for deletion without needing to open detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `trust policy open to anyone` is actionable on sight (name the accounts or the organization), and a yellow row reading `dormant role (>90d)` tells the operator this role is a candidate for deletion without needing to open detail.
 
 ## 5. Out of Scope
 
@@ -176,11 +183,12 @@ role — SECURITY & IAM. Status key: `state` — the column naming it is the sta
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "*" principal in the trust policy with the specific account or role ARNs, or scope it by the caller's account or organization (aws:PrincipalAccount, aws:PrincipalOrgID). An sts:ExternalId condition scopes nothing on a "*" principal: anyone who presents the value passes it, so keep it beside a named partner account. |
 | role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition that requires the key to equal the account or ARN you expect; a condition that only says whether the key is set, or that lists what it must not be, scopes nothing. |
 | role.inline-privilege-escalation | inline policy allows privilege escalation | broken | wave1 | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |
 | role.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
+| role.trust.wildcard-principal | trust policy open to anyone | broken | wave1 | The trust policy allows any principal, so anyone can use this role, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| role.trust.policy-not-inspected | trust policy not inspected | warn | wave1 | The trust policy document AWS returned does not parse, so a9s cannot say whether it opens this role to anyone. Read the document in the detail view and judge its grants by hand. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

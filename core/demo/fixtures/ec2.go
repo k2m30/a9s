@@ -204,6 +204,9 @@ const (
 	// VPCEPolicyOpen is the only demo VPC endpoint whose policy grants every
 	// action to every principal.
 	VPCEPolicyOpen = "vpce-0aaa111111111111a"
+	// VPCEUnreadablePolicy is the only demo VPC endpoint whose policy
+	// document does not parse.
+	VPCEUnreadablePolicy = "vpce-0unreadpolicy001l"
 )
 
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
@@ -2936,6 +2939,23 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("prod-logs-endpoint-partial")},
 			},
 		},
+		// VPCEUnreadablePolicy: an available endpoint whose policy document
+		// does not parse, so its row reads "endpoint policy not inspected".
+		{
+			VpcEndpointId:     aws.String(VPCEUnreadablePolicy),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.kms"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.State("available"),
+			VpcId:             aws.String(fixtProdVPCID),
+			SubnetIds:         []string{fixtProdPrivateSubnetA},
+			PrivateDnsEnabled: aws.Bool(true),
+			PolicyDocument:    aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"kms:*"`),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2026, 2, 3, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-kms-endpoint")},
+			},
+		},
 		// prod-as2-gateway's auto-created VPC endpoint (transfer.go graph
 		// root) — required for the transfer→vpce related-panel pivot to
 		// drill through to a real row.
@@ -3917,5 +3937,5 @@ func init() {
 	Register(Pin{ShortName: "subnet", Rows: 38, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "tgw", Rows: 8, Issues: 5})
 	Register(Pin{ShortName: "vpc", Rows: 9, Issues: 2, CoverageGaps: []string{"broken", "dim"}})
-	Register(Pin{ShortName: "vpce", Rows: 12, Issues: 8})
+	Register(Pin{ShortName: "vpce", Rows: 13, Issues: 9})
 }

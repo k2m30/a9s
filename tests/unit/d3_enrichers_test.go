@@ -368,7 +368,7 @@ func TestD3LambdaWithAPublicPolicyStillReports(t *testing.T) {
 		[]resource.Resource{d3LambdaResource("acme-open-fn")}, nil)
 
 	w4AssertFinding(t, res.Findings["acme-open-fn"], d3CodeLambdaPublic,
-		"invokable by anyone", domain.SevBroken, "wave2")
+		"resource policy open to anyone", domain.SevBroken, "wave2")
 }
 
 // d3NotFoundErr is the shape a service returns when the thing asked about

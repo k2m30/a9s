@@ -172,7 +172,7 @@ var pw1WitnessPhrases = []struct {
 	{"ecs-task", fixtures.ECSTaskWritableRoot, "writable root filesystem"},
 	{"ecs-task", fixtures.ECSTaskNoLogging, "container without log driver"},
 	{"ecs-task", fixtures.ECSTaskEnvSecret, "credential in container environment"},
-	{"lambda", fixtures.LambdaPublicPolicy, "invokable by anyone"},
+	{"lambda", fixtures.LambdaPublicPolicy, "resource policy open to anyone"},
 	{"lambda", fixtures.LambdaFunctionURLPublic, "function endpoint open without authentication"},
 	{"lambda", fixtures.LambdaEnvSecret, "credential in environment variables"},
 	{"asg", fixtures.ASGSingleAZ, "single availability zone"},

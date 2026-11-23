@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,15 +15,15 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // efs canonical FindingCodes.
 const (
-	efsCodeMountTargetDown domain.FindingCode = "efs.mount-target-down"
-	efsCodePublicPolicy    domain.FindingCode = "efs.public-policy"
-	efsCodeNoBackupPolicy  domain.FindingCode = "efs.no-backup-policy"
+	efsCodeMountTargetDown    domain.FindingCode = "efs.mount-target-down"
+	efsCodePublicPolicy       domain.FindingCode = "efs.public-policy"
+	efsCodeCrossAccountPolicy domain.FindingCode = "efs.cross-account-policy"
+	efsCodeNoBackupPolicy     domain.FindingCode = "efs.no-backup-policy"
 )
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
@@ -58,7 +57,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		// The policy checks are independent of the mount-target walk below —
 		// they run first so a mount-target pagination failure cannot swallow
 		// them.
-		enrichEFSPolicies(ctx, clients, fsID, ownAccount, &result, &policyFailures, &mu)
+		fs, _ := assertStruct[efstypes.FileSystemDescription](r.RawStruct)
+		enrichEFSPolicies(ctx, clients, fsID, ownAccount, aws.ToString(fs.FileSystemArn), &result, &policyFailures, &mu)
 
 		allMountTargets, complete, pageErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]efstypes.MountTargetDescription, *string, error) {
 			out, err := clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
@@ -145,6 +145,7 @@ func enrichEFSPolicies(
 	clients *ServiceClients,
 	fsID string,
 	ownAccount string,
+	fsARN string,
 	result *IssueEnricherResult,
 	failures *[]Failure,
 	mu *sync.Mutex,
@@ -161,19 +162,11 @@ func enrichEFSPolicies(
 	case policyErr != nil:
 		MarkSkipped(result, fsID, failures, policyErr)
 	default:
-		doc, parseErr := iampolicy.Parse(aws.ToString(policyOut.Policy))
-		if parseErr != nil {
-			MarkSkipped(result, fsID, failures, parseErr)
-			break
+		var policy string
+		if policyOut != nil {
+			policy = aws.ToString(policyOut.Policy)
 		}
-		ex := iampolicy.Evaluate(doc, ownAccount)
-		if ex.Public {
-			setWave2Finding(result, fsID, efsCodePublicPolicy, append([]domain.DetailRow{
-				{Label: "Principal", Value: "*", Tier: "!"},
-				{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-			}, publicConditionRows(ex, "")...))
-
-		}
+		readPolicy("efs", policy, ownAccount, fsARN).raise(result, fsID)
 	}
 
 	// A file system with no backup policy at all is as unbacked-up as one

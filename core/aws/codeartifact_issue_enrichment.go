@@ -13,13 +13,13 @@ import (
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // codeartifact canonical FindingCodes.
 const (
 	codeartifactCodePublicAccessPolicy  domain.FindingCode = "codeartifact.public-access-policy"
+	codeartifactCodeCrossAccountPolicy  domain.FindingCode = "codeartifact.cross-account-policy"
 	codeartifactCodeNoPermissionsPolicy domain.FindingCode = "codeartifact.no-permissions-policy"
 )
 
@@ -112,21 +112,11 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}
-		if out.Policy == nil || out.Policy.Document == nil {
-			truncated = true
-			MarkSkipped(&result, r.ID, &failures, UnusableAnswerErr{Call: "GetRepositoryPermissionsPolicy", Field: "policy document"})
-			return
+		var policy string
+		if out != nil && out.Policy != nil {
+			policy = aws.ToString(out.Policy.Document)
 		}
-		parsed, perr := iampolicy.Parse(*out.Policy.Document)
-		if perr != nil {
-			truncated = true
-			MarkSkipped(&result, r.ID, &failures, perr)
-			return
-		}
-		if ex := iampolicy.Evaluate(parsed, ownAccount); ex.Public {
-			setWave2Finding(&result, key, codeartifactCodePublicAccessPolicy, publicPolicyRows(ex))
-
-		}
+		readPolicy("codeartifact", policy, ownAccount, r.Fields["arn"]).raise(&result, key)
 	})
 	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("repository packages and policy", failures, n))

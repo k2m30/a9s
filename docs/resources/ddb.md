@@ -132,7 +132,7 @@ One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` 
   - **API call**: `DescribeContinuousBackups` — one call per table.
   - **Cost shape**: per-resource.
 
-- **Signal**: Resource policy names a foreign account.
+- **Signal**: Resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
   - **Own account**: principals of the owning account are not foreign. When STS cannot name the session's account, the owning account is the one the resource's ARN names; only when neither does is the row marked not inspected.
   - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
   - **State bucket**: Warning.
@@ -174,7 +174,7 @@ One row per signal from §3:
 | `DescribeTable` was denied for this table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | `DescribeTable` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | PITR disabled | 2 | Warning | `~` | S2, S3, S4, S5 | `point-in-time recovery disabled` |
-| Resource policy names a foreign account | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
+| Resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
 | no backup plan selection matches this table | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
 | `TableStatus == REPLICATION_NOT_AUTHORIZED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `replication not authorized` |
@@ -186,6 +186,8 @@ Rules for filling list and detail text:
 - A bare state keyword (`ACTIVE`, `ARCHIVED`) in the List text column is not acceptable without a cause. `archiving` and `archived` are paired with their cause above.
 - For signals that legitimately have no operator-actionable cause (pure Healthy), the row is omitted from this table; §3 still describes it.
 - Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
+
+A policy document that does not parse, or a policy read that answers without a document, says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse` or `no policy document returned`.
 
 ## 4.1 UX review (two sentences)
 
@@ -239,11 +241,11 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | ddb.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | DynamoDB reports a table status a9s does not recognise, so a9s cannot tell whether the table serves requests. Check the table in the AWS console before relying on it. |
 | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 | Point-in-time recovery is off, so there is no way to roll this table back to a moment before a bad write and only explicit backups exist. Turn it on — it keeps a rolling 35-day window with no change to the table. |
 | ddb.deletion-protection-off | deletion protection off | warn | wave1 | A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step. |
-| ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest. |
-| ddb.public-policy | resource policy open to anyone | broken | wave2 | The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access. |
 | ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan backs up this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by its ARN or by the DynamoDB table resource type; a plan that takes it in only by tag, by service name or by selecting everything backs it up only once DynamoDB is opted in under this Region's AWS Backup service opt-in. |
 | ddb.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | ddb.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
+| ddb.public-policy | resource policy open to anyone | broken | wave2 | The resource policy allows any principal, so anyone can use this table, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The resource policy admits a caller from another AWS account, so that account can use this table, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the resource policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

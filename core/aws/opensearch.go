@@ -14,7 +14,6 @@ import (
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
 	domainpkg "github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -70,9 +69,11 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	// Reachable outside a VPC only counts when the access policy also lets
 	// anyone in: a public endpoint fronted by a scoped policy is a deliberate,
 	// defended design.
-	if d.VPCOptions == nil && openSearchPolicyIsPublic(d) {
+	policy := readPolicy("opensearch", aws.ToString(d.AccessPolicies), "", "")
+	if d.VPCOptions == nil && policy.public() {
 		findings = append(findings, wave1Finding(opensearchCodePublic))
 	}
+	findings = policy.withUnread(findings)
 	if openSearchHTTPSNotEnforced(d) {
 		findings = append(findings, wave1Finding(opensearchCodeHTTPSNotForced))
 	}
@@ -97,14 +98,6 @@ func openSearchHTTPSNotEnforced(d opensearchtypes.DomainStatus) bool {
 
 func openSearchNodeToNodeOff(d opensearchtypes.DomainStatus) bool {
 	return d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled)
-}
-
-// openSearchPolicyIsPublic reports whether the domain's access policy lets any
-// principal in. The fetcher also writes the verdict to Fields for the list
-// column; both read it from here so the two can never disagree.
-func openSearchPolicyIsPublic(d opensearchtypes.DomainStatus) bool {
-	doc, err := iampolicy.Parse(aws.ToString(d.AccessPolicies))
-	return err == nil && iampolicy.Evaluate(doc, "").Public
 }
 
 // FetchOpenSearchDomains performs a two-step fetch:
@@ -207,12 +200,7 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 
 	encEnabled := strconv.FormatBool(!openSearchEncryptionAtRestOff(domain))
 
-	// VPC placement and the access policy verdict are read here, at
-	// the one point that holds the DomainStatus, and handed to the
-	// wave-2 enricher as Fields — the enricher makes no AWS calls of
-	// its own and must not re-derive them from RawStruct.
 	vpcEnabled := strconv.FormatBool(domain.VPCOptions != nil)
-	accessPolicyPublic := strconv.FormatBool(openSearchPolicyIsPublic(domain))
 	enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
 	nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
 
@@ -237,7 +225,6 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 			"current_version":                   currentVersion,
 			"new_version":                       newVersion,
 			"vpc_enabled":                       vpcEnabled,
-			"access_policy_public":              accessPolicyPublic,
 			"enforce_https":                     enforceHTTPS,
 			"node_to_node_encryption_enabled":   nodeToNode,
 		},
@@ -258,7 +245,7 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 		addWave1Rows(&r, opensearchCodeUpdateForced, rows...)
 	}
 
-	if vpcEnabled == "false" && accessPolicyPublic == "true" {
+	if hasFinding(r.Findings, opensearchCodePublic) {
 		addWave1Rows(&r, opensearchCodePublic,
 			domainpkg.DetailRow{Label: "Endpoint", Value: "public", Tier: "!"},
 			domainpkg.DetailRow{Label: "Access policy", Value: "open", Tier: "!"},

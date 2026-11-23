@@ -57,12 +57,19 @@ One bullet per distinct signal.
 maxResults=1)` runs once per repository and fills the package count the detail
 view shows. It raises no finding: an empty registry is not reported (see §5).
 
-- **Signal**: the repository permissions policy has an Allow statement that grants to any principal with no restrictive condition → **`public access policy`**. The policy is parsed and evaluated, not string-matched, so a wildcard principal written any legal way is caught and one scoped by a condition is not — `core/iampolicy/evaluate.go`.
+- **Signal**: the repository permissions policy has an Allow statement that grants to any principal with no restrictive condition → **`repository policy open to anyone`**. The policy is parsed and evaluated, not string-matched, so a wildcard principal written any legal way is caught and one scoped by a condition is not — `core/iampolicy/evaluate.go`.
   - **Explicit Deny**: a Deny statement that takes the grant from every caller on every granted resource clears the signal, and so do Deny statements that together fence both AWS service principals and every other caller to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. A conditional Deny that spares AWS service principals, or that names only part of the granted resources, does not clear it and is shown in the `Deny when` row. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged. A grant conditioned on `aws:PrincipalIsAWSService` being true admits every AWS service acting for any account and is public; the Attention block's Condition row shows that condition.
   - **State bucket**: Broken.
   - **API call**: `GetRepositoryPermissionsPolicy` — one call per repository. Implemented: `core/aws/codeartifact_issue_enrichment.go:100-132`.
   - **Cost shape**: per-resource.
   - **Why**: a publicly readable/writable CodeArtifact repository is a real supply-chain exposure (dependency-confusion and package-poisoning surface) that operators must see — a9s-devops (2026-07-05): possible=yes, worth=yes.
+
+- **Signal**: the repository permissions policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it → **`repository policy grants another account`**.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the repository's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
+  - **State bucket**: Warning.
+  - **API call**: same `GetRepositoryPermissionsPolicy` call as above; no added cost.
+  - **Cost shape**: per-resource.
 
 - **Signal**: repository has no permissions policy at all → **`no permissions policy`**.
   - **State bucket**: Warning.
@@ -87,16 +94,19 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| policy grants to any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `public access policy` |
+| policy grants to any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `repository policy open to anyone` |
+| policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `repository policy grants another account` |
 | no permissions policy | 2 | Warning | `~` | S2, S3, S4, S5 | `no permissions policy` |
 
 Rationale for severity: a repository anyone can reach is a live supply-chain exposure, so it reads Broken and bumps the menu count. A repository with no policy at all is open to its whole domain but no further, which is worth knowing on a review pass rather than at 3am, so it reads Warning.
 
 Note: both findings colour the row, and each carries its tier in the detail view's Attention section — `!` for the public policy, `~` for the missing one.
 
+A policy document that does not parse, or a policy read that answers without a document, says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse` or `no policy document returned`.
+
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red repository row reading `public access policy` says the repository is reachable by anyone, and a yellow one reading `no permissions policy` says it is open to the domain; both name the exposure in the Status column. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red repository row reading `repository policy open to anyone` says the repository is reachable by anyone, and a yellow one reading `no permissions policy` says it is open to the domain; both name the exposure in the Status column. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -118,7 +128,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `CreatedTime` field used for age computation — `AWS SDK Go v2 — codeartifact/types.RepositorySummary § CreatedTime`.
 - `PackageSummary` shape (emptiness check via `ListPackages` response) — `AWS SDK Go v2 — codeartifact/types.PackageSummary`.
 - Deferred item (`DescribeRepository` encryption check) — `docs/attention-signals.md § Not yet implemented`. The `GetRepositoryPermissionsPolicy` analysis originally listed there shipped as a Wave 2 signal and was moved to §3.2 during this amendment.
-- Wave 2 public-policy signal — the repository permissions policy is parsed and its Allow statements evaluated for a wildcard principal without a restrictive condition (`core/iampolicy/evaluate.go`); a public verdict raises `!` "public access policy" and a missing policy raises `~` "no permissions policy" — `core/aws/codeartifact_issue_enrichment.go`, one `GetRepositoryPermissionsPolicy` call per repo; phrase and severity on `core/aws/catalog_cicd.go`. a9s-devops (2026-07-05): possible=yes, worth=yes. A public CodeArtifact repository is a live supply-chain exposure (dependency confusion, package poisoning); operators doing an access review must see it without leaving the list.
+- Wave 2 public-policy signal — the repository permissions policy is parsed and its Allow statements evaluated for a wildcard principal without a restrictive condition (`core/iampolicy/evaluate.go`); a public verdict raises `!` "repository policy open to anyone" and a missing policy raises `~` "no permissions policy" — `core/aws/codeartifact_issue_enrichment.go`, one `GetRepositoryPermissionsPolicy` call per repo; phrase and severity on `core/aws/catalog_cicd.go`. a9s-devops (2026-07-05): possible=yes, worth=yes. A public CodeArtifact repository is a live supply-chain exposure (dependency confusion, package poisoning); operators doing an access review must see it without leaving the list.
 - Expected related targets (`ct-events`, `kms`) — `docs/related-resources.md § Per-type contract` and `docs/related-resources.md § codeartifact`.
 - `kms` pivot field citation (domain-level, not repo-level) — `AWS SDK Go v2 — codeartifact/types.DomainDescription § EncryptionKey`; `codeartifact/types.RepositorySummary § DomainName, DomainOwner` provides the lookup keys for `DescribeDomain`. The earlier wording "Repo EncryptionKey" in `docs/related-resources.md § codeartifact` was factually wrong (no such field exists on the Repository shape) and was amended during this spec generation — a9s-devops (2026-04-20): possible=yes, worth=yes; rationale — CodeArtifact encryption is domain-scoped; pivoting from repo to KMS requires a one-hop `DescribeDomain` call, which is cheap (cacheable per domain) and directly serves the "who depends on this CMK?" workflow during key rotation / access-audit reviews.
 - `DescribeRepository` deferred — `docs/attention-signals.md § Not yet implemented`.
@@ -138,7 +148,8 @@ codeartifact — CI/CD. Status key: `state` — the column naming it is the stat
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 | The repository has no resource policy, so who may read and publish depends entirely on the IAM policies attached to each caller and there is no single place to see or restrict it. Attach a repository policy naming the accounts and roles allowed to pull, and the smaller set allowed to publish. |
-| codeartifact.public-access-policy | public access policy | broken | wave2 | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "*" principal with the accounts or roles that need the repository, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| codeartifact.public-access-policy | repository policy open to anyone | broken | wave2 | The repository policy allows any principal, so anyone can use this repository, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| codeartifact.cross-account-policy | repository policy grants another account | warn | wave2 | The repository policy admits a caller from another AWS account, so that account can use this repository, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the repository policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -221,10 +221,15 @@ read failed, is not inspected: its Status cell stays empty, never `Active`.
   - **State bucket**: Broken.
   - **API call**: `GetFunction` response fields `Configuration.LastUpdateStatus` + `LastUpdateStatusReason` + `LastUpdateStatusReasonCode`.
   - **Cost shape**: per-resource.
-- **Signal**: the function's resource policy allows a wildcard principal, so any AWS caller can invoke it.
+- **Signal**: the function's resource policy allows a wildcard principal, so any AWS caller can call the actions it grants.
   - A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **API call**: `GetPolicy` — one call per function.
+  - **Cost shape**: per-resource.
+- **Signal**: the function's resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it.
+  - **Own account**: principals of the owning account are not foreign, and AWS service principals are never counted. When STS cannot name the session's account, the owning account is the one the function's ARN names; only when neither does is the row marked not inspected.
+  - **State bucket**: Warning.
+  - **API call**: `GetPolicy` — the same read as the wildcard-principal signal.
   - **Cost shape**: per-resource.
 - **Signal**: the function has a URL that requires no authentication (`AuthType == NONE`).
   - **State bucket**: Broken.
@@ -277,7 +282,8 @@ One row per signal from §3:
 | `Runtime` deprecated | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `runtime is end-of-life` |
 | `DeadLetterConfig==nil` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no dead-letter queue configured` |
 | credential in `Environment.Variables` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
-| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `invokable by anyone` |
+| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
+| resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it (`GetPolicy`) | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `function endpoint open without authentication` |
 | `State == Deactivating` (GetFunction) | 2 | Warning | `~` | S2, S3, S4, S5 | `deactivating` |
 | `State == Deactivated` (GetFunction) | 2 | Dim | n/a | S2, S4 | `deactivated` |
@@ -291,6 +297,8 @@ Rules for filling list and detail text:
 - A bare state keyword (`DORMANT`, `stopped`, `available`, `failed`) in the List text column is not acceptable. Pair it with the cause, or put the cause in the adjacent description column. Tests will assert the cause is present.
 - For signals that legitimately have no operator-actionable cause (e.g. pure `Healthy`), you may omit the row from this table entirely; §3 still describes it.
 - Keep the List text short enough to fit: ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.
+
+A policy document that does not parse, or a policy read that answers without a document, says nothing about who may call: the row reads `not inspected` instead of a verdict, and its detail names the reason, `policy does not parse` or `no policy document returned`.
 
 ## 4.1 UX review (two sentences)
 
@@ -394,8 +402,9 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 | lambda.state.unrecognised | <state> (unrecognised) | warn | wave2 | Lambda reports a function state a9s does not recognise, so a9s cannot tell whether the function can be invoked. Check the function in the AWS console before relying on it. |
 | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed. |
 | lambda.env-secret | credential in environment variables | broken | wave1 | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
-| lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it. |
 | lambda.function-url-public | function endpoint open without authentication | broken | wave2 | The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it. |
+| lambda.public-policy | resource policy open to anyone | broken | wave2 | The resource policy allows any principal, so anyone can use this function, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| lambda.cross-account-policy | resource policy grants another account | warn | wave2 | The resource policy admits a caller from another AWS account, so that account can use this function, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the resource policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -349,7 +349,7 @@ func cappedKMSKeys(n int) []resource.Resource {
 		id := fmt.Sprintf("key-%03d", i+1)
 		out = append(out, resource.Resource{
 			ID: id, Name: id, Type: "kms",
-			Fields: map[string]string{"key_id": id, "alias": "alias/" + id, "status": "Enabled"},
+			Fields: map[string]string{"key_id": id, "alias": "alias/" + id, "status": "Enabled", "arn": "arn:aws:kms:us-east-1:123456789012:key/" + id},
 		})
 	}
 	return out

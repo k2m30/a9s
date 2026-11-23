@@ -361,11 +361,9 @@ func TestEnricher_UninspectedUser_SaysWhy(t *testing.T) {
 	}
 }
 
-// TestEnricher_TableWithNoPolicy_IsNotAFailure pins that an empty policy
-// response is an answer, not a refusal: DynamoDB reports "no resource policy"
-// as PolicyNotFoundException, but a response carrying no document at all must
-// not be recorded as a parse failure — the row would say a check failed when
-// nothing did.
+// DynamoDB answers GetResourcePolicy for a table with no resource policy
+// with PolicyNotFoundException (Amazon DynamoDB API Reference,
+// GetResourcePolicy). That answer is the healthy one: no failure, no mark.
 func TestEnricher_TableWithNoPolicy_IsNotAFailure(t *testing.T) {
 	clients := &awsclient.ServiceClients{DynamoDB: &ddbEmptyPolicyFake{}}
 	resources := []resource.Resource{
@@ -384,7 +382,6 @@ func TestEnricher_TableWithNoPolicy_IsNotAFailure(t *testing.T) {
 	}
 }
 
-// ddbEmptyPolicyFake answers every call, with no resource policy document.
 type ddbEmptyPolicyFake struct {
 	awsclient.DynamoDBAPI
 }
@@ -404,5 +401,5 @@ func (f *ddbEmptyPolicyFake) DescribeContinuousBackups(
 func (f *ddbEmptyPolicyFake) GetResourcePolicy(
 	_ context.Context, _ *dynamodb.GetResourcePolicyInput, _ ...func(*dynamodb.Options),
 ) (*dynamodb.GetResourcePolicyOutput, error) {
-	return &dynamodb.GetResourcePolicyOutput{}, nil
+	return nil, &ddbtypes.PolicyNotFoundException{Message: aws.String("Resource-based policy not found for the provided ResourceArn")}
 }

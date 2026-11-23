@@ -14,7 +14,6 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -43,25 +42,8 @@ func refContext(clients any, cache resource.ResourceCache, target string) domain
 // resource's own ARN names, so a foreign principal never reads as local.
 func policyRefContext(clients any, cache resource.ResourceCache, target, resourceARN string) domain.RefContext {
 	rc := refContext(clients, cache, target)
-	rc.AccountID = cmp.Or(rc.AccountID, iampolicy.AccountFromARN(resourceARN))
+	rc.AccountID = ownAccountOf(rc.AccountID, resourceARN)
 	return rc
-}
-
-// grantedPrincipalRefs returns the IAM principal ARNs of kind ("role/",
-// "user/", "group/") that policy grants once its explicit Deny statements are
-// applied, in every account: the resolver leaves out another account's. ok is
-// false when the policy does not parse.
-func grantedPrincipalRefs(policy, kind string) (refs []string, ok bool) {
-	doc, err := iampolicy.Parse(policy)
-	if err != nil {
-		return nil, false
-	}
-	for _, p := range iampolicy.AllowedPrincipals(doc, "") {
-		if a, isIAM := ARNForService(p.Value, "iam"); p.Kind == "AWS" && isIAM && strings.HasPrefix(a.Resource, kind) {
-			refs = append(refs, p.Value)
-		}
-	}
-	return refs, true
 }
 
 // relatedRefs is the result of a checker that found refs to target: each ref
