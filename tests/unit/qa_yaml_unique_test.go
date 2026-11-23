@@ -34,7 +34,7 @@ func TestQA_YAML_CloudTrailEvent_JSONFieldRenderedAsNestedYAML(t *testing.T) {
 		RawStruct: event,
 	}
 
-	out := yamlView(t, res, 120, 40)
+	out := yamlView(t, res)
 
 	for _, want := range []string{
 		"eventVersion",
@@ -68,7 +68,7 @@ func TestQA_YAML_CloudTrailEvent_NullValuesInJSON(t *testing.T) {
 		RawStruct: event,
 	}
 
-	out := yamlView(t, res, 120, 40)
+	out := yamlView(t, res)
 
 	if !strings.Contains(out, "requestParameters") {
 		t.Errorf("CloudTrail Event YAML null values: expected 'requestParameters' in output, got:\n%s", out)

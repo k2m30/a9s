@@ -5,8 +5,8 @@ list_hashes:
   Storage Class: b49b5b529360f95c
   Last Modified: 4f3fe753e3fcb2cb
 detail_hashes:
-  Key: 699b276a0427a38e
-  Size: 967b94ca90be54e3
+  "key:key": aa6536764c40abdf
+  "key:size": d3cf1535b3dc9c6c
   LastModified: 6b3b06aaac7b075a
   StorageClass: e6440b8ff556cb4b
   ETag: d5fd73721a7c5f90
@@ -33,8 +33,8 @@ list:
     width: 22
 
 detail:
-  - Key
-  - Size
+  - { key: key, label: Key }
+  - { key: size, label: Size }
   - LastModified
   - StorageClass
   - ETag

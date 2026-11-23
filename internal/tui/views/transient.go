@@ -70,12 +70,10 @@ func (m DetailModel) Viewport() viewport.Model {
 	return m.viewport
 }
 
-// ── YAMLModel ─────────────────────────────────────────────────────────────────
-
-// NewTransientYAML creates a YAMLModel whose viewport is pre-initialised from
+// NewTransientText creates a TextModel whose viewport is pre-initialised from
 // vp. ready is set to true so RenderText does not return early.
-func NewTransientYAML(w, h int, vp viewport.Model) YAMLModel {
-	return YAMLModel{
+func NewTransientText(w, h int, vp viewport.Model) TextModel {
+	return TextModel{
 		width:    w,
 		height:   h,
 		viewport: vp,
@@ -85,26 +83,7 @@ func NewTransientYAML(w, h int, vp viewport.Model) YAMLModel {
 
 // Viewport returns the current viewport.Model so the caller can persist
 // scroll state across renders.
-func (m YAMLModel) Viewport() viewport.Model {
-	return m.viewport
-}
-
-// ── JSONModel ─────────────────────────────────────────────────────────────────
-
-// NewTransientJSON creates a JSONModel whose viewport is pre-initialised from
-// vp. ready is set to true so RenderText does not return early.
-func NewTransientJSON(w, h int, vp viewport.Model) JSONModel {
-	return JSONModel{
-		width:    w,
-		height:   h,
-		viewport: vp,
-		ready:    true,
-	}
-}
-
-// Viewport returns the current viewport.Model so the caller can persist
-// scroll state across renders.
-func (m JSONModel) Viewport() viewport.Model {
+func (m TextModel) Viewport() viewport.Model {
 	return m.viewport
 }
 
@@ -118,15 +97,6 @@ func NewTransientSelector(w, h int) SelectorModel {
 		width:  w,
 		height: h,
 	}
-}
-
-// ── DetailModel helpers ────────────────────────────────────────────────────────
-
-// RawYAMLFromResource converts a resource.Resource to a YAML string for
-// clipboard copy. Exported for use by the tui package's handleCopy dispatcher.
-func RawYAMLFromResource(res resource.Resource) string {
-	m := DetailModel{res: res}
-	return m.RawYAML()
 }
 
 // ── RightColumnModel ──────────────────────────────────────────────────────────

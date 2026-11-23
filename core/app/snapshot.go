@@ -99,7 +99,7 @@ func (c *Controller) snapshot() ViewState {
 		vs.FrameTitle = selectorFrameTitle(top.State.Selector)
 	}
 	if top.State.Text != nil {
-		vs.Body.Text = buildTextBody(top.State.Text)
+		vs.Body.Text = buildTextBody(top.ID, top.State.Text)
 		vs.Footer = c.buildTextFooterHints(top.ID, top.Ctx)
 	}
 	if top.State.Detail != nil {

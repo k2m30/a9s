@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
 	"gopkg.in/yaml.v3"
@@ -20,7 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
@@ -135,14 +135,12 @@ func TestPort_ErrorLogCopy_UncoloredContent(t *testing.T) {
 	}
 }
 
-func TestPort_YAML_ColorizeGolden_LiveContentLines(t *testing.T) {
+func TestPort_YAML_ColorizeGolden_LiveScreenLines(t *testing.T) {
 	res := resource.Resource{
 		ID: "i-goldenyaml", Name: "golden-yaml",
 		Fields: map[string]string{"state": "running"},
 	}
-	m := views.NewYAMLWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(120, 40)
-	lines := m.ContentLines()
+	lines := strings.Split(textScreenContent(t, runtime.ScreenYAML, res), "\n")
 
 	var target string
 	for _, line := range lines {
@@ -152,37 +150,35 @@ func TestPort_YAML_ColorizeGolden_LiveContentLines(t *testing.T) {
 		}
 	}
 	if target == "" {
-		t.Fatalf("expected a ContentLines() entry whose stripped form is exactly %q, got lines: %v", "state: running", lines)
+		t.Fatalf("expected a YAML screen line whose stripped form is exactly %q, got lines: %v", "state: running", lines)
 	}
 	if stripANSI(target) != "state: running" {
 		t.Errorf("golden line mismatch after stripping ANSI: got %q, want %q", stripANSI(target), "state: running")
 	}
 	if !strings.Contains(target, "\x1b[") {
-		t.Errorf("live YAML ContentLines() must colorize the key/value line with ANSI codes, got: %q", target)
+		t.Errorf("the YAML screen must colorize the key/value line with ANSI codes, got: %q", target)
 	}
 }
 
-func TestPort_JSON_ColorizeGolden_LiveContentLines(t *testing.T) {
+func TestPort_JSON_ColorizeGolden_LiveScreenLines(t *testing.T) {
 	res := resource.Resource{
 		ID: "i-goldenjson", Name: "golden-json",
 		Fields: map[string]string{"state": "running"},
 	}
-	m := views.NewJSONWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(120, 40)
-	lines := m.ContentLines()
+	lines := strings.Split(textScreenContent(t, runtime.ScreenJSON, res), "\n")
 
 	var found bool
 	for _, line := range lines {
 		if strings.Contains(stripANSI(line), `"state"`) && strings.Contains(stripANSI(line), `"running"`) {
 			if !strings.Contains(line, "\x1b[") {
-				t.Errorf("live JSON ContentLines() must colorize the state field with ANSI codes, got: %q", line)
+				t.Errorf("the JSON screen must colorize the state field with ANSI codes, got: %q", line)
 			}
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected a ContentLines() entry containing the state field, got lines: %v", lines)
+		t.Fatalf("expected a JSON screen line containing the state field, got lines: %v", lines)
 	}
 }
 
@@ -701,9 +697,7 @@ func wave3CtrlInteractionResource() resource.Resource {
 
 func wave3TextInteractionLines(t *testing.T) []string {
 	t.Helper()
-	m := views.NewYAMLWithCtrl(wave3CtrlInteractionResource(), "ec2", keys.Default(), nil)
-	m.SetSize(80, 24)
-	return m.ContentLines()
+	return views.TextLines(runtime.ScreenYAML, wave3CtrlInteractionResource())
 }
 
 func TestPort_YAML_ToggleWrap_CtrlPrecision(t *testing.T) {
@@ -745,8 +739,7 @@ func TestPort_YAML_Search_CtrlPrecision(t *testing.T) {
 		t.Fatal("expected SearchMatches to be populated after ActionSearch with a matching query")
 	}
 
-	var scratch views.YAMLModel
-	scratch.SetSize(80, 24)
+	scratch := newTextRenderer(80, 24)
 	withSearch := scratch.RenderText(*after)
 	withoutSearch := scratch.RenderText(app.TextBody{Lines: lines})
 	if withSearch == withoutSearch {
@@ -783,9 +776,7 @@ func TestPort_YAML_SearchNextPrev_CtrlPrecision(t *testing.T) {
 
 func TestPort_YAML_Scroll_CtrlPrecision(t *testing.T) {
 	tuitest.NoColor(t)
-	m := views.NewYAMLWithCtrl(wave3CtrlInteractionResource(), "ec2", keys.Default(), nil)
-	m.SetSize(80, 5)
-	lines := m.ContentLines()
+	lines := views.TextLines(runtime.ScreenYAML, wave3CtrlInteractionResource())
 	ctrl := newTextScreenController(t, runtime.ScreenYAML, lines)
 
 	before := textSnapshotHelper(t, ctrl)
@@ -828,9 +819,7 @@ func TestPort_YAML_Scroll_CtrlPrecision(t *testing.T) {
 
 func TestPort_JSON_Search_CtrlPrecision(t *testing.T) {
 	tuitest.NoColor(t)
-	m := views.NewJSONWithCtrl(wave3CtrlInteractionResource(), "ec2", keys.Default(), nil)
-	m.SetSize(80, 24)
-	lines := m.ContentLines()
+	lines := views.TextLines(runtime.ScreenJSON, wave3CtrlInteractionResource())
 	ctrl := newTextScreenController(t, runtime.ScreenJSON, lines)
 
 	ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: "instance"})
@@ -842,8 +831,7 @@ func TestPort_JSON_Search_CtrlPrecision(t *testing.T) {
 		t.Fatal("expected SearchMatches populated after search in JSON")
 	}
 
-	var scratch views.JSONModel
-	scratch.SetSize(80, 24)
+	scratch := newTextRenderer(80, 24)
 	withSearch := scratch.RenderText(*snap)
 	withoutSearch := scratch.RenderText(app.TextBody{Lines: lines})
 	if withSearch == withoutSearch {
@@ -858,6 +846,25 @@ func textSnapshotHelper(t *testing.T, ctrl *app.Controller) *app.TextBody {
 		t.Fatal("Snapshot().Body.Text is nil — screen was not pushed or EnsureTextState was not called")
 	}
 	return snap.Body.Text
+}
+
+// textScreenContent is what the YAML or JSON screen of res draws: the lines
+// the TUI seeds at push, held by a controller text screen and read back from
+// its snapshot.
+func textScreenContent(t *testing.T, id runtime.ScreenID, res resource.Resource) string {
+	t.Helper()
+	return views.TextContent(*textSnapshotHelper(t, newTextScreenController(t, id, views.TextLines(id, res))))
+}
+
+// yamlScreen is a controller showing the YAML screen of res as the TUI pushes
+// it.
+func yamlScreen(t *testing.T, res resource.Resource) *app.Controller {
+	t.Helper()
+	return newTextScreenController(t, runtime.ScreenYAML, views.TextLines(runtime.ScreenYAML, res))
+}
+
+func newTextRenderer(w, h int) views.TextModel {
+	return views.NewTransientText(w, h, viewport.New(viewport.WithWidth(w), viewport.WithHeight(h)))
 }
 
 // wave3EnterYAML navigates a fresh root model to the live YAML screen for
@@ -1007,8 +1014,8 @@ func TestPort_YAML_Scroll_LiveKeyPath(t *testing.T) {
 //
 //	aws: autoscaling:groupName: acme-web-prod-asg
 //
-// ContentLines() is the same colorizeYAML output View() renders, so this is
-// exactly what a user sees on the live YAML screen and copies from it.
+// textScreenContent is the colorizeYAML output the YAML screen draws, so this
+// is exactly what a user sees on the live YAML screen and copies from it.
 
 func TestPort_ColorizeYAML_ColonInQuotedKey_Regression(t *testing.T) {
 	res := resource.Resource{
@@ -1018,9 +1025,7 @@ func TestPort_ColorizeYAML_ColonInQuotedKey_Regression(t *testing.T) {
 			"aws:autoscaling:groupName": "acme-web-prod-asg",
 		},
 	}
-	m := views.NewYAMLWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(80, 24)
-	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	raw := stripANSI(textScreenContent(t, runtime.ScreenYAML, res))
 
 	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(raw), &parsed); err != nil {
@@ -1044,9 +1049,7 @@ func TestPort_ColorizeYAML_EvenBackslashRunBeforeQuote_Regression(t *testing.T) 
 			"foo\t\\": "bar",
 		},
 	}
-	m := views.NewYAMLWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(80, 24)
-	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	raw := stripANSI(textScreenContent(t, runtime.ScreenYAML, res))
 
 	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(raw), &parsed); err != nil {

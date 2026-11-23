@@ -24,7 +24,7 @@ detail_hashes:
   StoppedAt: 503ede778d8a26ce
   StoppedReason: a04ddd1618e0b88c
   StopCode: 3f760ccb1566d480
-  HealthStatus: b0f95ff830baff4c
+  "key:health_status": 1415c9447ba65205
   Connectivity: f35a473cc5ce4d6a
   PlatformVersion: 291612949499faed
   PlatformFamily: d3185240f966faec
@@ -84,7 +84,7 @@ detail:
   - StoppedAt
   - StoppedReason
   - StopCode
-  - HealthStatus
+  - { key: health_status, label: HealthStatus }
   - Connectivity
   - PlatformVersion
   - PlatformFamily

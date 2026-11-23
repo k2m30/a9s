@@ -5,6 +5,7 @@ package fieldpath
 import (
 	"fmt"
 	"maps"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -215,10 +216,12 @@ func ExtractSubtree(obj any, dotPath string) string {
 
 	// Dereference pointer and interface wrappers (e.g., fields of type `any`
 	// containing a map[string]any from JSON unmarshal).
+	viaInterface := false
 	for val.Kind() == reflect.Pointer || val.Kind() == reflect.Interface {
 		if val.IsNil() {
 			return ""
 		}
+		viaInterface = viaInterface || val.Kind() == reflect.Interface
 		val = val.Elem()
 	}
 
@@ -226,7 +229,7 @@ func ExtractSubtree(obj any, dotPath string) string {
 	if isScalar(val) {
 		if val.Kind() == reflect.String {
 			if parsed := tryParseJSON(val.String()); parsed != nil {
-				out, err := yaml.Marshal(parsed)
+				out, err := yaml.Marshal(detailDoc(parsed))
 				if err == nil {
 					return strings.TrimRight(string(out), "\n")
 				}
@@ -239,7 +242,12 @@ func ExtractSubtree(obj any, dotPath string) string {
 	// AWS SDK structs contain unexported fields that cause yaml.Marshal to panic.
 	switch val.Kind() {
 	case reflect.Struct, reflect.Slice, reflect.Map:
-		safe := ToSafeValue(val)
+		var safe any
+		if viaInterface && val.Kind() != reflect.Struct {
+			safe = detailDoc(val.Interface())
+		} else {
+			safe = detailValue(toSafeValue(val, true))
+		}
 		if safe == nil {
 			return ""
 		}
@@ -251,6 +259,79 @@ func ExtractSubtree(obj any, dotPath string) string {
 	}
 
 	return FormatValue(val)
+}
+
+// jsonDoc marks, in the tree the detail builds, a JSON document: one carried
+// in a string, or one an enricher stored in a field typed any. A document is
+// shown as written, so no SDK "not set" rule reaches inside it.
+type jsonDoc struct{ v any }
+
+// detailValue is v as a nested detail row shows it, built as a new tree so
+// the struct behind the row is never changed. A bool and a time.Time take the
+// form a top-level row gives them (FormatValue: Yes/No, the minute), written
+// as a plain scalar, so a nested line is formatted once. A zero Quantity beside
+// an empty Items list is left out, with a map that leaves empty: AWS wraps a
+// list as {Quantity, Items} and the SDK fills in Quantity: 0 when the list is
+// unset. The rule is for SDK values: a jsonDoc keeps every key and every empty
+// container (detailDoc). The YAML view, built from ToSafeValue alone, keeps
+// that Quantity.
+func detailValue(v any) any {
+	switch x := v.(type) {
+	case jsonDoc:
+		return detailDoc(x.v)
+	case bool, time.Time:
+		return &yaml.Node{Kind: yaml.ScalarNode, Value: FormatValue(reflect.ValueOf(x))}
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, sub := range x {
+			kept := detailValue(sub)
+			if sub != nil && kept == nil {
+				continue
+			}
+			out[k] = kept
+		}
+		if q, ok := out["Quantity"]; ok && q == int64(0) && out["Items"] == nil {
+			delete(out, "Quantity")
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	case []any:
+		var out []any
+		for _, el := range x {
+			if kept := detailValue(el); kept != nil {
+				out = append(out, kept)
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	return v
+}
+
+func detailDoc(v any) any {
+	switch x := v.(type) {
+	case jsonDoc:
+		return detailDoc(x.v)
+	case bool, time.Time:
+		return detailValue(x)
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, sub := range x {
+			out[k] = detailDoc(sub)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, el := range x {
+			out[i] = detailDoc(el)
+		}
+		return out
+	}
+	return v
 }
 
 // extractMultiScalars walks a dot path and supports traversing slices/arrays
@@ -324,8 +405,22 @@ func promotesInline(f reflect.StructField) bool {
 }
 
 // ToSafeValue recursively converts a reflect.Value into a representation
-// that only contains exported fields, safe for yaml.Marshal.
+// that only contains exported fields, safe for yaml.Marshal. It is the one
+// value conversion of the YAML view and of nested detail rows, and types each
+// scalar by its Go kind: a number stays a number (an integral float as an
+// integer, any other float in plain decimal, never exponent form), a bool a
+// bool, a time.Time an RFC 3339 instant at the precision it holds.
+//
+// What is left out: a nil pointer or interface, an empty string, slice or map,
+// a zero time.Time, and a struct left with no fields. Every false or 0 is
+// kept: the SDK gives a non-pointer field its zero value both when AWS states
+// it and when the response omits it, the two cannot be told apart here, and
+// the JSON view of the same struct shows it.
 func ToSafeValue(val reflect.Value) any {
+	return toSafeValue(val, false)
+}
+
+func toSafeValue(val reflect.Value, docs bool) any {
 	for val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return nil
@@ -335,6 +430,12 @@ func ToSafeValue(val reflect.Value) any {
 
 	switch val.Kind() {
 	case reflect.Struct:
+		if val.Type() == reflect.TypeFor[time.Time]() && val.CanInterface() {
+			if ts := val.Interface().(time.Time); !ts.IsZero() {
+				return ts
+			}
+			return nil
+		}
 		if isScalar(val) {
 			return FormatValue(val)
 		}
@@ -357,15 +458,17 @@ func ToSafeValue(val reflect.Value) any {
 				continue
 			}
 			fv := val.Field(i)
-			if isZeroOrNil(fv) {
+			if isNilOrEmpty(fv) {
 				continue
 			}
-			switch sv := ToSafeValue(fv).(type) {
+			switch sv := toSafeValue(fv, docs).(type) {
 			case map[string]any:
 				maps.Copy(m, sv)
 			case nil:
 			default:
-				m[field.Name] = sv
+				if sv != "" {
+					m[field.Name] = sv
+				}
 			}
 		}
 		for i := 0; i < t.NumField(); i++ {
@@ -374,7 +477,7 @@ func ToSafeValue(val reflect.Value) any {
 				continue
 			}
 			fv := val.Field(i)
-			if isZeroOrNil(fv) {
+			if isNilOrEmpty(fv) {
 				continue
 			}
 			name := field.Name
@@ -383,8 +486,7 @@ func ToSafeValue(val reflect.Value) any {
 					name = n
 				}
 			}
-			sv := ToSafeValue(fv)
-			if sv != nil {
+			if sv := toSafeValue(fv, docs); sv != nil && sv != "" {
 				m[name] = sv
 			}
 		}
@@ -403,7 +505,7 @@ func ToSafeValue(val reflect.Value) any {
 		}
 		var result []any
 		for i := 0; i < val.Len(); i++ {
-			sv := ToSafeValue(val.Index(i))
+			sv := toSafeValue(val.Index(i), docs)
 			if sv != nil {
 				result = append(result, sv)
 			}
@@ -419,35 +521,67 @@ func ToSafeValue(val reflect.Value) any {
 		}
 		m := make(map[string]any)
 		for _, key := range val.MapKeys() {
-			m[fmt.Sprintf("%v", key.Interface())] = ToSafeValue(val.MapIndex(key))
+			m[fmt.Sprintf("%v", key.Interface())] = toSafeValue(val.MapIndex(key), docs)
 		}
 		return m
 
 	default:
+		switch val.Kind() {
+		case reflect.Bool:
+			return val.Bool()
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return val.Int()
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return val.Uint()
+		case reflect.Float32, reflect.Float64:
+			return safeFloat(val)
+		}
 		if isScalar(val) {
 			if val.Kind() == reflect.String {
 				if parsed := tryParseJSON(val.String()); parsed != nil {
+					if docs {
+						return jsonDoc{parsed}
+					}
 					return parsed
 				}
 			}
 			return FormatValue(val)
 		}
 		if val.CanInterface() {
+			if docs && val.Kind() == reflect.Interface {
+				return jsonDoc{val.Interface()}
+			}
 			return val.Interface()
 		}
 		return fmt.Sprintf("%v", val)
 	}
 }
 
-// isZeroOrNil checks if a value is nil (for pointers/slices/maps) or the zero value.
-func isZeroOrNil(v reflect.Value) bool {
+// safeFloat is a float in the form yaml.Marshal writes as a plain number: an
+// integral value as an int64, any other finite value as a float node in plain
+// decimal, because yaml.Marshal itself switches to exponent form for large
+// magnitudes.
+func safeFloat(val reflect.Value) any {
+	f := val.Float()
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return f
+	}
+	if f == math.Trunc(f) && math.Abs(f) < 1<<53 {
+		return int64(f)
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!float", Value: strconv.FormatFloat(f, 'f', -1, val.Type().Bits())}
+}
+
+func isNilOrEmpty(v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.Pointer, reflect.Interface:
 		return v.IsNil()
 	case reflect.Slice, reflect.Map:
 		return v.IsNil() || v.Len() == 0
+	case reflect.String:
+		return v.Len() == 0
 	default:
-		return v.IsZero()
+		return false
 	}
 }
 
@@ -603,8 +737,15 @@ func ToSnakeCase(s string) string {
 // ExtractFieldList builds a structured []FieldItem for the given field paths.
 //
 // For each path in paths:
-//  1. Check fields map first (case-insensitive + snake_case fallback)
-//  2. If not found in map, call ExtractSubtree(obj, path)
+//  1. When obj is non-nil, the value is ExtractSubtree(obj, path) and fields
+//     is not read: a value only the fetcher computes is a key-form detail
+//     field, which the caller reads from Fields itself.
+//  2. When obj is nil (a cache-replayed or degraded row), the fields map is
+//     read: case-insensitive, then snake_case; a dotted leaf path such as
+//     "State.Name" then reads the key pathKeys (the type's list columns, Path
+//     to Key) declares for it; then dotted sub-keys. pathKeys answers dotted
+//     paths only: a top-level column path can sit beside a key that holds a
+//     different fact (secrets' status column names the path Name).
 //  3. If still empty, set Value = "-"
 //
 // If the extracted value contains "\n" (multi-line — struct/slice/map from ExtractSubtree):
@@ -617,16 +758,19 @@ func ToSnakeCase(s string) string {
 // Check navigable map for IsNavigable/TargetType annotation on top-level scalar items.
 //
 // Always returns a non-nil slice (empty []FieldItem{} for empty paths).
-func ExtractFieldList(obj any, fields map[string]string, paths []string, navigable map[string]string) []FieldItem {
+func ExtractFieldList(obj any, fields map[string]string, paths []string, navigable, pathKeys map[string]string) []FieldItem {
 	if len(paths) == 0 {
 		return []FieldItem{}
+	}
+	if v := reflect.ValueOf(obj); v.Kind() == reflect.Pointer && v.IsNil() {
+		obj = nil
 	}
 	var items []FieldItem
 	for _, path := range paths {
 		val := ""
 		nonScalarFromObj := false
 		nonScalarFromFields := false
-		if len(fields) > 0 {
+		if obj == nil && len(fields) > 0 {
 			for k, v := range fields {
 				if strings.EqualFold(k, path) {
 					val = v
@@ -639,12 +783,15 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 					val = v
 				}
 			}
+			if key, ok := pathKeys[path]; ok && val == "" && strings.Contains(path, ".") {
+				val = fields[key]
+			}
 			if nested := extractNestedFieldLines(fields, path); len(nested) > 0 {
 				nonScalarFromFields = true
 				val = strings.Join(nested, "\n")
 			}
 		}
-		if val == "" && obj != nil {
+		if obj != nil {
 			val = ExtractSubtree(obj, path)
 			if val != "" {
 				if rv, err := ExtractValue(obj, path); err == nil {

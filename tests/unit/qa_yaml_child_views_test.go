@@ -42,7 +42,7 @@ func fixtureLogEvents() []resource.Resource {
 
 func TestQA_YAML_LogStreams_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureLogStreams() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("LogStreams YAML for %q missing key %q", r.ID, k)
@@ -55,23 +55,23 @@ func TestQA_YAML_LogStreams_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_LogStreams_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureLogStreams()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("LogStreams FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureLogStreams()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("LogStreams frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_LogStreams_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureLogStreams()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureLogStreams()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("LogStreams RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("LogStreams YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
 func TestQA_YAML_LogEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureLogEvents() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("LogEvents YAML for %q missing key %q", r.ID, k)
@@ -84,17 +84,17 @@ func TestQA_YAML_LogEvents_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_LogEvents_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureLogEvents()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("LogEvents FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureLogEvents()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("LogEvents frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_LogEvents_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureLogEvents()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureLogEvents()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("LogEvents RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("LogEvents YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -117,7 +117,7 @@ func fixtureTargetHealth() []resource.Resource {
 
 func TestQA_YAML_TargetHealth_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureTargetHealth() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("TargetHealth YAML for %q missing key %q", r.ID, k)
@@ -130,17 +130,17 @@ func TestQA_YAML_TargetHealth_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_TargetHealth_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureTargetHealth()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("TargetHealth FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureTargetHealth()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("TargetHealth frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_TargetHealth_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureTargetHealth()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureTargetHealth()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("TargetHealth RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("TargetHealth YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -163,7 +163,7 @@ func fixtureLambdaInvocations() []resource.Resource {
 
 func TestLambdaInvocationsYAMLViewContains(t *testing.T) {
 	for _, r := range fixtureLambdaInvocations() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("LambdaInvocations YAML for %q missing key %q", r.ID, k)
@@ -176,17 +176,17 @@ func TestLambdaInvocationsYAMLViewContains(t *testing.T) {
 }
 
 func TestLambdaInvocationsYAMLFrameTitle(t *testing.T) {
-	m := yamlModel(fixtureLambdaInvocations()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("LambdaInvocations FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureLambdaInvocations()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("LambdaInvocations frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestLambdaInvocationsYAMLNoANSI(t *testing.T) {
-	m := yamlModel(fixtureLambdaInvocations()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureLambdaInvocations()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("LambdaInvocations RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("LambdaInvocations YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -205,7 +205,7 @@ func fixtureLambdaInvocationLogs() []resource.Resource {
 
 func TestLambdaInvocationLogsYAMLViewContains(t *testing.T) {
 	for _, r := range fixtureLambdaInvocationLogs() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("LambdaInvocationLogs YAML for %q missing key %q", r.ID, k)
@@ -218,17 +218,17 @@ func TestLambdaInvocationLogsYAMLViewContains(t *testing.T) {
 }
 
 func TestLambdaInvocationLogsYAMLFrameTitle(t *testing.T) {
-	m := yamlModel(fixtureLambdaInvocationLogs()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("LambdaInvocationLogs FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureLambdaInvocationLogs()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("LambdaInvocationLogs frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestLambdaInvocationLogsYAMLNoANSI(t *testing.T) {
-	m := yamlModel(fixtureLambdaInvocationLogs()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureLambdaInvocationLogs()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("LambdaInvocationLogs RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("LambdaInvocationLogs YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -247,7 +247,7 @@ func fixtureEcsSvcEvents() []resource.Resource {
 
 func TestQA_YAML_EcsSvcEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEcsSvcEvents() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("EcsSvcEvents YAML for %q missing key %q", r.ID, k)
@@ -260,17 +260,17 @@ func TestQA_YAML_EcsSvcEvents_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_EcsSvcEvents_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureEcsSvcEvents()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("EcsSvcEvents FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureEcsSvcEvents()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EcsSvcEvents frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_EcsSvcEvents_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureEcsSvcEvents()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureEcsSvcEvents()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("EcsSvcEvents RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("EcsSvcEvents YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -293,7 +293,7 @@ func fixtureEcsSvcTasks() []resource.Resource {
 
 func TestQA_YAML_EcsSvcTasks_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEcsSvcTasks() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("EcsSvcTasks YAML for %q missing key %q", r.ID, k)
@@ -306,17 +306,17 @@ func TestQA_YAML_EcsSvcTasks_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_EcsSvcTasks_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureEcsSvcTasks()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("EcsSvcTasks FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureEcsSvcTasks()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EcsSvcTasks frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_EcsSvcTasks_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureEcsSvcTasks()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureEcsSvcTasks()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("EcsSvcTasks RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("EcsSvcTasks YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -336,7 +336,7 @@ func fixtureEcsSvcLogs() []resource.Resource {
 
 func TestQA_YAML_EcsSvcLogs_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEcsSvcLogs() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("EcsSvcLogs YAML for %q missing key %q", r.ID, k)
@@ -349,17 +349,17 @@ func TestQA_YAML_EcsSvcLogs_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_EcsSvcLogs_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureEcsSvcLogs()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("EcsSvcLogs FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureEcsSvcLogs()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EcsSvcLogs frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_EcsSvcLogs_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureEcsSvcLogs()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureEcsSvcLogs()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("EcsSvcLogs RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("EcsSvcLogs YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -381,7 +381,7 @@ func fixtureCfnEvents() []resource.Resource {
 
 func TestQA_YAML_CfnEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureCfnEvents() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("CfnEvents YAML for %q missing key %q", r.ID, k)
@@ -394,17 +394,17 @@ func TestQA_YAML_CfnEvents_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_CfnEvents_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureCfnEvents()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("CfnEvents FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureCfnEvents()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CfnEvents frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_CfnEvents_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureCfnEvents()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureCfnEvents()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("CfnEvents RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("CfnEvents YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -427,7 +427,7 @@ func fixtureCfnResources() []resource.Resource {
 
 func TestQA_YAML_CfnResources_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureCfnResources() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("CfnResources YAML for %q missing key %q", r.ID, k)
@@ -440,17 +440,17 @@ func TestQA_YAML_CfnResources_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_CfnResources_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureCfnResources()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("CfnResources FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureCfnResources()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CfnResources frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_CfnResources_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureCfnResources()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureCfnResources()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("CfnResources RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("CfnResources YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -481,7 +481,7 @@ func fixtureAsgActivities() []resource.Resource {
 
 func TestQA_YAML_AsgActivities_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureAsgActivities() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("AsgActivities YAML for %q missing key %q", r.ID, k)
@@ -494,17 +494,17 @@ func TestQA_YAML_AsgActivities_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_AsgActivities_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureAsgActivities()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("AsgActivities FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureAsgActivities()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("AsgActivities frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_AsgActivities_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureAsgActivities()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureAsgActivities()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("AsgActivities RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("AsgActivities YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -533,7 +533,7 @@ func fixtureAlarmHistory() []resource.Resource {
 
 func TestQA_YAML_AlarmHistory_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureAlarmHistory() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("AlarmHistory YAML for %q missing key %q", r.ID, k)
@@ -546,17 +546,17 @@ func TestQA_YAML_AlarmHistory_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_AlarmHistory_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureAlarmHistory()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("AlarmHistory FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureAlarmHistory()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("AlarmHistory frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_AlarmHistory_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureAlarmHistory()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureAlarmHistory()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("AlarmHistory RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("AlarmHistory YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -591,7 +591,7 @@ func fixtureELBListeners() []resource.Resource {
 
 func TestQA_YAML_ELBListeners_ContainsFields(t *testing.T) {
 	for _, r := range fixtureELBListeners() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("ELBListeners YAML for %q missing key %q", r.ID, k)
@@ -604,17 +604,17 @@ func TestQA_YAML_ELBListeners_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_ELBListeners_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureELBListeners()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("ELBListeners FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureELBListeners()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("ELBListeners frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_ELBListeners_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureELBListeners()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureELBListeners()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("ELBListeners RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("ELBListeners YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -645,7 +645,7 @@ func fixtureCBBuilds() []resource.Resource {
 
 func TestQA_YAML_CBBuilds_ContainsFields(t *testing.T) {
 	for _, r := range fixtureCBBuilds() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("CBBuilds YAML for %q missing key %q", r.ID, k)
@@ -658,17 +658,17 @@ func TestQA_YAML_CBBuilds_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_CBBuilds_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureCBBuilds()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("CBBuilds FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureCBBuilds()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CBBuilds frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_CBBuilds_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureCBBuilds()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureCBBuilds()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("CBBuilds RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("CBBuilds YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -689,7 +689,7 @@ func fixtureCBBuildLogs() []resource.Resource {
 
 func TestQA_YAML_CBBuildLogs_ContainsFields(t *testing.T) {
 	for _, r := range fixtureCBBuildLogs() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("CBBuildLogs YAML for %q missing key %q", r.ID, k)
@@ -702,17 +702,17 @@ func TestQA_YAML_CBBuildLogs_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_CBBuildLogs_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureCBBuildLogs()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("CBBuildLogs FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureCBBuildLogs()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CBBuildLogs frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_CBBuildLogs_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureCBBuildLogs()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureCBBuildLogs()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("CBBuildLogs RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("CBBuildLogs YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -736,7 +736,7 @@ func fixtureECRImages() []resource.Resource {
 
 func TestQA_YAML_ECRImages_ContainsFields(t *testing.T) {
 	for _, r := range fixtureECRImages() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("ECRImages YAML for %q missing key %q", r.ID, k)
@@ -749,17 +749,17 @@ func TestQA_YAML_ECRImages_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_ECRImages_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureECRImages()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("ECRImages FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureECRImages()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("ECRImages frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_ECRImages_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureECRImages()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureECRImages()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("ECRImages RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("ECRImages YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -786,7 +786,7 @@ func fixturePipelineStages() []resource.Resource {
 
 func TestQA_YAML_PipelineStages_ContainsFields(t *testing.T) {
 	for _, r := range fixturePipelineStages() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("PipelineStages YAML for %q missing key %q", r.ID, k)
@@ -799,17 +799,17 @@ func TestQA_YAML_PipelineStages_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_PipelineStages_FrameTitle(t *testing.T) {
-	m := yamlModel(fixturePipelineStages()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("PipelineStages FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixturePipelineStages()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("PipelineStages frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_PipelineStages_NoANSI(t *testing.T) {
-	m := yamlModel(fixturePipelineStages()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixturePipelineStages()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("PipelineStages RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("PipelineStages YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -838,7 +838,7 @@ func fixtureRolePolicies() []resource.Resource {
 
 func TestQA_YAML_RolePolicies_ContainsFields(t *testing.T) {
 	for _, r := range fixtureRolePolicies() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("RolePolicies YAML for %q missing key %q", r.ID, k)
@@ -851,17 +851,17 @@ func TestQA_YAML_RolePolicies_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_RolePolicies_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureRolePolicies()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("RolePolicies FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureRolePolicies()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("RolePolicies frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_RolePolicies_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureRolePolicies()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureRolePolicies()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("RolePolicies RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("RolePolicies YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -882,7 +882,7 @@ func fixtureIAMGroupMembers() []resource.Resource {
 
 func TestQA_YAML_IAMGroupMembers_ContainsFields(t *testing.T) {
 	for _, r := range fixtureIAMGroupMembers() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("IAMGroupMembers YAML for %q missing key %q", r.ID, k)
@@ -895,17 +895,17 @@ func TestQA_YAML_IAMGroupMembers_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_IAMGroupMembers_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureIAMGroupMembers()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("IAMGroupMembers FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureIAMGroupMembers()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("IAMGroupMembers frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_IAMGroupMembers_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureIAMGroupMembers()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureIAMGroupMembers()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("IAMGroupMembers RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("IAMGroupMembers YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -926,7 +926,7 @@ func fixtureELBListenerRules() []resource.Resource {
 
 func TestQA_YAML_ELBListenerRules_ContainsFields(t *testing.T) {
 	for _, r := range fixtureELBListenerRules() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("ELBListenerRules YAML for %q missing key %q", r.ID, k)
@@ -939,17 +939,17 @@ func TestQA_YAML_ELBListenerRules_ContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_ELBListenerRules_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureELBListenerRules()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("ELBListenerRules FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureELBListenerRules()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("ELBListenerRules frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_ELBListenerRules_NoANSI(t *testing.T) {
-	m := yamlModel(fixtureELBListenerRules()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureELBListenerRules()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("ELBListenerRules RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("ELBListenerRules YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -972,7 +972,7 @@ func fixtureDbiEvents() []resource.Resource {
 
 func TestQA_YAML_DbiEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureDbiEvents() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("DbiEvents YAML for %q missing key %q", r.ID, k)
@@ -985,17 +985,17 @@ func TestQA_YAML_DbiEvents_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_DbiEvents_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureDbiEvents()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("DbiEvents FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureDbiEvents()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("DbiEvents frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_DbiEvents_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureDbiEvents()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureDbiEvents()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("DbiEvents RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("DbiEvents YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -1018,7 +1018,7 @@ func fixtureSnsSubscriptions() []resource.Resource {
 
 func TestQA_YAML_SnsSubscriptions_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureSnsSubscriptions() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("SnsSubscriptions YAML for %q missing key %q", r.ID, k)
@@ -1031,17 +1031,17 @@ func TestQA_YAML_SnsSubscriptions_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_SnsSubscriptions_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureSnsSubscriptions()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("SnsSubscriptions FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureSnsSubscriptions()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("SnsSubscriptions frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_SnsSubscriptions_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureSnsSubscriptions()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureSnsSubscriptions()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("SnsSubscriptions RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("SnsSubscriptions YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -1074,7 +1074,7 @@ func fixtureEbRuleTargets() []resource.Resource {
 
 func TestQA_YAML_EbRuleTargets_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEbRuleTargets() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("EbRuleTargets YAML for %q missing key %q", r.ID, k)
@@ -1087,17 +1087,17 @@ func TestQA_YAML_EbRuleTargets_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_EbRuleTargets_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureEbRuleTargets()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("EbRuleTargets FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureEbRuleTargets()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EbRuleTargets frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_EbRuleTargets_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureEbRuleTargets()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureEbRuleTargets()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("EbRuleTargets RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("EbRuleTargets YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
@@ -1122,7 +1122,7 @@ func fixtureGlueRuns() []resource.Resource {
 
 func TestQA_YAML_GlueRuns_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureGlueRuns() {
-		out := yamlView(t, r, 120, 40)
+		out := yamlView(t, r)
 		for k, val := range r.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("GlueRuns YAML for %q missing key %q", r.ID, k)
@@ -1135,27 +1135,27 @@ func TestQA_YAML_GlueRuns_ViewContainsFields(t *testing.T) {
 }
 
 func TestQA_YAML_GlueRuns_FrameTitle(t *testing.T) {
-	m := yamlModel(fixtureGlueRuns()[0], 120, 40)
-	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
-		t.Errorf("GlueRuns FrameTitle() = %q, want 'yaml' in title", title)
+	m := yamlScreen(t, fixtureGlueRuns()[0])
+	if title := m.TextFrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("GlueRuns frame title %q, want 'yaml' in title", title)
 	}
 }
 
 func TestQA_YAML_GlueRuns_RawContentUncolored(t *testing.T) {
-	m := yamlModel(fixtureGlueRuns()[0], 120, 40)
-	raw := m.RawContent()
+	m := yamlScreen(t, fixtureGlueRuns()[0])
+	raw, _ := m.CopyContent()
 	if raw != stripANSI(raw) {
-		t.Error("GlueRuns RawContent() contains ANSI codes, expected plain YAML")
+		t.Error("GlueRuns YAML copy contains ANSI codes, expected plain YAML")
 	}
 }
 
 // TestQA_YAML_AllChildTypes iterates every registered child type and verifies:
 //
 //	(a) the demo fixture's YAML view renders without error and is non-empty
-//	(b) RawContent() is valid YAML (parseable by yaml.v3)
-//	(c) RawContent() contains no unresolved template markers
-//	(d) FrameTitle() contains "yaml"
-//	(e) RawContent() contains no ANSI escape codes
+//	(b) the YAML copy is valid YAML (parseable by yaml.v3)
+//	(c) the YAML copy contains no unresolved template markers
+//	(d) the frame title contains "yaml"
+//	(e) the YAML copy contains no ANSI escape codes
 func TestQA_YAML_AllChildTypes(t *testing.T) {
 	forbidden := []string{"<no value>", "<nil>", "%!(EXTRA", "<missing field>"}
 
@@ -1175,18 +1175,18 @@ func TestQA_YAML_AllChildTypes(t *testing.T) {
 			res := result.Resources[0]
 
 			// (a) non-empty view
-			out := yamlView(t, res, 120, 40)
+			out := yamlView(t, res)
 			if out == "" {
 				t.Fatalf("YAML view is empty for child type %s", ct.ShortName)
 			}
 
-			m := yamlModel(res, 120, 40)
-			raw := m.RawContent()
+			m := yamlScreen(t, res)
+			raw, _ := m.CopyContent()
 
 			// (b) valid YAML
 			var parsed any
 			if err := yaml.Unmarshal([]byte(raw), &parsed); err != nil {
-				t.Errorf("RawContent() is not valid YAML for child type %s: %v\n---\n%s", ct.ShortName, err, raw)
+				t.Errorf("the YAML copy is not valid YAML for child type %s: %v\n---\n%s", ct.ShortName, err, raw)
 			}
 
 			// (c) no unresolved template markers
@@ -1196,15 +1196,13 @@ func TestQA_YAML_AllChildTypes(t *testing.T) {
 				}
 			}
 
-			// (d) FrameTitle contains "yaml"
-			title := m.FrameTitle()
+			title := m.TextFrameTitle()
 			if !strings.Contains(title, "yaml") {
-				t.Errorf("%s FrameTitle() = %q, want 'yaml' in title", ct.ShortName, title)
+				t.Errorf("%s frame title %q, want 'yaml' in title", ct.ShortName, title)
 			}
 
-			// (e) RawContent has no ANSI codes
 			if strings.Contains(raw, "\x1b[") {
-				t.Errorf("%s RawContent() contains ANSI codes — must be plain for clipboard copy", ct.ShortName)
+				t.Errorf("%s YAML copy contains ANSI codes — must be plain for clipboard copy", ct.ShortName)
 			}
 		})
 	}

@@ -3,7 +3,7 @@ list_hashes:
   Timestamp: 5bf08271cbcd6527
   Message: f19ceb8284129254
 detail_hashes:
-  timestamp: 0ef36ad9c35adbf4
+  "key:timestamp": 383094c32cda4844
   message: 46ba0d519233b00b
 list:
   Timestamp:
@@ -14,5 +14,5 @@ list:
     width: 120
 
 detail:
-  - timestamp
+  - { key: timestamp }
   - message

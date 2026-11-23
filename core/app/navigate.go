@@ -14,39 +14,41 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// resourceYAMLLines marshals r to plain YAML text (no ANSI coloring) and
-// returns the individual lines. Mirrors the source that YAMLModel.RawContent
-// uses — RawStruct when present, resource.Fields as fallback — so the
-// content is equivalent to what the TUI YAML screen shows (minus syntax color).
-//
-// Returns a one-element slice with a "No YAML data available" notice when
-// the resource carries neither RawStruct nor Fields.
-func resourceYAMLLines(r resource.Resource) []string {
+func resourceYAML(r resource.Resource) string {
 	var data []byte
 	var err error
 	if r.RawStruct != nil {
-		safe := fieldpath.ToSafeValue(reflect.ValueOf(r.RawStruct))
-		data, err = yaml.Marshal(safe)
+		data, err = yaml.Marshal(fieldpath.ToSafeValue(reflect.ValueOf(r.RawStruct)))
 	} else if len(r.Fields) > 0 {
 		data, err = yaml.Marshal(r.Fields)
 	}
-	if err != nil || len(data) == 0 {
-		return []string{"  No YAML data available"}
+	if err != nil {
+		return ""
 	}
-	raw := strings.TrimRight(string(data), "\n")
+	return string(data)
+}
+
+// ResourceText is what a copy of r's YAML or JSON puts on the clipboard,
+// byte for byte the text the screen shows without its styling.
+func ResourceText(id runtime.ScreenID, r resource.Resource) string {
+	return strings.Join(ResourceTextLines(id, r), "\n")
+}
+
+// ResourceTextLines returns the plain (uncoloured) lines of r's YAML or JSON
+// screen, and no lines when r carries no data (the screen then shows its
+// TextBody.Notice). Both renderers show these lines; the TUI only colours
+// them, and copy joins them.
+func ResourceTextLines(id runtime.ScreenID, r resource.Resource) []string {
+	if id == runtime.ScreenJSON {
+		return resourceJSONLines(r)
+	}
+	raw := strings.TrimRight(resourceYAML(r), "\n")
+	if raw == "" {
+		return nil
+	}
 	return strings.Split(raw, "\n")
 }
 
-// resourceJSONLines marshals r to indented plain JSON text (no ANSI coloring)
-// and returns the individual lines. Mirrors JSONModel.RawContent — RawStruct
-// when present, resource.Fields as fallback.
-//
-// For the JSON case we also try a roundtrip through jsonyaml.TryJSONToYAMLLines
-// to validate the JSON is well-formed; the actual output is the MarshalIndent
-// string split by newline, which is always valid when MarshalIndent succeeds.
-//
-// Returns a one-element slice with a "No JSON data available" notice when the
-// resource carries neither RawStruct nor Fields.
 func resourceJSONLines(r resource.Resource) []string {
 	var data []byte
 	var err error
@@ -56,10 +58,9 @@ func resourceJSONLines(r resource.Resource) []string {
 		data, err = json.MarshalIndent(r.Fields, "", "  ")
 	}
 	if err != nil || len(data) == 0 {
-		return []string{"  No JSON data available"}
+		return nil
 	}
-	raw := strings.TrimRight(string(data), "\n")
-	return strings.Split(raw, "\n")
+	return strings.Split(strings.TrimRight(string(data), "\n"), "\n")
 }
 
 // applyNavResult converts a NavigateResult into PushScreen/ReplaceScreen/PopScreen
@@ -190,7 +191,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		if res.Resource == nil {
 			return nil
 		}
-		lines := resourceYAMLLines(*res.Resource)
+		lines := ResourceTextLines(runtime.ScreenYAML, *res.Resource)
 		intent := runtime.PushScreen{
 			ID: runtime.ScreenYAML,
 			Context: runtime.ScreenContext{
@@ -214,7 +215,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		if res.Resource == nil {
 			return nil
 		}
-		lines := resourceJSONLines(*res.Resource)
+		lines := ResourceTextLines(runtime.ScreenJSON, *res.Resource)
 		intent := runtime.PushScreen{
 			ID: runtime.ScreenJSON,
 			Context: runtime.ScreenContext{

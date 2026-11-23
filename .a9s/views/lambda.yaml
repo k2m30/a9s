@@ -15,7 +15,7 @@ detail_hashes:
   MemorySize: d050da8253593411
   Timeout: 3ec9650aedcaa6c4
   EphemeralStorage: fa5b26e3734633d7
-  CodeSize: 6b0f36f4240dadb5
+  "key:code_size": e8de24fa73b14eac
   Description: 170fb1f14fe6d129
   Role: 5f2dc9cb822f04d0
   PackageType: b133fc59817c8821
@@ -70,7 +70,7 @@ detail:
   - MemorySize
   - Timeout
   - EphemeralStorage
-  - CodeSize
+  - { key: code_size, label: CodeSize }
   - Description
   - Role
   - PackageType

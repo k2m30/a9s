@@ -8,37 +8,27 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/session"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// Helper: build a YAMLModel with NewYAMLWithCtrl and return its ContentLines()
-// joined, as the navigate path does (runtime_adapter_navigate.go's
-// pushTextScreen).
-
-func yamlView(t *testing.T, res resource.Resource, w, h int) string {
+func yamlView(t *testing.T, res resource.Resource) string {
 	t.Helper()
-	k := keys.Default()
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(w, h)
-	out := strings.Join(m.ContentLines(), "\n")
+	out := textScreenContent(t, runtime.ScreenYAML, res)
 	if out == "" {
-		t.Fatalf("YAMLModel.ContentLines() returned empty for resource %q", res.ID)
+		t.Fatalf("the YAML screen is empty for resource %q", res.ID)
 	}
 	return out
 }
 
-func yamlModel(res resource.Resource, w, h int) views.YAMLModel {
-	k := keys.Default()
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(w, h)
-	return m
+func yamlText(t *testing.T, res resource.Resource) string {
+	t.Helper()
+	return textScreenContent(t, runtime.ScreenYAML, res)
 }
 
 func TestQA_YAML_S3_ViewContainsFields(t *testing.T) {
 	buckets := fixtureS3Buckets()
 	for _, b := range buckets {
-		out := yamlView(t, b, 120, 40)
+		out := yamlView(t, b)
 		for k, v := range b.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("S3 YAML for %q missing key %q", b.ID, k)
@@ -52,7 +42,7 @@ func TestQA_YAML_S3_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_S3_SyntaxColoring(t *testing.T) {
 	buckets := fixtureS3Buckets()
-	out := yamlView(t, buckets[0], 120, 40)
+	out := yamlView(t, buckets[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("S3 YAML output has no ANSI color codes — syntax coloring missing")
 	}
@@ -61,7 +51,7 @@ func TestQA_YAML_S3_SyntaxColoring(t *testing.T) {
 func TestQA_YAML_EC2_ViewContainsFields(t *testing.T) {
 	instances := fixtureEC2Instances()
 	for _, inst := range instances {
-		out := yamlView(t, inst, 120, 40)
+		out := yamlView(t, inst)
 		for k, v := range inst.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("EC2 YAML for %q missing key %q", inst.ID, k)
@@ -75,7 +65,7 @@ func TestQA_YAML_EC2_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_EC2_SyntaxColoring(t *testing.T) {
 	instances := fixtureEC2Instances()
-	out := yamlView(t, instances[0], 120, 40)
+	out := yamlView(t, instances[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("EC2 YAML output has no ANSI color codes")
 	}
@@ -84,7 +74,7 @@ func TestQA_YAML_EC2_SyntaxColoring(t *testing.T) {
 func TestQA_YAML_RDS_ViewContainsFields(t *testing.T) {
 	instances := fixtureRDSInstances()
 	for _, inst := range instances {
-		out := yamlView(t, inst, 120, 40)
+		out := yamlView(t, inst)
 		for k, v := range inst.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("RDS YAML for %q missing key %q", inst.ID, k)
@@ -98,7 +88,7 @@ func TestQA_YAML_RDS_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_RDS_SyntaxColoring(t *testing.T) {
 	instances := fixtureRDSInstances()
-	out := yamlView(t, instances[0], 120, 40)
+	out := yamlView(t, instances[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("RDS YAML output has no ANSI color codes")
 	}
@@ -107,7 +97,7 @@ func TestQA_YAML_RDS_SyntaxColoring(t *testing.T) {
 func TestQA_YAML_Redis_ViewContainsFields(t *testing.T) {
 	clusters := fixtureRedisClusters()
 	for _, c := range clusters {
-		out := yamlView(t, c, 120, 40)
+		out := yamlView(t, c)
 		if c.RawStruct != nil {
 			// With RawStruct set (the ReplicationGroup), YAML renders SDK field names. The
 			// fixture leaves MemberClusters empty so the output stays key:value pairs.
@@ -138,7 +128,7 @@ func TestQA_YAML_Redis_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_Redis_SyntaxColoring(t *testing.T) {
 	clusters := fixtureRedisClusters()
-	out := yamlView(t, clusters[0], 120, 40)
+	out := yamlView(t, clusters[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("Redis YAML output has no ANSI color codes")
 	}
@@ -147,7 +137,7 @@ func TestQA_YAML_Redis_SyntaxColoring(t *testing.T) {
 func TestQA_YAML_DocDB_ViewContainsFields(t *testing.T) {
 	clusters := fixtureDocDBClusters()
 	for _, c := range clusters {
-		out := yamlView(t, c, 120, 40)
+		out := yamlView(t, c)
 		if c.RawStruct != nil {
 			// When RawStruct is present, YAML renders SDK struct field names
 			expectedKeys := []string{"DBClusterIdentifier", "EngineVersion", "Status", "Endpoint"}
@@ -171,7 +161,7 @@ func TestQA_YAML_DocDB_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_DocDB_SyntaxColoring(t *testing.T) {
 	clusters := fixtureDocDBClusters()
-	out := yamlView(t, clusters[0], 120, 40)
+	out := yamlView(t, clusters[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("DocDB YAML output has no ANSI color codes")
 	}
@@ -180,7 +170,7 @@ func TestQA_YAML_DocDB_SyntaxColoring(t *testing.T) {
 func TestQA_YAML_EKS_ViewContainsFields(t *testing.T) {
 	clusters := fixtureEKSClusters()
 	for _, c := range clusters {
-		out := yamlView(t, c, 120, 40)
+		out := yamlView(t, c)
 		for k, v := range c.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("EKS YAML for %q missing key %q", c.ID, k)
@@ -194,7 +184,7 @@ func TestQA_YAML_EKS_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_EKS_SyntaxColoring(t *testing.T) {
 	clusters := fixtureEKSClusters()
-	out := yamlView(t, clusters[0], 120, 40)
+	out := yamlView(t, clusters[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("EKS YAML output has no ANSI color codes")
 	}
@@ -203,7 +193,7 @@ func TestQA_YAML_EKS_SyntaxColoring(t *testing.T) {
 func TestQA_YAML_Secrets_ViewContainsFields(t *testing.T) {
 	secrets := fixtureSecrets()
 	for _, s := range secrets {
-		out := yamlView(t, s, 120, 40)
+		out := yamlView(t, s)
 		for k, v := range s.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("Secrets YAML for %q missing key %q", s.ID, k)
@@ -217,7 +207,7 @@ func TestQA_YAML_Secrets_ViewContainsFields(t *testing.T) {
 
 func TestQA_YAML_Secrets_SyntaxColoring(t *testing.T) {
 	secrets := fixtureSecrets()
-	out := yamlView(t, secrets[0], 120, 40)
+	out := yamlView(t, secrets[0])
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("Secrets YAML output has no ANSI color codes")
 	}
@@ -226,7 +216,7 @@ func TestQA_YAML_Secrets_SyntaxColoring(t *testing.T) {
 // TestQA_YAML_WrapToggle_KnownLongValue verifies wrap behaviour with a
 // resource that has a KNOWN 200-char field value, making the assertion
 // unconditionally reliable. Uses the live ctrl.Apply(ActionToggleWrap) ->
-// RenderText(body) seam (ContentLines() cannot observe wrap at all).
+// RenderText(body) seam (the screen's lines cannot observe wrap at all).
 func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	longValue := strings.Repeat("A", 200)
 	res := resource.Resource{
@@ -235,8 +225,7 @@ func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 		Fields: map[string]string{"description": longValue},
 	}
 
-	k := keys.Default()
-	lines := views.NewYAMLWithCtrl(res, "", k, nil).ContentLines()
+	lines := views.TextLines(runtime.ScreenYAML, res)
 
 	s := session.New()
 	s.Profile = "demo"
@@ -246,8 +235,7 @@ func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenYAML}})
 	ctrl.EnsureTextState(lines)
 
-	m := views.NewYAMLWithCtrl(res, "", k, ctrl)
-	m.SetSize(40, 30) // narrow: 40 cols, the 200-char value must wrap
+	m := newTextRenderer(40, 30) // narrow: 40 cols, the 200-char value must wrap
 
 	viewNoWrap := m.RenderText(*ctrl.Snapshot().Body.Text)
 
@@ -283,19 +271,19 @@ func TestQA_YAML_RawContent_AllTypes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := yamlModel(tc.res, 120, 40)
-			raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+			m := yamlText(t, tc.res)
+			raw := stripANSI(m)
 
 			if raw == "" {
-				t.Fatalf("%s: RawContent() is empty", tc.name)
+				t.Fatalf("%s: the YAML text is empty", tc.name)
 			}
 
 			if strings.Contains(raw, "\x1b[") {
-				t.Errorf("%s: RawContent() contains ANSI codes", tc.name)
+				t.Errorf("%s: the YAML text contains ANSI codes", tc.name)
 			}
 
 			if !strings.Contains(raw, ": ") {
-				t.Errorf("%s: RawContent() missing YAML key: value format", tc.name)
+				t.Errorf("%s: the YAML text missing YAML key: value format", tc.name)
 			}
 
 			// When RawStruct is set, YAML renders SDK struct field names, not Fields keys.
@@ -303,7 +291,7 @@ func TestQA_YAML_RawContent_AllTypes(t *testing.T) {
 			if tc.res.RawStruct == nil {
 				for k := range tc.res.Fields {
 					if !strings.Contains(raw, k) {
-						t.Errorf("%s: RawContent() missing field key %q", tc.name, k)
+						t.Errorf("%s: the YAML text missing field key %q", tc.name, k)
 					}
 				}
 			}
@@ -321,8 +309,8 @@ func TestQA_YAML_FieldsOnly_NoRawStruct(t *testing.T) {
 		},
 	}
 
-	m := yamlModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := yamlText(t, res)
+	out := m
 	if out == "" || out == "Initializing..." {
 		t.Fatal("YAML View() returned empty for fields-only resource")
 	}
@@ -333,12 +321,12 @@ func TestQA_YAML_FieldsOnly_NoRawStruct(t *testing.T) {
 		t.Error("YAML View() missing 'value1' for fields-only resource")
 	}
 
-	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	raw := stripANSI(m)
 	if raw == "" {
-		t.Fatal("RawContent() returned empty for fields-only resource")
+		t.Fatal("the YAML text returned empty for fields-only resource")
 	}
 	if strings.Contains(raw, "\x1b[") {
-		t.Error("RawContent() contains ANSI for fields-only resource")
+		t.Error("the YAML text contains ANSI for fields-only resource")
 	}
 }
 
@@ -349,10 +337,7 @@ func TestQA_YAML_EmptyResource(t *testing.T) {
 		Fields: map[string]string{},
 	}
 
-	k := keys.Default()
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	out := yamlText(t, res)
 
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "No YAML data available") {
@@ -366,10 +351,7 @@ func TestQA_YAML_NilFieldsResource(t *testing.T) {
 		Name: "nil",
 	}
 
-	k := keys.Default()
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	out := yamlText(t, res)
 
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "No YAML data available") {
@@ -400,14 +382,14 @@ func TestQA_YAML_BooleanColoring(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := yamlText(t, res)
+	out := m
 
 	if !strings.Contains(out, "\x1b[") {
 		t.Fatal("Boolean test: no ANSI codes in output")
 	}
 
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	rawYAML := stripANSI(m)
 
 	// FormatValue converts true -> "Yes", which yaml.v3 may quote as '"Yes"' to
 	// avoid YAML 1.1 boolean interpretation.
@@ -471,8 +453,8 @@ func TestQA_YAML_NullFields(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := yamlText(t, res)
+	out := m
 	plain := stripANSI(out)
 
 	if !strings.Contains(plain, "10.0.0.1") {
@@ -500,8 +482,8 @@ func TestQA_YAML_NullColoringViaFields(t *testing.T) {
 		},
 	}
 
-	m := yamlModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := yamlText(t, res)
+	out := m
 	plain := stripANSI(out)
 
 	if !strings.Contains(plain, "null") {
@@ -532,8 +514,8 @@ func TestQA_YAML_NumericColoring(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := yamlText(t, res)
+	out := m
 	plain := stripANSI(out)
 
 	if !strings.Contains(plain, "5432") {
@@ -568,8 +550,8 @@ func TestQA_YAML_RawStructPrecedence(t *testing.T) {
 		},
 	}
 
-	m := yamlModel(res, 120, 40)
-	plain := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := yamlText(t, res)
+	plain := stripANSI(m)
 
 	if !strings.Contains(plain, "StructField") {
 		t.Error("RawStruct field 'StructField' not found — RawStruct should take precedence")
@@ -603,8 +585,8 @@ func TestQA_YAML_NestedStructIndentation(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := yamlText(t, res)
+	rawYAML := stripANSI(m)
 
 	if !strings.Contains(rawYAML, "Endpoint:") {
 		t.Fatal("Nested struct test: 'Endpoint:' not found in raw YAML")
@@ -642,14 +624,14 @@ func TestQA_YAML_ArrayItems(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := yamlText(t, res)
+	rawYAML := stripANSI(m)
 
 	if !strings.Contains(rawYAML, "- Key:") {
 		t.Error("Array test: expected '- Key:' prefix for array items")
 	}
 
-	out := strings.Join(m.ContentLines(), "\n")
+	out := m
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "api-prod") {
 		t.Error("Array test: 'api-prod' not found in view")
@@ -677,8 +659,8 @@ func TestQA_YAML_EmptyArray(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := yamlText(t, res)
+	rawYAML := stripANSI(m)
 
 	if strings.Contains(rawYAML, "AssociatedRoles") {
 		t.Errorf("Empty array 'AssociatedRoles' should be omitted by ToSafeValue, got: %q", rawYAML)
@@ -714,8 +696,8 @@ func TestQA_YAML_NilPointerToStructShowsNoNull(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := yamlText(t, res)
+	rawYAML := stripANSI(m)
 
 	if strings.Contains(rawYAML, "null") {
 		t.Errorf("Non-nil pointer to empty struct should be omitted, not 'null'. Got:\n%s", rawYAML)
@@ -747,8 +729,8 @@ func TestQA_YAML_SliceOfEmptyStructsShowsNoNull(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := yamlModel(res, 120, 40)
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := yamlText(t, res)
+	rawYAML := stripANSI(m)
 
 	if strings.Contains(rawYAML, "null") {
 		t.Errorf("Slice of empty structs should not produce 'null'. Got:\n%s", rawYAML)
@@ -793,21 +775,21 @@ func TestQA_YAML_AllFixtureResources(t *testing.T) {
 	for typeName, resources := range allResources {
 		for i, res := range resources {
 			t.Run(typeName+"_"+res.ID, func(t *testing.T) {
-				m := yamlModel(res, 120, 40)
-				out := strings.Join(m.ContentLines(), "\n")
+				m := yamlText(t, res)
+				out := m
 
 				if out == "" || out == "Initializing..." {
 					t.Errorf("%s[%d] %q: View() returned empty or initializing", typeName, i, res.ID)
 				}
 
-				raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+				raw := stripANSI(m)
 				if raw == "" {
-					t.Errorf("%s[%d] %q: RawContent() returned empty", typeName, i, res.ID)
+					t.Errorf("%s[%d] %q: the YAML text returned empty", typeName, i, res.ID)
 				}
 
-				title := m.FrameTitle()
+				title := yamlScreen(t, res).TextFrameTitle()
 				if !strings.Contains(title, "yaml") {
-					t.Errorf("%s[%d] %q: FrameTitle() = %q, missing 'yaml'", typeName, i, res.ID, title)
+					t.Errorf("%s[%d] %q: frame title %q, missing 'yaml'", typeName, i, res.ID, title)
 				}
 
 				if !strings.Contains(out, "\x1b[") {
@@ -815,7 +797,7 @@ func TestQA_YAML_AllFixtureResources(t *testing.T) {
 				}
 
 				if strings.Contains(raw, "\x1b[") {
-					t.Errorf("%s[%d] %q: RawContent() contains ANSI codes", typeName, i, res.ID)
+					t.Errorf("%s[%d] %q: the YAML text contains ANSI codes", typeName, i, res.ID)
 				}
 			})
 		}
@@ -825,7 +807,7 @@ func TestQA_YAML_AllFixtureResources(t *testing.T) {
 func TestQA_YAML_S3Objects_ViewContainsFields(t *testing.T) {
 	objects := fixtureS3Objects()
 	for _, obj := range objects {
-		out := yamlView(t, obj, 120, 40)
+		out := yamlView(t, obj)
 		for k, v := range obj.Fields {
 			if !strings.Contains(out, k) {
 				t.Errorf("S3 Object YAML for %q missing key %q", obj.ID, k)
@@ -854,12 +836,12 @@ func TestQA_YAML_KeyValueFormat_AllTypes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := yamlModel(tc.res, 120, 40)
-			raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+			m := yamlText(t, tc.res)
+			raw := stripANSI(m)
 			lines := strings.Split(strings.TrimSpace(raw), "\n")
 
 			if len(lines) == 0 {
-				t.Fatalf("%s: RawContent() produced no lines", tc.name)
+				t.Fatalf("%s: the YAML text produced no lines", tc.name)
 			}
 
 			for _, line := range lines {
@@ -870,32 +852,6 @@ func TestQA_YAML_KeyValueFormat_AllTypes(t *testing.T) {
 				if !strings.Contains(trimmed, ":") {
 					t.Errorf("%s: line %q missing colon — not valid YAML key:value", tc.name, trimmed)
 				}
-			}
-		})
-	}
-}
-
-func TestQA_YAML_ResourceID_AllTypes(t *testing.T) {
-	type testCase struct {
-		name string
-		res  resource.Resource
-	}
-	cases := []testCase{
-		{"S3", fixtureS3Buckets()[0]},
-		{"EC2", fixtureEC2Instances()[0]},
-		{"RDS", fixtureRDSInstances()[0]},
-		{"Redis", fixtureRedisClusters()[0]},
-		{"DocDB", fixtureDocDBClusters()[0]},
-		{"EKS", fixtureEKSClusters()[0]},
-		{"Secrets", fixtureSecrets()[0]},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			m := yamlModel(tc.res, 120, 40)
-			rid := m.ResourceID()
-			if rid != tc.res.ID {
-				t.Errorf("%s: ResourceID() = %q, want %q", tc.name, rid, tc.res.ID)
 			}
 		})
 	}
@@ -914,8 +870,8 @@ func TestQA_YAML_ColorizeListItems(t *testing.T) {
 		RawStruct: &raw,
 		Fields:    map[string]string{},
 	}
-	m := yamlModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := yamlText(t, res)
+	out := m
 	plain := stripANSI(out)
 
 	if !strings.Contains(plain, "reader") {
@@ -929,8 +885,8 @@ func TestQA_YAML_ColorizeListItems(t *testing.T) {
 		t.Error("YAML view with list items has no ANSI color codes")
 	}
 
-	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	rawYAML := stripANSI(m)
 	if !strings.Contains(rawYAML, "- reader") {
-		t.Errorf("RawContent() missing '- reader' list item, got:\n%s", rawYAML)
+		t.Errorf("the YAML text missing '- reader' list item, got:\n%s", rawYAML)
 	}
 }

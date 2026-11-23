@@ -11,9 +11,9 @@ list_hashes:
   Launch Time: 863159acdb435de8
 detail_hashes:
   InstanceId: eca2142cd16c4577
-  State: a60d7692c7b3780c
+  State.Name: e3ebee2ebe2f6a70
   InstanceType: 9ce2c29c67bd9d70
-  InstanceLifecycle: aa123929e36b790a
+  "key:lifecycle": 464154e0d88a05f9
   ImageId: 0cdee1891bcda243
   KeyName: c1ee93640e35e33c
   Placement: 4e91e5c5a4df432e
@@ -70,9 +70,9 @@ list:
 
 detail:
   - InstanceId
-  - State
+  - { path: State.Name, label: State }
   - InstanceType
-  - InstanceLifecycle
+  - { key: lifecycle, label: InstanceLifecycle }
   - ImageId
   - KeyName
   - Placement

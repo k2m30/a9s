@@ -103,6 +103,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lambda:FunctionUrlAuthType = AWS_IAM` no longer scopes a `Principal: "*"` grant, since any AWS
   account can sign the request. `elasticfilesystem:AccessedViaMountTarget = true` and
   `aws:SourceOrgPaths` now scope a grant; `elasticfilesystem:AccessPointArn` no longer does.
+- The detail view shows what AWS returned for each field. The `Status` row of
+  ElastiCache, DB cluster, DB snapshot, DB cluster snapshot, MWAA, VPC peering
+  and Transfer agreement rows shows the AWS status, not the finding phrase and
+  its `(+N)` count (the findings stay in the Attention section). VPC peering
+  shows the status code in `Status` and its message in `StatusMessage`. A DB
+  instance's `Endpoint` and a Redshift cluster's `Endpoint` show the address
+  and the port. EC2 `State` shows the
+  state name. A CloudFront distribution's `Aliases` row lists the aliases. A
+  nested yes/no value reads `Yes`/`No` without quotes, as a top-level one
+  does; a nested `0` or `No` that AWS returned is shown, and an empty AWS list
+  (for example a CloudFront cache behavior with no Lambda associations) no
+  longer shows `Quantity: 0`. A log stream's first and last event times read
+  as a date and time, not as epoch milliseconds. A container-image Lambda
+  function's `CodeSize` reads `0 B`.
+- The YAML view shows `false` and `0` values (for example `Enabled: false` on a
+  disabled KMS key, `DesiredCount: 0` on an ECS service scaled to zero), and a
+  yes/no value reads `true`/`false` as in the JSON view. A number reads as a
+  number (`HttpPutResponseHopLimit: 2`, not `"2"`; a large alarm `Threshold`
+  reads `10000000000`, not `1e+10`) and a time keeps its full
+  RFC 3339 precision (`2025-11-15T08:30:00Z`). The terminal and the web page
+  show the same YAML and JSON text. A resource with no data shows
+  `No YAML data available` and copying it copies nothing.
+- `o` on a DocumentDB or Neptune DB instance, a DocumentDB cluster snapshot or
+  an event of such an instance opens the DocumentDB or Neptune console, not the
+  RDS console. A DocumentDB instance or snapshot and any Neptune row open the
+  service's console home for the region, because no per-resource console link
+  is documented for them.
 - Every AWS read retries when throttled, with one retry policy for all
   services: up to 5 attempts, a bare HTTP 429 counts as a throttle, and a
   burst of throttles during a wide sweep no longer stops retries early. A

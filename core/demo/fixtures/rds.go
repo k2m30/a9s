@@ -44,7 +44,7 @@ var sharedRDSFixtures = shared(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances:        slices.Concat(dbi.Instances, []rdstypes.DBInstance{dbiDocDBClusterMember()}, normalizeRDSInstancePosture(legacy), dbiLifecycleWitnesses()),
+		DBInstances:        slices.Concat(dbi.Instances, []rdstypes.DBInstance{dbiDocDBClusterMember()}, normalizeRDSInstancePosture(legacy), dbiLifecycleWitnesses(), []rdstypes.DBInstance{dbiNeptuneClusterMember()}),
 		DBSnapshots:        NewDBISnapFixtures().Instances,
 		Events:             buildRDSEvents(),
 		DBClusters:         normalizeRDSClusterPosture(buildRDSDBClusters()),
@@ -762,7 +762,7 @@ func buildRDSEvents() []rdstypes.Event {
 func init() {
 	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
 	// carries dbi.warn.deletion_protection_off.
-	Register(Pin{ShortName: "dbi", Rows: 58, Issues: 35, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi", Rows: 59, Issues: 35, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 13, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.

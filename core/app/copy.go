@@ -3,13 +3,10 @@
 package app
 
 import (
-	"reflect"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
-	"gopkg.in/yaml.v3"
 
-	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -100,30 +97,11 @@ func (c *Controller) copyContentDetail() (string, string) {
 			return val, "Copied: " + val
 		}
 	}
-	content := detailResourceRawYAML(ds.Resource)
+	content := ResourceText(runtime.ScreenYAML, ds.Resource)
 	if content == "" {
 		return "", ""
 	}
 	return content, "Copied detail to clipboard"
-}
-
-// detailResourceRawYAML marshals res to YAML text for the detail-screen copy
-// fallback, mirroring views.DetailModel.RawYAML's RawStruct-then-Fields
-// precedence. Kept in core (duplicated rather than shared) so CopyContent
-// never imports internal/tui.
-func detailResourceRawYAML(res resource.Resource) string {
-	var data []byte
-	var err error
-	if res.RawStruct != nil {
-		safe := fieldpath.ToSafeValue(reflect.ValueOf(res.RawStruct))
-		data, err = yaml.Marshal(safe)
-	} else if len(res.Fields) > 0 {
-		data, err = yaml.Marshal(res.Fields)
-	}
-	if err != nil || len(data) == 0 {
-		return ""
-	}
-	return string(data)
 }
 
 // copyContentText resolves copy content for a text screen (YAML, JSON, or

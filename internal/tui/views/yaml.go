@@ -3,7 +3,6 @@
 package views
 
 import (
-	"reflect"
 	"regexp"
 	"strings"
 
@@ -14,147 +13,61 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/app"
-	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
-
-	"gopkg.in/yaml.v3"
 )
 
-// YAMLModel renders YAML with syntax coloring using bubbles/viewport for scroll.
-// ctrl is non-nil when the model is constructed by the TUI navigator; when
-// ctrl is set, View() delegates to RenderText(ctrl.Snapshot().Body.Text) so
-// the headless/web renderer and the TUI renderer share one code path.
-// Unit tests and isolated callers leave ctrl nil; View() falls back to the
-// direct viewport path in that case so parity tests remain unaffected.
-type YAMLModel struct {
-	ctrl         *app.Controller
-	res          resource.Resource
-	resourceType string
-	viewport     viewport.Model
-	ready        bool
-	width        int
-	height       int
-	keys         keys.Map
-	search       SearchModel
+// TextModel renders a YAML or JSON text screen from the controller's
+// TextBody; the renderer builds one per frame (NewTransientText) and discards
+// it.
+type TextModel struct {
+	viewport viewport.Model
+	ready    bool
+	width    int
+	height   int
 }
 
-// NewYAMLWithCtrl creates a YAMLModel backed by the given controller.
-// The controller stack must already have ScreenYAML pushed and EnsureTextState
-// called before the first View() so that Snapshot().Body.Text is non-nil.
-func NewYAMLWithCtrl(res resource.Resource, resourceType string, k keys.Map, ctrl *app.Controller) YAMLModel {
-	return YAMLModel{
-		ctrl:         ctrl,
-		res:          res,
-		resourceType: resourceType,
-		keys:         k,
+// ColourText applies the syntax colouring of screen id (YAML or JSON) to the
+// plain lines core built. Stripping the styling gives back the same lines.
+func ColourText(id runtime.ScreenID, lines []string) []string {
+	if len(lines) == 0 {
+		return nil
 	}
-}
-
-// SetSize initializes or resizes the viewport.
-func (m *YAMLModel) SetSize(w, h int) {
-	m.width = w
-	m.height = h
-	if !m.ready {
-		m.viewport = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))
-		m.ready = true
-	} else {
-		m.viewport.SetWidth(w)
-		m.viewport.SetHeight(h)
+	raw := strings.Join(lines, "\n")
+	if id == runtime.ScreenJSON {
+		return strings.Split(colorizeJSON(raw), "\n")
 	}
-	m.refreshViewportContent()
+	return strings.Split(colorizeYAML(raw), "\n")
 }
 
-// refreshViewportContent re-renders content and applies search highlights.
-func (m *YAMLModel) refreshViewportContent() {
-	content := m.renderContent()
-	if m.search.IsActive() && m.search.Query() != "" {
-		plain := ansi.Strip(content)
-		m.search.SetContent(plain)
-		var matchLine int
-		content, matchLine = m.search.Apply(content)
-		if matchLine >= 0 {
-			m.viewport.GotoTop()
-			m.viewport.SetYOffset(matchLine)
-		}
+// TextLines is what a YAML or JSON screen of res is seeded with when it is
+// pushed; RegenerateTextScreens reseeds it with the same colouring.
+func TextLines(id runtime.ScreenID, res resource.Resource) []string {
+	return ColourText(id, app.ResourceTextLines(id, res))
+}
+
+// TextContent is the text RenderText hands the viewport; tests read a
+// screen's content through it so they see what the terminal draws.
+func TextContent(body app.TextBody) string {
+	if len(body.Lines) == 0 && body.Notice != "" {
+		return styles.DimText.Render("  " + body.Notice)
 	}
-	m.viewport.SetContent(content)
+	return strings.Join(body.Lines, "\n")
 }
 
-// FrameTitle returns e.g. "i-0abc123 yaml".
-func (m YAMLModel) FrameTitle() string {
-	id := m.res.ID
-	if m.res.Name != "" {
-		id = m.res.Name
-	}
-	return id + " yaml"
-}
-
-// ContentLines returns the syntax-colored YAML content as a slice of lines,
-// matching exactly what refreshViewportContent passes to the viewport.
-// Used by the TUI navigator at push time to seed EnsureTextState.
-func (m YAMLModel) ContentLines() []string {
-	content := m.renderContent()
-	return strings.Split(content, "\n")
-}
-
-// RawContent returns the uncolored YAML text for clipboard copy.
-func (m YAMLModel) RawContent() string {
-	var data []byte
-	var err error
-
-	if m.res.RawStruct != nil {
-		safe := fieldpath.ToSafeValue(reflect.ValueOf(m.res.RawStruct))
-		data, err = yaml.Marshal(safe)
-	} else if len(m.res.Fields) > 0 {
-		data, err = yaml.Marshal(m.res.Fields)
-	}
-
-	if err != nil || len(data) == 0 {
-		return ""
-	}
-	return string(data)
-}
-
-// ResourceID returns the resource ID for clipboard copy.
-func (m YAMLModel) ResourceID() string {
-	return m.res.ID
-}
-
-// renderContent marshals the resource to YAML and applies syntax coloring.
-func (m YAMLModel) renderContent() string {
-	var data []byte
-	var err error
-
-	if m.res.RawStruct != nil {
-		safe := fieldpath.ToSafeValue(reflect.ValueOf(m.res.RawStruct))
-		data, err = yaml.Marshal(safe)
-	} else if len(m.res.Fields) > 0 {
-		data, err = yaml.Marshal(m.res.Fields)
-	}
-
-	if err != nil || len(data) == 0 {
-		return styles.DimText.Render("  No YAML data available")
-	}
-
-	return colorizeYAML(string(data))
-}
-
-// RenderText renders a YAML text screen from a controller-supplied TextBody,
-// byte-identical to View() for the same logical state. The Lines in body are
-// the syntax-colored content strings set at push time. Scroll, wrap, and
-// search highlights are applied from body fields; width and height come from
-// the model's viewport (set by SetSize).
+// RenderText renders a YAML or JSON text screen from a controller-supplied
+// TextBody. The Lines in body are the syntax-coloured lines set at push time
+// (TextLines). Scroll, wrap and search highlights are applied from body
+// fields; width and height come from the viewport NewTransientText was given.
 //
-// If the model is not yet ready (SetSize not called), returns "Initializing..."
-// matching View()'s pre-ready behaviour.
-func (m *YAMLModel) RenderText(body app.TextBody) string {
+// A model not built by NewTransientText returns "Initializing...".
+func (m *TextModel) RenderText(body app.TextBody) string {
 	if !m.ready {
 		return "Initializing..."
 	}
 
-	content := strings.Join(body.Lines, "\n")
+	content := TextContent(body)
 
 	if body.Search != "" {
 		// The body already carries the match set the controller computed, in

@@ -123,7 +123,7 @@ func TestSearchHighlight_LandsOnTheMatchAfterADoubleWidthRune(t *testing.T) {
 	}
 
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(10))
-	m := views.NewTransientYAML(80, 10, vp)
+	m := views.NewTransientText(80, 10, vp)
 	out := m.RenderText(*body)
 
 	want := styles.SearchCurrentStyle.Render(tui6WideQuery)
@@ -150,11 +150,11 @@ func TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone(t *testing.T) {
 		render func(vp viewport.Model, body app.TextBody) string
 	}{
 		{"yaml", runtime.ScreenYAML, func(vp viewport.Model, body app.TextBody) string {
-			m := views.NewTransientYAML(80, 6, vp)
+			m := views.NewTransientText(80, 6, vp)
 			return m.RenderText(body)
 		}},
 		{"json", runtime.ScreenJSON, func(vp viewport.Model, body app.TextBody) string {
-			m := views.NewTransientJSON(80, 6, vp)
+			m := views.NewTransientText(80, 6, vp)
 			return m.RenderText(body)
 		}},
 	} {
@@ -224,7 +224,7 @@ func TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold(t *testing.T) {
 		t.Fatal("no text body on the snapshot")
 	}
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(6))
-	m := views.NewTransientYAML(80, 6, vp)
+	m := views.NewTransientText(80, 6, vp)
 	out := m.RenderText(*body)
 
 	if !strings.Contains(out, styles.SearchCurrentStyle.Render(tui6WideQuery)) {
@@ -294,7 +294,7 @@ func TestSearchHighlight_CoversExactlyTheMatchedBytes(t *testing.T) {
 				t.Fatalf("no match published for %q in %q", tc.query, tc.line)
 			}
 			vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(6))
-			m := views.NewTransientYAML(80, 6, vp)
+			m := views.NewTransientText(80, 6, vp)
 			out := m.RenderText(*body)
 
 			if !strings.Contains(out, styles.SearchCurrentStyle.Render(tc.query)) {

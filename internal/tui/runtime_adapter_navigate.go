@@ -255,12 +255,10 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		return m, m.dispatchTaskRequests(workloadTasks)
 
 	case runtime.NavigateKindPushYAML:
-		y := views.NewYAMLWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
-		return m.pushTextScreen(result, runtime.ScreenYAML, &y)
+		return m.pushTextScreen(result, runtime.ScreenYAML)
 
 	case runtime.NavigateKindPushJSON:
-		j := views.NewJSONWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
-		return m.pushTextScreen(result, runtime.ScreenJSON, &j)
+		return m.pushTextScreen(result, runtime.ScreenJSON)
 
 	case runtime.NavigateKindPushHelp:
 		ctx := m.helpContext()
@@ -355,26 +353,16 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// textScreenView is the shared surface of YAMLModel and JSONModel that
-// pushTextScreen needs: a resizable viewport and its rendered content lines.
-type textScreenView interface {
-	SetSize(w, h int)
-	ContentLines() []string
-}
-
 // pushTextScreen handles the shared push logic for NavigateKindPushYAML and
-// NavigateKindPushJSON: sizes the view, pushes the controller screen with
-// resource context, seeds TextState with the syntax-colored content lines
-// (must happen after SetSize so ContentLines() uses the fully-initialised
-// viewport width), pushes the rendererState, and dispatches DetailEnrich
-// when requested. Carries ResourceType + ResourceID so
-// selectedResourceForAction resolves the resource from this text screen
-// (enables 't', child views, etc.).
-func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.ScreenID, view textScreenView) (tea.Model, tea.Cmd) {
+// NavigateKindPushJSON: pushes the controller screen with resource context,
+// seeds TextState with core's lines in syntax colour, pushes the
+// rendererState, and dispatches the detail workload. Carries ResourceType +
+// ResourceID so selectedResourceForAction resolves the resource from this
+// text screen (enables 't', child views, etc.).
+func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.ScreenID) (tea.Model, tea.Cmd) {
 	if result.ReplaceCurrent {
 		m.popRS()
 	}
-	view.SetSize(m.innerSize())
 	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID: screenID,
 		Context: runtime.ScreenContext{
@@ -383,8 +371,8 @@ func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.Sc
 			Region:       result.Region,
 		},
 	}})
-	m.ctrl.EnsureTextState(view.ContentLines())
 	res := *result.Resource
+	m.ctrl.EnsureTextState(views.TextLines(screenID, res))
 	m.ctrl.SetTextResource(res)
 	textRS := newTextRS()
 	textRS.textResource = &res

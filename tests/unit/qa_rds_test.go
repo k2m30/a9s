@@ -13,6 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -443,12 +444,10 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 }
 
 func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
-	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 40)
+	m := textScreenContent(t, runtime.ScreenYAML, res)
 
-	out := strings.Join(m.ContentLines(), "\n")
+	out := m
 	if out == "Initializing..." || out == "" {
 		t.Fatal("YAML view should not be empty or initializing after SetSize")
 	}
@@ -461,12 +460,10 @@ func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 }
 
 func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
-	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 40)
+	m := textScreenContent(t, runtime.ScreenYAML, res)
 
-	out := strings.Join(m.ContentLines(), "\n")
+	out := m
 	for _, val := range res.Fields {
 		if val == "" {
 			continue
@@ -478,18 +475,16 @@ func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
 }
 
 func TestQA_RDS_YAML_RawContentNonEmpty(t *testing.T) {
-	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
+	m := textScreenContent(t, runtime.ScreenYAML, res)
 
-	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	raw := stripANSI(m)
 	if raw == "" {
-		t.Error("YAML RawContent should not be empty")
+		t.Error("YAML text should not be empty")
 	}
 }
 
 func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
-	k := keys.Default()
 
 	dbIdentifier := "test-yaml-db"
 	engine := "postgres"
@@ -522,10 +517,9 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 50)
+	m := textScreenContent(t, runtime.ScreenYAML, res)
 
-	out := strings.Join(m.ContentLines(), "\n")
+	out := m
 	plain := stripANSI(out)
 
 	expectedValues := []string{
@@ -550,7 +544,6 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 }
 
 func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
-	k := keys.Default()
 
 	dbIdentifier := "yaml-creating-db"
 	status := "creating"
@@ -567,11 +560,10 @@ func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 40)
+	m := textScreenContent(t, runtime.ScreenYAML, res)
 
 	// Should not panic.
-	out := strings.Join(m.ContentLines(), "\n")
+	out := m
 	plain := stripANSI(out)
 
 	if strings.Contains(plain, "<nil>") {
@@ -582,12 +574,10 @@ func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
 func TestQA_RDS_YAML_SyntaxColoring(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(120, 40)
+	m := textScreenContent(t, runtime.ScreenYAML, res)
 
-	out := strings.Join(m.ContentLines(), "\n")
+	out := m
 
 	if out == stripANSI(out) {
 		t.Error("YAML view should have ANSI color codes when NO_COLOR is not set")

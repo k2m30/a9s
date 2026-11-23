@@ -1,8 +1,6 @@
-// JSON view content correctness via NewJSONWithCtrl +
-// ContentLines(). json.MarshalIndent (unlike YAML's fieldpath.ToSafeValue)
-// keeps zero/false values, and native JSON types (bool/float64) round-trip
-// through json.Unmarshal. The colorize golden and uncolored copy are pinned
-// in text_ports_test.go.
+// JSON view content correctness through the JSON screen's lines: native JSON
+// types (bool/float64) round-trip through json.Unmarshal. The colorize golden
+// and uncolored copy are pinned in text_ports_test.go.
 package unit
 
 import (
@@ -11,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // testJSONStruct is a simple struct for RawStruct tests.
@@ -21,19 +18,9 @@ type testJSONStruct struct {
 	Count int
 }
 
-// jsonModel creates a live JSONModel (NewJSONWithCtrl) from a resource and
-// sets its size.
-func jsonModel(res resource.Resource, w, h int) views.JSONModel {
-	k := keys.Default()
-	m := views.NewJSONWithCtrl(res, "", k, nil)
-	m.SetSize(w, h)
-	return m
-}
-
-// jsonRawContent returns the uncolored JSON text via the live ContentLines()
-// seam.
-func jsonRawContent(m views.JSONModel) string {
-	return stripANSI(strings.Join(m.ContentLines(), "\n"))
+func jsonRawContent(t *testing.T, res resource.Resource) string {
+	t.Helper()
+	return stripANSI(textScreenContent(t, runtime.ScreenJSON, res))
 }
 
 // TestJSON_RawContent_WithRawStruct verifies the JSON content is valid
@@ -47,8 +34,7 @@ func TestJSON_RawContent_WithRawStruct(t *testing.T) {
 			Count: 42,
 		},
 	}
-	m := jsonModel(res, 80, 24)
-	raw := jsonRawContent(m)
+	raw := jsonRawContent(t, res)
 	if raw == "" {
 		t.Fatal("content returned empty for resource with RawStruct")
 	}
@@ -78,8 +64,7 @@ func TestJSON_RawContent_WithFields(t *testing.T) {
 			"state":         "running",
 		},
 	}
-	m := jsonModel(res, 80, 24)
-	raw := jsonRawContent(m)
+	raw := jsonRawContent(t, res)
 	if raw == "" {
 		t.Fatal("content returned empty for resource with Fields")
 	}
@@ -112,8 +97,7 @@ func TestJSON_ValidJSON_WithRawStruct(t *testing.T) {
 			Active: true,
 		},
 	}
-	m := jsonModel(res, 80, 24)
-	raw := jsonRawContent(m)
+	raw := jsonRawContent(t, res)
 	if raw == "" {
 		t.Fatal("content returned empty for resource with RawStruct")
 	}
@@ -145,8 +129,7 @@ func TestJSON_RawContent_PreservesZeroAndFalseValues(t *testing.T) {
 		ID:        "zero-json-id",
 		RawStruct: zeroStruct{Count: 0, Active: false},
 	}
-	m := jsonModel(res, 80, 24)
-	raw := jsonRawContent(m)
+	raw := jsonRawContent(t, res)
 	if raw == "" {
 		t.Fatal("content returned empty for resource with zero values")
 	}
@@ -185,8 +168,7 @@ func TestJSON_ColorizeStructuralTokens(t *testing.T) {
 		RawStruct: &raw,
 		Fields:    map[string]string{},
 	}
-	m := jsonModel(res, 120, 40)
-	out := strings.Join(m.ContentLines(), "\n")
+	out := textScreenContent(t, runtime.ScreenJSON, res)
 	plain := stripANSI(out)
 
 	if !strings.Contains(plain, "{") {

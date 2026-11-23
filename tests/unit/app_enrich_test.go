@@ -15,8 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // rolePolicyRes builds a minimal role_policies resource for enrich tests.
@@ -65,7 +63,6 @@ func newEnrichApp(t testing.TB) tui.Model {
 func TestDetailView_EnrichResult_UpdatesRawStruct(t *testing.T) {
 	// Test via YAML model directly — YAML view renders from RawStruct
 	// and will include Document if present.
-	k := keys.Default()
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/test-policy", "test-policy", "Managed")
 	enrichedRes := withDocument(res, map[string]any{
@@ -79,10 +76,9 @@ func TestDetailView_EnrichResult_UpdatesRawStruct(t *testing.T) {
 		},
 	})
 
-	y := views.NewYAMLWithCtrl(enrichedRes, "role_policies", k, nil)
-	y.SetSize(120, 40)
+	y := textScreenContent(t, runtime.ScreenYAML, enrichedRes)
 
-	content := stripANSI(strings.Join(y.ContentLines(), "\n"))
+	content := stripANSI(y)
 	if !strings.Contains(content, "Document") {
 		t.Error("YAML view should render Document field from enriched RawStruct")
 	}
@@ -97,7 +93,6 @@ func TestDetailView_EnrichResult_UpdatesRawStruct(t *testing.T) {
 // Pressing 'y' returns a cmd that must be driven separately, so the YAML model
 // is built directly.
 func TestDetailView_EnrichResult_YAMLViewShowsDocument(t *testing.T) {
-	k := keys.Default()
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-test-policy", "yaml-test-policy", "Managed")
 	enrichedRes := withDocument(res, map[string]any{
@@ -107,10 +102,9 @@ func TestDetailView_EnrichResult_YAMLViewShowsDocument(t *testing.T) {
 		},
 	})
 
-	y := views.NewYAMLWithCtrl(enrichedRes, "role_policies", k, nil)
-	y.SetSize(120, 40)
+	y := textScreenContent(t, runtime.ScreenYAML, enrichedRes)
 
-	content := stripANSI(strings.Join(y.ContentLines(), "\n"))
+	content := stripANSI(y)
 	if !strings.Contains(content, "Document") {
 		t.Error("expected YAML view to contain Document section")
 	}
@@ -120,7 +114,6 @@ func TestDetailView_EnrichResult_YAMLViewShowsDocument(t *testing.T) {
 }
 
 func TestDetailView_EnrichResult_JSONViewShowsDocument(t *testing.T) {
-	k := keys.Default()
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/json-test-policy", "json-test-policy", "Managed")
 	enrichedRes := withDocument(res, map[string]any{
@@ -130,10 +123,9 @@ func TestDetailView_EnrichResult_JSONViewShowsDocument(t *testing.T) {
 		},
 	})
 
-	j := views.NewJSONWithCtrl(enrichedRes, "role_policies", k, nil)
-	j.SetSize(120, 40)
+	j := textScreenContent(t, runtime.ScreenJSON, enrichedRes)
 
-	content := stripANSI(strings.Join(j.ContentLines(), "\n"))
+	content := stripANSI(j)
 	if !strings.Contains(content, "Document") {
 		t.Error("expected JSON view to contain Document")
 	}
@@ -190,7 +182,6 @@ func TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment(t *testing.T) {
 }
 
 func TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument(t *testing.T) {
-	k := keys.Default()
 
 	res := rolePolicyRes("deny-all", "deny-all", "Inline")
 	enrichedRes := withDocument(res, map[string]any{
@@ -200,10 +191,9 @@ func TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument(t *testing.T) {
 		},
 	})
 
-	y := views.NewYAMLWithCtrl(enrichedRes, "role_policies", k, nil)
-	y.SetSize(120, 40)
+	y := textScreenContent(t, runtime.ScreenYAML, enrichedRes)
 
-	content := stripANSI(strings.Join(y.ContentLines(), "\n"))
+	content := stripANSI(y)
 	if !strings.Contains(content, "Document") {
 		t.Error("expected YAML view to show Document section for inline policy after enrichment")
 	}

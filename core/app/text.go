@@ -149,9 +149,20 @@ func TextSearchMatches(lines []string, query string) []SearchMatch {
 	return matches
 }
 
-// buildTextBody constructs a TextBody from TextState, mirroring the data that
-// YAMLModel.View() / JSONModel.View() consume via their viewport content.
-func buildTextBody(ts *TextState) *TextBody {
+// NoDataNotice is drawn by the renderer beside an empty YAML or JSON text,
+// never as one of its lines, so copying a resource with no data copies
+// nothing.
+func NoDataNotice(id runtime.ScreenID) string {
+	switch id {
+	case runtime.ScreenYAML:
+		return "No YAML data available"
+	case runtime.ScreenJSON:
+		return "No JSON data available"
+	}
+	return ""
+}
+
+func buildTextBody(id runtime.ScreenID, ts *TextState) *TextBody {
 	matches := ts.searchMatches()
 
 	cursor := ts.SearchCursor
@@ -164,7 +175,12 @@ func buildTextBody(ts *TextState) *TextBody {
 		cursor = 0
 	}
 
+	notice := ""
+	if len(ts.Lines) == 0 {
+		notice = NoDataNotice(id)
+	}
 	return &TextBody{
+		Notice:        notice,
 		Lines:         ts.Lines,
 		SearchMatches: matches,
 		Wrap:          ts.Wrap,
@@ -176,9 +192,8 @@ func buildTextBody(ts *TextState) *TextBody {
 
 // TextFrameTitle returns the frame-border title for the top text screen.
 // Returns an empty string when the top screen is not a text screen.
-// The title is the raw ScreenID string ("yaml" or "json"); callers that need
-// a resource-qualified title (e.g. "i-0abc123 yaml") should use the TUI
-// view's FrameTitle() which has access to the resource.Resource.
+// The title is the raw ScreenID string ("yaml" or "json"); the TUI frame
+// prefixes it with the resource's name (internal/tui/app_view.go).
 func (c *Controller) TextFrameTitle() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

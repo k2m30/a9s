@@ -18,8 +18,8 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"logs": {
 			Detail: []DetailField{
 				{Path: "LogGroupName"}, {Path: "LogGroupArn"}, {Path: "LogGroupClass"},
-				{Path: "StoredBytes"}, {Path: "RetentionInDays"}, {Path: "MetricFilterCount"},
-				{Path: "DeletionProtectionEnabled"}, {Path: "CreationTime"},
+				{Key: "stored_bytes", Label: "StoredBytes"}, {Path: "RetentionInDays"}, {Path: "MetricFilterCount"},
+				{Path: "DeletionProtectionEnabled"}, {Key: "creation_time", Label: "CreationTime"},
 				{Path: "KmsKeyId"}, {Path: "DataProtectionStatus"},
 			},
 		},
@@ -43,13 +43,13 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"log_streams": {
 			Detail: []DetailField{
 				{Path: "LogStreamName"}, {Path: "Arn"}, {Path: "CreationTime"},
-				{Path: "FirstEventTimestamp"}, {Path: "LastEventTimestamp"},
+				{Key: "first_event", Label: "FirstEventTimestamp"}, {Key: "last_event", Label: "LastEventTimestamp"},
 				{Path: "LastIngestionTime"}, {Path: "UploadSequenceToken"},
 			},
 		},
 		"log_events": {
 			Detail: []DetailField{
-				{Path: "Timestamp"}, {Path: "Message"}, {Path: "IngestionTime"},
+				{Key: "timestamp", Label: "Timestamp"}, {Path: "Message"}, {Key: "ingestion_time", Label: "IngestionTime"},
 				{Key: "event_id", Label: "Event ID"},
 			},
 		},

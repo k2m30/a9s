@@ -34,7 +34,7 @@ func TestExtractFieldList_ScalarField(t *testing.T) {
 	obj := testEC2Instance{VpcId: new("vpc-abc")}
 	paths := []string{"VpcId"}
 
-	items := fieldpath.ExtractFieldList(obj, nil, paths, nil)
+	items := fieldpath.ExtractFieldList(obj, nil, paths, nil, nil)
 
 	if len(items) != 1 {
 		t.Fatalf("expected 1 FieldItem, got %d", len(items))
@@ -64,7 +64,7 @@ func TestExtractFieldList_NavigableScalar(t *testing.T) {
 	paths := []string{"VpcId"}
 	navigable := map[string]string{"VpcId": "vpc"}
 
-	items := fieldpath.ExtractFieldList(obj, nil, paths, navigable)
+	items := fieldpath.ExtractFieldList(obj, nil, paths, navigable, nil)
 
 	if len(items) != 1 {
 		t.Fatalf("expected 1 FieldItem, got %d", len(items))
@@ -86,7 +86,7 @@ func TestExtractFieldList_StructField(t *testing.T) {
 	}
 	paths := []string{"State"}
 
-	items := fieldpath.ExtractFieldList(obj, nil, paths, nil)
+	items := fieldpath.ExtractFieldList(obj, nil, paths, nil, nil)
 
 	if len(items) == 0 {
 		t.Fatal("expected at least 1 FieldItem for struct field, got 0")
@@ -122,7 +122,7 @@ func TestExtractFieldList_NilObjWithFields(t *testing.T) {
 	fields := map[string]string{"Name": "test-instance"}
 	paths := []string{"Name"}
 
-	items := fieldpath.ExtractFieldList(nil, fields, paths, nil)
+	items := fieldpath.ExtractFieldList(nil, fields, paths, nil, nil)
 
 	if len(items) != 1 {
 		t.Fatalf("expected 1 FieldItem, got %d", len(items))
@@ -138,7 +138,7 @@ func TestExtractFieldList_UnknownPath(t *testing.T) {
 	obj := testEC2Instance{}
 	paths := []string{"NonExistent"}
 
-	items := fieldpath.ExtractFieldList(obj, nil, paths, nil)
+	items := fieldpath.ExtractFieldList(obj, nil, paths, nil, nil)
 
 	if len(items) != 1 {
 		t.Fatalf("expected 1 FieldItem for unknown path, got %d", len(items))
@@ -153,7 +153,7 @@ func TestExtractFieldList_UnknownPath(t *testing.T) {
 func TestExtractFieldList_EmptyPaths(t *testing.T) {
 	obj := testEC2Instance{VpcId: new("vpc-abc")}
 
-	items := fieldpath.ExtractFieldList(obj, nil, []string{}, nil)
+	items := fieldpath.ExtractFieldList(obj, nil, []string{}, nil, nil)
 
 	if items == nil {
 		t.Error("expected non-nil slice for empty paths, got nil")
@@ -163,20 +163,29 @@ func TestExtractFieldList_EmptyPaths(t *testing.T) {
 	}
 }
 
-// TestExtractFieldList_FieldsMapPrecedence verifies that the pre-formatted
-// fields map takes precedence over reflection on the obj struct.
+// The fields map stands in for the struct only on a row that has none (a
+// cache-replayed or degraded row); a fetcher-computed value is a key-form field.
 func TestExtractFieldList_FieldsMapPrecedence(t *testing.T) {
 	obj := testEC2Instance{VpcId: new("vpc-from-struct")}
 	fields := map[string]string{"VpcId": "vpc-from-map"}
 	paths := []string{"VpcId"}
 
-	items := fieldpath.ExtractFieldList(obj, fields, paths, nil)
+	items := fieldpath.ExtractFieldList(obj, fields, paths, nil, nil)
 
 	if len(items) != 1 {
 		t.Fatalf("expected 1 FieldItem, got %d", len(items))
 	}
+	if items[0].Value != "vpc-from-struct" {
+		t.Errorf("Value: expected the struct to answer a path when the row has one, got %q", items[0].Value)
+	}
+
+	items = fieldpath.ExtractFieldList(nil, fields, paths, nil, nil)
+
+	if len(items) != 1 {
+		t.Fatalf("expected 1 FieldItem with no struct, got %d", len(items))
+	}
 	if items[0].Value != "vpc-from-map" {
-		t.Errorf("Value: expected fields map to win, got %q", items[0].Value)
+		t.Errorf("Value: expected the fields map to answer a path when the row has no struct, got %q", items[0].Value)
 	}
 }
 
@@ -189,7 +198,7 @@ func TestExtractFieldList_MultiplePaths(t *testing.T) {
 	}
 	paths := []string{"VpcId", "InstanceType"}
 
-	items := fieldpath.ExtractFieldList(obj, nil, paths, nil)
+	items := fieldpath.ExtractFieldList(obj, nil, paths, nil, nil)
 
 	// Each scalar path yields exactly 1 item; total must be at least 2.
 	if len(items) < 2 {

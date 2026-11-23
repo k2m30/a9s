@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // coverage_live_gaps_whitebox_test.go — white-box tests for styleForCostCell,
-// decodeRune, searchReadClipboard, enterChildFor, and the three
-// refreshViewportContent methods (DetailModel/YAMLModel/JSONModel). All are
-// unexported, so they are exercised directly from package views.
+// decodeRune, searchReadClipboard, enterChildFor, and DetailModel's
+// refreshViewportContent. All are unexported, so they are exercised directly
+// from package views.
 package views
 
 import (
@@ -192,11 +192,9 @@ func TestLiveGap_EnterChildFor_NoDrillCondition_AlwaysReturnsChild(t *testing.T)
 }
 
 // ---------------------------------------------------------------------------
-// refreshViewportContent — DetailModel, YAMLModel, JSONModel
-//
-// All three share the same contract: when the search widget is active with a
-// non-empty query, the re-rendered content is scanned for the first matching
-// line and the viewport scrolls to it (GotoTop + SetYOffset(matchLine)). The
+// When the search widget is active with a non-empty query, the re-rendered
+// content is scanned for the first matching line and the viewport scrolls to
+// it (GotoTop + SetYOffset(matchLine)). The
 // expected line is computed the same way production does (ANSI-stripped
 // content, first line containing the query) rather than hardcoded, so the
 // assertion tracks the real render output instead of a guessed layout.
@@ -262,59 +260,5 @@ func TestLiveGap_DetailModel_RenderDetail_SearchActiveNoMatch_LeavesScrollAtZero
 	vpAfter := m.Viewport()
 	if got := vpAfter.YOffset(); got != 0 {
 		t.Errorf("RenderDetail() with a non-matching search query: viewport YOffset = %d, want 0 (no scroll)", got)
-	}
-}
-
-func TestLiveGap_YAMLModel_RefreshViewportContent_SearchActiveScrollsToMatch(t *testing.T) {
-	// Same non-zero-line + clamped-height setup as the DetailModel case above.
-	const marker = "zzz-yaml-marker-zzz"
-	res := resource.Resource{Fields: map[string]string{
-		"AFirst": "first-field",
-		"Marker": marker,
-		"ZLast":  "last-field",
-	}}
-	m := NewYAMLWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(80, 1)
-
-	wantLine := livegapFindLine(m.renderContent(), marker)
-	if wantLine <= 0 {
-		t.Fatalf("precondition: want marker on a non-zero line (to prove real scrolling, not a zero-clamped false pass), got line %d in:\n%s", wantLine, ansi.Strip(m.renderContent()))
-	}
-
-	m.search.Activate()
-	m.search.SetQuery(marker)
-	m.refreshViewportContent()
-
-	vp := m.Viewport()
-	if got := vp.YOffset(); got != wantLine {
-		t.Errorf("refreshViewportContent() with active search: viewport YOffset = %d, want %d", got, wantLine)
-	}
-}
-
-func TestLiveGap_JSONModel_RefreshViewportContent_SearchActiveScrollsToMatch(t *testing.T) {
-	// 5 keys -> 7 JSON lines ("{", 5 entries, "}"); marker sorts to the
-	// middle. Viewport height 3 (< 7 total lines) forces a real scroll.
-	const marker = "zzz-json-marker-zzz"
-	res := resource.Resource{Fields: map[string]string{
-		"A":      "1",
-		"B":      "2",
-		"Marker": marker,
-		"Y":      "3",
-		"Z":      "4",
-	}}
-	m := NewJSONWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(80, 3)
-
-	wantLine := livegapFindLine(m.renderContent(), marker)
-	if wantLine <= 0 {
-		t.Fatalf("precondition: want marker on a non-zero line (to prove real scrolling, not a zero-clamped false pass), got line %d in:\n%s", wantLine, ansi.Strip(m.renderContent()))
-	}
-
-	m.search.Activate()
-	m.search.SetQuery(marker)
-	m.refreshViewportContent()
-
-	if got := m.viewport.YOffset(); got != wantLine {
-		t.Errorf("refreshViewportContent() with active search: viewport YOffset = %d, want %d", got, wantLine)
 	}
 }

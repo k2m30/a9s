@@ -37,7 +37,7 @@ func TestT1aDev_StateWitnessesAfterTheSweep(t *testing.T) {
 	counts := renderedMenuCounts(t, scenario.currentView())
 	for short, want := range map[string]struct{ rows, issues int }{
 		"cfn":        {19, 8},
-		"dbi":        {58, 36},
+		"dbi":        {59, 36},
 		"dbc":        {24, 22},
 		"ddb":        {14, 11},
 		"efs":        {13, 10},

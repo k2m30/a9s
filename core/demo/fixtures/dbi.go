@@ -63,6 +63,11 @@ const (
 	DBIDocDBMember    = ProdDbcID + "-01"
 	DBIDocDBMemberARN = "arn:aws:rds:us-east-1:123456789012:db:" + DBIDocDBMember
 
+	// DBINeptuneMember is the writer instance of the Neptune cluster
+	// acme-graph-neptune; DescribeDBInstances lists it beside the RDS and
+	// DocumentDB instances, and its console is Neptune's.
+	DBINeptuneMember = DBCNeptune + "-writer"
+
 	// warn-dbi-public — Warning (CIS RDS.2)
 	WarnDbiPublicID  = "warn-dbi-public"
 	WarnDbiPublicARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-public"
@@ -429,6 +434,16 @@ func dbiDocDBClusterMember() rdstypes.DBInstance {
 	db.EngineVersion = aws.String("5.0.0")
 	db.DBClusterIdentifier = aws.String(ProdDbcID)
 	db.Endpoint.Port = aws.Int32(27017)
+	return db
+}
+
+func dbiNeptuneClusterMember() rdstypes.DBInstance {
+	db := dbiBaselineHealthy(DBINeptuneMember, "arn:aws:rds:us-east-1:123456789012:db:"+DBINeptuneMember)
+	db.Engine = aws.String("neptune")
+	db.EngineVersion = aws.String("1.3.2.1")
+	db.DBClusterIdentifier = aws.String(DBCNeptune)
+	db.Endpoint.Address = aws.String(DBINeptuneMember + ".c9xyz123.us-east-1.neptune.amazonaws.com")
+	db.Endpoint.Port = aws.Int32(8182)
 	return db
 }
 

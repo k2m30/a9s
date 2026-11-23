@@ -13,9 +13,9 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
@@ -174,11 +174,9 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 
 func TestQA_DocDB_YAMLView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	m.SetSize(80, 30)
-	out := strings.Join(m.ContentLines(), "\n")
+	m := textScreenContent(t, runtime.ScreenYAML, res)
+	out := m
 
 	if out == "" || out == "Initializing..." {
 		t.Fatal("DocumentDB YAML view returned empty or initializing")
@@ -201,20 +199,19 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 
 func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAMLWithCtrl(res, "", k, nil)
-	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
+	m := textScreenContent(t, runtime.ScreenYAML, res)
+	raw := stripANSI(m)
 
 	if raw == "" {
-		t.Fatal("DocumentDB YAML RawContent() returned empty string")
+		t.Fatal("DocumentDB YAML the YAML text returned empty string")
 	}
 
-	// RawContent renders from RawStruct (SDK struct field names)
+	// The YAML text renders from RawStruct (SDK struct field names)
 	expectedKeys := []string{"DBClusterIdentifier", "EngineVersion", "Status", "Endpoint", "DBClusterMembers"}
 	for _, key := range expectedKeys {
 		if !strings.Contains(raw, key) {
-			t.Errorf("DocumentDB YAML RawContent missing SDK struct key %q", key)
+			t.Errorf("DocumentDB YAML text missing SDK struct key %q", key)
 		}
 	}
 }

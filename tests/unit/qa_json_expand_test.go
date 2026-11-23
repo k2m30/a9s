@@ -10,9 +10,9 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/jsonyaml"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -274,18 +274,21 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 			"Policy": policyJSON,
 		},
 	}
-	k := keys.Default()
-	jm := views.NewJSONWithCtrl(res, "ec2", k, nil)
-	jm.SetSize(120, 40)
-
-	raw := stripAnsi(strings.Join(jm.ContentLines(), "\n"))
+	c := newVisibilityDetailController(t)
+	c.EnsureDetailState(res, "ec2")
+	c.Apply(app.Action{Kind: app.ActionOpenJSON})
+	body := c.Snapshot().Body.Text
+	if body == nil {
+		t.Fatal("the JSON screen did not open")
+	}
+	raw := stripAnsi(strings.Join(body.Lines, "\n"))
 	// JSON view serializes the Fields map — Policy value stays as a JSON string,
 	// not expanded into nested structure.
 	if !strings.Contains(raw, "Policy") {
-		t.Errorf("JSONModel.RawContent() should contain 'Policy' key:\n%s", raw)
+		t.Errorf("the JSON screen should contain 'Policy' key:\n%s", raw)
 	}
 	if !strings.Contains(raw, "2012-10-17") {
-		t.Errorf("JSONModel.RawContent() should contain original JSON content:\n%s", raw)
+		t.Errorf("the JSON screen should contain original JSON content:\n%s", raw)
 	}
 }
 

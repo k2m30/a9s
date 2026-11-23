@@ -5,7 +5,7 @@ list_hashes:
   Status: 01663bd76ca187fc
 detail_hashes:
   IdentityName: be7b1c66c99cc811
-  IdentityType: 39ab93be44da5e2c
+  "key:identity_type": 3bf04fd7abd0d28e
   SendingEnabled: 47125b99a9eaa234
   VerificationStatus: 83bad1d2d5108f89
 list:
@@ -22,6 +22,6 @@ list:
 
 detail:
   - IdentityName
-  - IdentityType
+  - { key: identity_type, label: IdentityType }
   - SendingEnabled
   - VerificationStatus

@@ -385,10 +385,8 @@ func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.Attentio
 // other and leave a lane's successful Ctrl+R never clearing the latch.
 //
 // Also regenerates an open YAML/JSON text screen for this resource
-// (regenerateTextScreenLocked) using the same neutral (uncolored)
-// resourceYAMLLines/resourceJSONLines helpers navigate.go's PushYAML/PushJSON
-// branches use — the web/headless lane's own single source of text-viewer
-// content, independent of the TUI's syntax-colored regeneration.
+// (regenerateTextScreenLocked) from ResourceTextLines, the one builder of
+// text-viewer content; this lane shows the lines uncoloured.
 //
 // Callers must hold c.mu (write).
 func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResult) ([]runtime.UIIntent, []runtime.TaskRequest) {
@@ -404,12 +402,7 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 	}
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
 	c.applyDetailEnrichmentForResourceLocked(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, ef, ad)
-	c.regenerateTextScreenLocked(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, func(id runtime.ScreenID) []string {
-		if id == runtime.ScreenYAML {
-			return resourceYAMLLines(msg.EnrichedRes)
-		}
-		return resourceJSONLines(msg.EnrichedRes)
-	})
+	c.regenerateTextScreenLocked(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, nil)
 	return intents, tasks
 }
 
@@ -431,8 +424,11 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 // left untouched, exactly like UpdateTextLines/SetTextResource, so an
 // enrichment landing mid-search or mid-scroll does not reset either.
 //
+// colour, when non-nil, is the renderer's syntax colouring of the lines
+// ResourceTextLines built; it never changes their text.
+//
 // Callers must hold c.mu (write).
-func (c *Controller) regenerateTextScreenLocked(resourceType, region, resourceID string, enriched resource.Resource, lines func(runtime.ScreenID) []string) {
+func (c *Controller) regenerateTextScreenLocked(resourceType, region, resourceID string, enriched resource.Resource, colour func(runtime.ScreenID, []string) []string) {
 	for i := range c.stack {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenYAML && s.ID != runtime.ScreenJSON {
@@ -445,19 +441,19 @@ func (c *Controller) regenerateTextScreenLocked(resourceType, region, resourceID
 		if ts == nil {
 			continue
 		}
-		ls := lines(s.ID)
-		if len(ls) == 0 {
-			continue
+		lines := ResourceTextLines(s.ID, enriched)
+		if colour != nil {
+			lines = colour(s.ID, lines)
 		}
-		ts.setLines(ls)
+		ts.setLines(lines)
 		ts.Resource = enriched.Sanitized()
 	}
 }
 
-func (c *Controller) RegenerateTextScreens(resourceType, region, resourceID string, enriched resource.Resource, lines func(runtime.ScreenID) []string) {
+func (c *Controller) RegenerateTextScreens(resourceType, region, resourceID string, enriched resource.Resource, colour func(runtime.ScreenID, []string) []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.regenerateTextScreenLocked(resourceType, region, resourceID, enriched, lines)
+	c.regenerateTextScreenLocked(resourceType, region, resourceID, enriched, colour)
 }
 
 // newlyReportedFindings returns the subset of candidates whose Code is not

@@ -13,7 +13,7 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 		"cf": {
 			Detail: []DetailField{
 				{Path: "Id"}, {Path: "DomainName"}, {Path: "Status"}, {Path: "Enabled"}, {Path: "Comment"},
-				{Path: "ARN"}, {Path: "Aliases"}, {Path: "Origins"}, {Path: "PriceClass"}, {Path: "HttpVersion"},
+				{Path: "ARN"}, {Path: "Aliases.Items", Label: "Aliases"}, {Path: "Origins"}, {Path: "PriceClass"}, {Path: "HttpVersion"},
 				{Path: "LastModifiedTime"}, {Path: "DefaultCacheBehavior"},
 			},
 		},
@@ -22,7 +22,7 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 				{Path: "DomainName"}, {Path: "CertificateArn"}, {Path: "SubjectAlternativeNameSummaries"},
 				{Path: "Status"}, {Path: "Type"}, {Path: "NotBefore"}, {Path: "NotAfter"},
 				{Path: "IssuedAt"}, {Path: "ImportedAt"}, {Path: "InUse"}, {Path: "CreatedAt"},
-				{Path: "RenewalEligibility"}, {Path: "KeyAlgorithm"},
+				{Path: "RenewalEligibility"}, {Key: "key_algorithm", Label: "KeyAlgorithm"},
 			},
 		},
 		"apigw": {

@@ -10,7 +10,7 @@ detail_hashes:
   Arn: fb866fb55912dfcd
   Path: 9f41e3fe5a1f14fb
   CreateDate: 12566b0c4fd518ca
-  PasswordLastUsed: 756fdd608d0a3bb4
+  "key:password_last_used": a4c4588bc06ac46b
   PermissionsBoundary: 274e4865b8cab7f9
   Tags: ee0396ef28e977b0
 list:
@@ -33,6 +33,6 @@ detail:
   - Arn
   - Path
   - CreateDate
-  - PasswordLastUsed
+  - { key: password_last_used, label: PasswordLastUsed }
   - PermissionsBoundary
   - Tags

@@ -17,7 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -234,7 +233,7 @@ func TestCopyContent_Detail_FieldCursor_DashValue_CopiesDash(t *testing.T) {
 // the ID/Name-synthesis branch is skipped whenever RawStruct is non-nil. The
 // FieldCursor-in-range branch of handleCopy cannot fire, forcing the YAML
 // fallback. RawStruct is a real SDK-typed fixture (core/demo/fixtures) so
-// RawYAMLFromResource has real data to marshal.
+// ResourceText has real data to marshal.
 
 func TestCopyContent_Detail_FallbackToRawYAML_WhenNoUsableField(t *testing.T) {
 	inst := fixtures.NewEC2Fixtures().Reservations[0].Instances[0]
@@ -245,14 +244,14 @@ func TestCopyContent_Detail_FallbackToRawYAML_WhenNoUsableField(t *testing.T) {
 	if body == nil || len(body.Fields) != 0 {
 		t.Fatalf("precondition: expected zero detail Fields rows for an unregistered type with no Fields/Findings, got %d: %+v", len(body.Fields), body)
 	}
-	wantYAML := views.RawYAMLFromResource(c.GetDetailResource())
+	wantYAML := app.ResourceText(runtime.ScreenYAML, c.GetDetailResource())
 	if wantYAML == "" {
-		t.Fatal("precondition: views.RawYAMLFromResource produced empty output for a non-empty resource")
+		t.Fatal("precondition: app.ResourceText produced empty output for a non-empty resource")
 	}
 
 	content, label := wave4AssertCopyContent(t, c)
 	if content != wantYAML {
-		t.Errorf("CopyContent() content does not match RawYAMLFromResource(GetDetailResource()):\ngot:\n%s\nwant:\n%s", content, wantYAML)
+		t.Errorf("CopyContent() content does not match ResourceText(GetDetailResource()):\ngot:\n%s\nwant:\n%s", content, wantYAML)
 	}
 	if label != "Copied detail to clipboard" {
 		t.Errorf("CopyContent() label = %q, want %q", label, "Copied detail to clipboard")
@@ -277,7 +276,7 @@ func wave4AssertTextScreenCopy(t *testing.T, screenID runtime.ScreenID, lines []
 		}
 	}
 	if !hasANSI {
-		t.Fatal("precondition: ContentLines() must contain ANSI color codes for this test to be meaningful")
+		t.Fatal("precondition: the screen lines must contain ANSI color codes for this test to be meaningful")
 	}
 
 	c := newTestController(t)
@@ -309,15 +308,11 @@ func wave4CopyTextResource() resource.Resource {
 }
 
 func TestCopyContent_Text_StripsANSI_JoinsLines(t *testing.T) {
-	m := views.NewYAMLWithCtrl(wave4CopyTextResource(), "ec2", keys.Default(), nil)
-	m.SetSize(120, 40)
-	wave4AssertTextScreenCopy(t, runtime.ScreenYAML, m.ContentLines(), "Copied YAML to clipboard")
+	wave4AssertTextScreenCopy(t, runtime.ScreenYAML, views.TextLines(runtime.ScreenYAML, wave4CopyTextResource()), "Copied YAML to clipboard")
 }
 
 func TestCopyContent_JSON_StripsANSI_JoinsLines(t *testing.T) {
-	m := views.NewJSONWithCtrl(wave4CopyTextResource(), "ec2", keys.Default(), nil)
-	m.SetSize(120, 40)
-	wave4AssertTextScreenCopy(t, runtime.ScreenJSON, m.ContentLines(), "Copied JSON to clipboard")
+	wave4AssertTextScreenCopy(t, runtime.ScreenJSON, views.TextLines(runtime.ScreenJSON, wave4CopyTextResource()), "Copied JSON to clipboard")
 }
 
 func TestCopyContent_Identity_LoadedWithARN_ReturnsARNAndBangLabel(t *testing.T) {

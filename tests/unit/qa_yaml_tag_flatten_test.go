@@ -19,8 +19,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // TestToSafeValue_FlattensKeyValueTagSlice_RDS verifies that a []rdstypes.Tag
@@ -245,7 +244,7 @@ func TestToSafeValue_NilTagValuePreservedAsNull(t *testing.T) {
 	}
 }
 
-// TestYAMLView_TagListFlattened verifies that when YAMLModel.ContentLines() serializes
+// TestYAMLView_TagListFlattened verifies that when the YAML screen serializes
 // a resource whose RawStruct has a TagList field of []rdstypes.Tag, the resulting YAML
 // contains "Component: x" (flattened map) and NOT "- Key: Component" (struct slice).
 func TestYAMLView_TagListFlattened(t *testing.T) {
@@ -266,11 +265,11 @@ func TestYAMLView_TagListFlattened(t *testing.T) {
 		RawStruct: snap,
 	}
 
-	model := views.NewYAMLWithCtrl(res, "rds", keys.Default(), nil)
-	content := stripANSI(strings.Join(model.ContentLines(), "\n"))
+	model := textScreenContent(t, runtime.ScreenYAML, res)
+	content := stripANSI(model)
 
 	if content == "" {
-		t.Fatal("RawContent() returned empty string — resource has RawStruct set")
+		t.Fatal("the YAML text returned empty string — resource has RawStruct set")
 	}
 
 	if !strings.Contains(content, "Component: x") {

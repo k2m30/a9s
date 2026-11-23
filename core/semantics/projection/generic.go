@@ -87,9 +87,18 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	// Only look up detail paths when a config is provided. cfg==nil renders
 	// flat alphabetical fields with raw (un-normalised) key names.
 	var detailFields []config.DetailField
+	var pathKeys map[string]string
 	if shortName != "" && cfg != nil {
 		vd := config.GetViewDef(cfg, shortName)
 		detailFields = vd.Detail
+		for _, col := range vd.List {
+			if col.Path != "" && col.Key != "" {
+				if pathKeys == nil {
+					pathKeys = make(map[string]string, len(vd.List))
+				}
+				pathKeys[col.Path] = col.Key
+			}
+		}
 	}
 
 	var detailPaths []string
@@ -132,13 +141,14 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		}
 	}
 
-	// ── no detail paths: flat Fields rendering ────────────────────────────
-	// When no detail paths are configured, use flat alphabetical rendering.
+	// A type whose declared fields are all key-form still has a declared
+	// detail, shown below in its order; only a type that declares none falls
+	// back to its Fields in name order.
 	// Pass nil navMap to suppress navigability — navigable affordances are
 	// only meaningful when the operator has a configured detail path that maps
 	// field keys to target types. Without that contract, an Enter press on
 	// a randomly-ordered flat field would be surprising.
-	if len(detailPaths) == 0 {
+	if len(detailFields) == 0 {
 		if len(fields) == 0 {
 			return nil
 		}
@@ -147,13 +157,13 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		return expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil)))
+		return expandFieldItems(fieldpath.ExtractFieldList(nil, fields, keys, nil, nil))
 	}
 
 	// ── structured path rendering ─────────────────────────────────────────
 
 	// Extract items for all path-form detail fields at once.
-	pathItems := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(r.RawStruct, fields, detailPaths, navMap)))
+	pathItems := expandFieldItems(fieldpath.ExtractFieldList(r.RawStruct, fields, detailPaths, navMap, pathKeys))
 
 	// Index items by path for ordered interleaving.
 	pathItemsByPath := make(map[string][]fieldpath.FieldItem, len(detailPaths))
@@ -172,11 +182,11 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 			if v, ok := fields[df.Key]; ok && v != "" {
 				val = v
 			}
-			items = append(items, fieldpath.FieldItem{
+			items = append(items, expandFieldItems([]fieldpath.FieldItem{{
 				Key:   df.DisplayLabel(),
 				Value: val,
 				Path:  df.Key,
-			})
+			}})...)
 		} else if !emittedPath[df.Path] {
 			emittedPath[df.Path] = true
 			pItems := pathItemsByPath[df.Path]
@@ -269,6 +279,13 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	}
 
 	return items
+}
+
+// expandFieldItems is the one step every detail item passes through, whether
+// it came from a path, a key or the flat Fields dump, so a JSON value expands
+// the same way under each form.
+func expandFieldItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
+	return expandJSONItems(flattenTagItems(items))
 }
 
 // listPath composes the path of a line at level under root from the keys of

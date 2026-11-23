@@ -7,17 +7,17 @@ list_hashes:
   Memory: 77856ac6b341d1d4
   Cold Start: 6fa188464e3e0f05
 detail_hashes:
-  request_id: 62d1e346a877d466
-  timestamp: 0ef36ad9c35adbf4
-  status: a21cfc365898cbf8
-  duration_ms: ad74cf681d6b61f0
-  billed_duration_ms: a9cd661313fac4d1
-  memory_size_mb: c20b5c969cc68cff
-  memory_used_mb: 57dfbc676fc3cdfa
-  init_duration_ms: c31fc77e1e6c89d7
-  restore_duration_ms: 68c1a144ccbd1706
-  error_type: f669afd4a2dfc059
-  xray_trace_id: cc3a00d33833bff8
+  "key:request_id": dde605b9badb39c5
+  "key:timestamp": 383094c32cda4844
+  "key:status": 8935b91881e7ba28
+  "key:duration_ms": 7ff8f3ffff69bfec
+  "key:billed_duration_ms": aa5f1f3706851103
+  "key:memory_size_mb": 4386899802ee65c8
+  "key:memory_used_mb": 5845d62c2edb1b5d
+  "key:init_duration_ms": ac179c41ed741e2b
+  "key:restore_duration_ms": 2a8b729b3334a12f
+  "key:error_type": 1a356568b6fcb949
+  "key:xray_trace_id": daee5dc37a6ede29
 list:
   Timestamp:
     key: timestamp
@@ -41,14 +41,14 @@ list:
     width: 12
 
 detail:
-  - request_id
-  - timestamp
-  - status
-  - duration_ms
-  - billed_duration_ms
-  - memory_size_mb
-  - memory_used_mb
-  - init_duration_ms
-  - restore_duration_ms
-  - error_type
-  - xray_trace_id
+  - { key: request_id }
+  - { key: timestamp }
+  - { key: status }
+  - { key: duration_ms }
+  - { key: billed_duration_ms }
+  - { key: memory_size_mb }
+  - { key: memory_used_mb }
+  - { key: init_duration_ms }
+  - { key: restore_duration_ms }
+  - { key: error_type }
+  - { key: xray_trace_id }

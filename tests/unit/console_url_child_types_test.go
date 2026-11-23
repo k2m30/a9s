@@ -40,6 +40,7 @@ type childConsoleURLCase struct {
 	shortName string
 	id        string
 	fields    map[string]string
+	parent    map[string]string
 	accountID string // passed to ConsoleURL's third arg; "" unless the case needs it
 	want      string
 }
@@ -127,6 +128,7 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 		{
 			name: "dbi_events", shortName: "dbi_events",
 			fields: map[string]string{"source_identifier": "acme-prod-db"},
+			parent: map[string]string{"db_identifier": "acme-prod-db", "engine": "postgres"},
 			want:   "https://" + r + ".console.aws.amazon.com/rds/home?region=" + r + "#database:id=acme-prod-db;is-cluster=false",
 		},
 
@@ -239,7 +241,7 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 			if td.ConsoleURL == nil {
 				t.Fatalf("%s: ConsoleURL is nil", c.shortName)
 			}
-			row := domain.Resource{ID: c.id, Type: c.shortName, Fields: c.fields}
+			row := domain.Resource{ID: c.id, Type: c.shortName, Fields: c.fields, Parent: c.parent}
 			got := td.ConsoleURL(row, r, c.accountID)
 			if got != c.want {
 				t.Errorf("%s: ConsoleURL(%+v) =\n  %q\nwant\n  %q", c.shortName, row, got, c.want)
@@ -294,7 +296,7 @@ func TestConsoleURL_Child_IncompleteRow_ReturnsEmpty(t *testing.T) {
 			if td.ConsoleURL == nil {
 				t.Fatalf("%s: ConsoleURL is nil", c.shortName)
 			}
-			row := domain.Resource{ID: c.id, Type: c.shortName, Fields: c.fields}
+			row := domain.Resource{ID: c.id, Type: c.shortName, Fields: c.fields, Parent: c.parent}
 			got := td.ConsoleURL(row, r, "")
 			if got != "" {
 				t.Errorf("%s: ConsoleURL on an incomplete row = %q, want \"\" (never a malformed URL)", c.name, got)

@@ -6,7 +6,7 @@ func computeDefaultViews() map[string]ViewDef {
 	return map[string]ViewDef{
 		"ec2": {
 			Detail: []DetailField{
-				{Path: "InstanceId"}, {Path: "State"}, {Path: "InstanceType"}, {Path: "InstanceLifecycle"}, {Path: "ImageId"},
+				{Path: "InstanceId"}, {Path: "State.Name", Label: "State"}, {Path: "InstanceType"}, {Key: "lifecycle", Label: "InstanceLifecycle"}, {Path: "ImageId"},
 				{Path: "KeyName"}, {Path: "Placement"},
 				{Path: "VpcId"}, {Path: "SubnetId"}, {Path: "PrivateIpAddress"}, {Path: "PrivateDnsName"},
 				{Path: "PublicIpAddress"}, {Path: "IamInstanceProfile"},
@@ -39,7 +39,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "TaskArn"}, {Path: "ClusterArn"}, {Path: "LastStatus"}, {Path: "DesiredStatus"},
 				{Path: "TaskDefinitionArn"}, {Path: "LaunchType"}, {Path: "Cpu"}, {Path: "Memory"},
 				{Path: "Group"}, {Path: "StartedBy"}, {Path: "StartedAt"}, {Path: "StoppedAt"},
-				{Path: "StoppedReason"}, {Path: "StopCode"}, {Path: "HealthStatus"},
+				{Path: "StoppedReason"}, {Path: "StopCode"}, {Key: "health_status", Label: "HealthStatus"},
 				{Path: "Connectivity"}, {Path: "PlatformVersion"}, {Path: "PlatformFamily"},
 				{Path: "AvailabilityZone"}, {Path: "Containers"}, {Path: "Attachments"},
 				{Path: "EnableExecuteCommand"}, {Path: "Tags"},
@@ -48,7 +48,7 @@ func computeDefaultViews() map[string]ViewDef {
 		"lambda": {
 			Detail: []DetailField{
 				{Path: "FunctionName"}, {Path: "FunctionArn"}, {Path: "Runtime"}, {Path: "Handler"},
-				{Path: "MemorySize"}, {Path: "Timeout"}, {Path: "EphemeralStorage"}, {Path: "CodeSize"},
+				{Path: "MemorySize"}, {Path: "Timeout"}, {Path: "EphemeralStorage"}, {Key: "code_size", Label: "CodeSize"},
 				{Path: "Description"}, {Path: "Role"}, {Path: "PackageType"}, {Path: "Architectures"},
 				{Path: "State"}, {Path: "LastUpdateStatus"}, {Path: "LastUpdateStatusReason"},
 				{Path: "Environment"}, {Path: "VpcConfig"}, {Path: "DeadLetterConfig"},
@@ -86,7 +86,7 @@ func computeDefaultViews() map[string]ViewDef {
 		"ecs_tasks": {
 			Detail: []DetailField{
 				{Path: "TaskArn"}, {Path: "ClusterArn"}, {Path: "LastStatus"}, {Path: "DesiredStatus"},
-				{Path: "HealthStatus"}, {Path: "TaskDefinitionArn"}, {Path: "StartedAt"}, {Path: "StoppedAt"},
+				{Key: "health", Label: "HealthStatus"}, {Path: "TaskDefinitionArn"}, {Path: "StartedAt"}, {Path: "StoppedAt"},
 				{Path: "StoppedReason"}, {Path: "StopCode"}, {Path: "LaunchType"}, {Path: "PlatformVersion"},
 				{Path: "Cpu"}, {Path: "Memory"}, {Path: "Group"}, {Path: "StartedBy"},
 				{Path: "Containers"}, {Path: "Attachments"}, {Path: "Tags"},
@@ -99,21 +99,21 @@ func computeDefaultViews() map[string]ViewDef {
 		},
 		"ecs_svc_logs": {
 			Detail: []DetailField{
-				{Path: "Timestamp"}, {Path: "Message"}, {Path: "IngestionTime"}, {Path: "EventId"}, {Path: "LogStreamName"},
+				{Key: "timestamp", Label: "Timestamp"}, {Path: "Message"}, {Key: "ingestion_time", Label: "IngestionTime"}, {Path: "EventId"}, {Path: "LogStreamName"},
 			},
 		},
 		"lambda_invocations": {
 			Detail: []DetailField{
-				{Path: "request_id"}, {Path: "timestamp"}, {Path: "status"},
-				{Path: "duration_ms"}, {Path: "billed_duration_ms"},
-				{Path: "memory_size_mb"}, {Path: "memory_used_mb"},
-				{Path: "init_duration_ms"}, {Path: "restore_duration_ms"},
-				{Path: "error_type"}, {Path: "xray_trace_id"},
+				{Key: "request_id"}, {Key: "timestamp"}, {Key: "status"},
+				{Key: "duration_ms"}, {Key: "billed_duration_ms"},
+				{Key: "memory_size_mb"}, {Key: "memory_used_mb"},
+				{Key: "init_duration_ms"}, {Key: "restore_duration_ms"},
+				{Key: "error_type"}, {Key: "xray_trace_id"},
 			},
 		},
 		"lambda_invocation_logs": {
 			Detail: []DetailField{
-				{Path: "timestamp"}, {Path: "message"},
+				{Key: "timestamp"}, {Path: "message"},
 			},
 		},
 		"ebs": {

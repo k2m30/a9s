@@ -372,9 +372,11 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 			it = redactCredential(it)
 			if !quoted {
 				if catalog.Humanizes(humanizePaths, it.Path, it.Label) {
-					it.Value = humanizeDetailValue(it)
+					it = humanizeDetailItem(it)
 				}
-				it.Value = config.CanonicalValue(it.Value)
+				if it.Kind != domain.ItemSubfield {
+					it.Value = config.CanonicalValue(it.Value)
+				}
 			}
 			items = append(items, domainItemToFieldItemDetail(it, sec.Title))
 		}
@@ -412,27 +414,34 @@ func redactCredential(it domain.Item) domain.Item {
 	return it
 }
 
-// humanizeDetailValue rewrites a declared field's value into the words it
+// humanizeDetailItem rewrites a declared field's value into the words it
 // renders in.
 //
-// A nested row carries its whole rendered line as the value — "StreamMode:
-// ON_DEMAND" — because the renderer colours a subfield by that line and paints
-// nothing when it is handed a key and a value apart. So the label is left
-// where it is and only what follows the colon is reworded: humanizing the line
-// would lowercase "StreamMode" along with the constant.
+// A nested row is one rendered line — "StreamMode: ON_DEMAND" — held as both
+// its label and its value, because the renderer colours a subfield by that
+// line and paints nothing when it is handed a key and a value apart. Only what
+// follows the colon is reworded (humanizing the whole line would lowercase
+// "StreamMode" along with the constant), and the reworded line replaces the
+// row, label included, so the row still renders as one line.
 //
 // The projector already told us this row IS the nested field, by composing its
 // path (core/semantics/projection/generic.go); this splits the rendered text,
 // not the fact.
-func humanizeDetailValue(it domain.Item) string {
+func humanizeDetailItem(it domain.Item) domain.Item {
 	if it.Kind != domain.ItemSubfield {
-		return domain.HumanizeStatusPhrase(it.Value)
+		it.Value = domain.HumanizeStatusPhrase(it.Value)
+		return it
 	}
 	label, scalar, ok := strings.Cut(it.Value, ":")
-	if !ok || strings.TrimSpace(scalar) == "" {
-		return domain.HumanizeStatusPhrase(it.Value)
+	line := domain.HumanizeStatusPhrase(it.Value)
+	if ok && strings.TrimSpace(scalar) != "" {
+		line = label + ": " + domain.HumanizeStatusPhrase(strings.TrimSpace(scalar))
 	}
-	return label + ": " + domain.HumanizeStatusPhrase(strings.TrimSpace(scalar))
+	if it.Label == it.Value {
+		it.Label = line
+	}
+	it.Value = line
+	return it
 }
 
 // domainItemToFieldItemDetail maps a domain.Item back to a fieldpath.FieldItem.

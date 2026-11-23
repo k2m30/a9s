@@ -214,23 +214,7 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
 	m.ctrl.ApplyDetailEnrichmentIn(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, ef, ad)
 
-	w, h := m.innerSize()
-	m.ctrl.RegenerateTextScreens(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, func(id runtime.ScreenID) []string {
-		if resource.FindResourceType(msg.ResourceType) == nil && resource.GetChildType(msg.ResourceType) == nil {
-			return nil
-		}
-		switch id {
-		case runtime.ScreenYAML:
-			y := views.NewYAMLWithCtrl(msg.EnrichedRes, msg.ResourceType, m.keys, m.ctrl)
-			y.SetSize(w, h)
-			return y.ContentLines()
-		case runtime.ScreenJSON:
-			j := views.NewJSONWithCtrl(msg.EnrichedRes, msg.ResourceType, m.keys, m.ctrl)
-			j.SetSize(w, h)
-			return j.ContentLines()
-		}
-		return nil
-	})
+	m.ctrl.RegenerateTextScreens(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, views.ColourText)
 	return m, tea.Batch(flashCmd, coreCmd)
 }
 

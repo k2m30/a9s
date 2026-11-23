@@ -24,7 +24,7 @@ import (
 //	(c) the marshaled data contains no unresolved template markers
 //
 // (b)/(c) marshal via fieldpath.ToSafeValue + yaml.Marshal rather than
-// ContentLines()+stripANSI, so the check covers the marshal step itself,
+// the YAML screen lines + stripANSI, so the check covers the marshal step itself,
 // independent of the colorizing pass; the colorized path's re-parseability
 // (including colon-bearing quoted keys like "aws:autoscaling:groupName") is
 // pinned by TestPort_ColorizeYAML_ColonInQuotedKey_Regression.
@@ -52,7 +52,7 @@ func TestQA_YAML_AllTypes(t *testing.T) {
 			res := result.Resources[0]
 
 			// (a) non-empty view
-			out := yamlView(t, res, 120, 40)
+			out := yamlView(t, res)
 			if out == "" {
 				t.Fatalf("YAML view is empty for %s", rt.ShortName)
 			}

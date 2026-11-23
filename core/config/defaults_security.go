@@ -24,7 +24,7 @@ func securityDefaultViews() map[string]ViewDef {
 		"iam-user": {
 			Detail: []DetailField{
 				{Path: "UserName"}, {Path: "UserId"}, {Path: "Arn"}, {Path: "Path"},
-				{Path: "CreateDate"}, {Path: "PasswordLastUsed"},
+				{Path: "CreateDate"}, {Key: "password_last_used", Label: "PasswordLastUsed"},
 				{Path: "PermissionsBoundary"}, {Path: "Tags"},
 			},
 		},
@@ -46,7 +46,7 @@ func securityDefaultViews() map[string]ViewDef {
 		"iam_group_members": {
 			Detail: []DetailField{
 				{Path: "UserName"}, {Path: "UserId"}, {Path: "Arn"}, {Path: "Path"},
-				{Path: "CreateDate"}, {Path: "PasswordLastUsed"},
+				{Path: "CreateDate"}, {Key: "password_last_used", Label: "PasswordLastUsed"},
 				{Path: "PermissionsBoundary"}, {Path: "Tags"},
 			},
 		},

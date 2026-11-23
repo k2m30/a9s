@@ -57,6 +57,47 @@ func GoView(region, arn string) string {
 	return Global(region, "go/view?arn="+url.QueryEscape(arn))
 }
 
+// RDSKind is the page an RDS-API row opens.
+type RDSKind int
+
+const (
+	RDSInstance RDSKind = iota
+	RDSCluster
+	RDSInstanceSnapshot
+	RDSClusterSnapshot
+)
+
+// RDSFamily is the console link of a row the RDS API lists, which serves the
+// RDS, DocumentDB and Neptune engine families: the engine picks the console.
+// A DocumentDB cluster opens its cluster page; any other DocumentDB row and
+// every Neptune row open that service's console home for the region. A
+// cluster with no engine has no link (a DocumentDB or Neptune cluster would
+// be sent to the wrong console). Any other row with no engine opens RDS: a DB
+// snapshot is always an RDS snapshot (DocumentDB and Neptune have cluster
+// snapshots only), and RDS is the console of the API that lists the row.
+func RDSFamily(engine string, kind RDSKind, id, region string) string {
+	engine = strings.ToLower(engine)
+	switch {
+	case engine == "" && kind == RDSCluster:
+		return ""
+	case strings.HasPrefix(engine, "docdb"):
+		if kind == RDSCluster {
+			return Regional(region, "docdb/home?region="+region+"#cluster-details/"+url.PathEscape(id))
+		}
+		return Regional(region, "docdb/home?region="+region)
+	case strings.HasPrefix(engine, "neptune"):
+		return Regional(region, "neptune/home?region="+region)
+	}
+	switch kind {
+	case RDSCluster:
+		return Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(id)+";is-cluster=true")
+	case RDSInstanceSnapshot, RDSClusterSnapshot:
+		return Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(id))
+	default:
+		return Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(id)+";is-cluster=false")
+	}
+}
+
 // AccountFromARN returns the account ID ref names, or "" when ref is not a
 // well-formed ARN.
 func AccountFromARN(ref string) string {

@@ -359,7 +359,10 @@ type SearchMatch struct {
 
 // TextBody is the body of a YAML/JSON text screen.
 type TextBody struct {
-	Lines         []string      `json:"lines,omitempty"`
+	Lines []string `json:"lines,omitempty"`
+	// Notice is what a YAML or JSON screen says when the resource has no data
+	// to show; it is not part of the text and is never copied.
+	Notice        string        `json:"notice,omitempty"`
 	SearchMatches []SearchMatch `json:"search_matches,omitempty"`
 	Wrap          bool          `json:"wrap,omitempty"`
 	// ScrollY is the current viewport Y offset (line index of the top visible line).

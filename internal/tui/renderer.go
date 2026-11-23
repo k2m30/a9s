@@ -277,7 +277,7 @@ func renderText(body *app.TextBody, rs *rendererState) string {
 	if vp.Height() == 0 && rs.height > 0 {
 		vp = viewport.New(viewport.WithWidth(rs.width), viewport.WithHeight(rs.height))
 	}
-	m := views.NewTransientYAML(rs.width, rs.height, vp)
+	m := views.NewTransientText(rs.width, rs.height, vp)
 	result := m.RenderText(*body)
 	rs.viewport = m.Viewport()
 	rs.ready = true

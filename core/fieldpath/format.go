@@ -5,6 +5,7 @@ package fieldpath
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -52,8 +53,10 @@ func FormatValue(val reflect.Value) string {
 	}
 
 	switch val.Kind() {
-	case reflect.Float32, reflect.Float64:
-		return fmt.Sprintf("%g", val.Float())
+	case reflect.Float32:
+		return strconv.FormatFloat(val.Float(), 'f', -1, 32)
+	case reflect.Float64:
+		return strconv.FormatFloat(val.Float(), 'f', -1, 64)
 	}
 
 	return fmt.Sprintf("%v", val.Interface())

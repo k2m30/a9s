@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"maps"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -501,14 +502,23 @@ func filteredFetcherWithClients(fn func(ctx context.Context, c *ServiceClients, 
 }
 
 // childFetcherWithClients is fetcherWithClients for a ResourceTypeDef's
-// ChildFetcher field (domain.PaginatedChildFetcher).
+// ChildFetcher field (domain.PaginatedChildFetcher). Every returned row
+// carries the parent context its drill resolved (Resource.Parent), so a
+// child's console link reads a parent fact such as the engine from the row,
+// the only input a ConsoleURL gets.
 func childFetcherWithClients(fn func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error)) func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 	return func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, err := svcClients(clients)
 		if err != nil {
 			return resource.FetchResult{}, err
 		}
-		return fn(ctx, c, parentCtx, continuationToken)
+		res, err := fn(ctx, c, parentCtx, continuationToken)
+		if len(parentCtx) > 0 {
+			for i := range res.Resources {
+				res.Resources[i].Parent = maps.Clone(parentCtx)
+			}
+		}
+		return res, err
 	}
 }
 

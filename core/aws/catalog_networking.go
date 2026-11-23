@@ -738,7 +738,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "pcx_id", Title: "Pcx Id", Path: "VpcPeeringConnectionId", Width: 24},
-			{Key: "status", Title: "Status", Width: 34},
+			{Key: "status", Title: "Status", Path: "Status.Code", Width: 34},
 			{Key: "requester_vpc", Title: "Requester VPC", Path: "RequesterVpcInfo.VpcId", Width: 22},
 			{Key: "requester_owner", Title: "Requester Owner", Path: "RequesterVpcInfo.OwnerId", Width: 14},
 			{Key: "accepter_vpc", Title: "Accepter VPC", Path: "AccepterVpcInfo.VpcId", Width: 22},

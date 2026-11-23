@@ -15,7 +15,7 @@ detail_hashes:
   Enabled: 0266064248bf45d6
   Comment: 0ec25ed4aaf65f02
   ARN: 55343400ae662083
-  Aliases: 3aa38ab3e2de2aee
+  Aliases.Items: 874210eb3db7ea4b
   Origins: 93183ce7297fbefb
   PriceClass: 3920b40fd6276baf
   HttpVersion: 3fa0a8a448b9b041
@@ -60,7 +60,7 @@ detail:
   - Enabled
   - Comment
   - ARN
-  - Aliases
+  - { path: Aliases.Items, label: Aliases }
   - Origins
   - PriceClass
   - HttpVersion

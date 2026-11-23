@@ -107,7 +107,7 @@ func databasesDefaultViews() map[string]ViewDef {
 		},
 		"s3_objects": {
 			Detail: []DetailField{
-				{Path: "Key"}, {Path: "Size"}, {Path: "LastModified"}, {Path: "StorageClass"}, {Path: "ETag"},
+				{Key: "key", Label: "Key"}, {Key: "size", Label: "Size"}, {Path: "LastModified"}, {Path: "StorageClass"}, {Path: "ETag"},
 				{Path: "ChecksumAlgorithm"}, {Path: "ChecksumType"}, {Path: "Owner"}, {Path: "RestoreStatus"},
 			},
 		},

@@ -13,6 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -316,26 +317,26 @@ type livegapRawStruct struct {
 func TestLiveGap_RawYAML_MarshalsFieldsWhenNoRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "res-2", Fields: map[string]string{"Alpha": "one"}}
 
-	got := views.RawYAMLFromResource(res)
+	got := app.ResourceText(runtime.ScreenYAML, res)
 	if !strings.Contains(got, "Alpha") || !strings.Contains(got, "one") {
-		t.Errorf("RawYAMLFromResource() with Fields set (no RawStruct) = %q, want it to contain the Fields map", got)
+		t.Errorf("ResourceText() with Fields set (no RawStruct) = %q, want it to contain the Fields map", got)
 	}
 }
 
-func TestLiveGap_RawYAMLFromResource_MirrorsRawYAML(t *testing.T) {
+func TestLiveGap_ResourceText_MirrorsRawYAML(t *testing.T) {
 	res := resource.Resource{ID: "res-4", RawStruct: &livegapRawStruct{Name: "gadget", N: 3}}
 
-	got := views.RawYAMLFromResource(res)
+	got := app.ResourceText(runtime.ScreenYAML, res)
 	if !strings.Contains(got, "gadget") || !strings.Contains(got, "3") {
-		t.Errorf("RawYAMLFromResource() = %q, want it to contain the marshaled struct fields", got)
+		t.Errorf("ResourceText() = %q, want it to contain the marshaled struct fields", got)
 	}
 }
 
-func TestLiveGap_RawYAMLFromResource_EmptyWhenNoDataAtAll(t *testing.T) {
+func TestLiveGap_ResourceText_EmptyWhenNoDataAtAll(t *testing.T) {
 	res := resource.Resource{ID: "res-5"}
 
-	if got := views.RawYAMLFromResource(res); got != "" {
-		t.Errorf("RawYAMLFromResource() with no data = %q, want empty string", got)
+	if got := app.ResourceText(runtime.ScreenYAML, res); got != "" {
+		t.Errorf("ResourceText() with no data = %q, want empty string", got)
 	}
 }
 

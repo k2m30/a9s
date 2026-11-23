@@ -7,8 +7,8 @@ detail_hashes:
   LogStreamName: bc655e8b39659f68
   Arn: fb866fb55912dfcd
   CreationTime: 74875c541e4b7e5e
-  FirstEventTimestamp: 406a89ea2732f525
-  LastEventTimestamp: 2a9574979f74c616
+  "key:first_event": 1fe0dcb6994b8a7b
+  "key:last_event": 5abdc64aa0d33914
   LastIngestionTime: fecb07847436d241
   UploadSequenceToken: 3ae3623e7c9ebbdb
 list:
@@ -27,7 +27,7 @@ detail:
   - LogStreamName
   - Arn
   - CreationTime
-  - FirstEventTimestamp
-  - LastEventTimestamp
+  - { key: first_event, label: FirstEventTimestamp }
+  - { key: last_event, label: LastEventTimestamp }
   - LastIngestionTime
   - UploadSequenceToken

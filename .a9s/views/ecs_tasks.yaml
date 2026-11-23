@@ -11,7 +11,7 @@ detail_hashes:
   ClusterArn: be3a87d4853b3411
   LastStatus: 2290a8ccbfde15b1
   DesiredStatus: c0e9f69cb97b0982
-  HealthStatus: b0f95ff830baff4c
+  "key:health": 657d984667481ec8
   TaskDefinitionArn: 048e1607ec1a33be
   StartedAt: 20b2b2ef41fef75c
   StoppedAt: 503ede778d8a26ce
@@ -51,7 +51,7 @@ detail:
   - ClusterArn
   - LastStatus
   - DesiredStatus
-  - HealthStatus
+  - { key: health, label: HealthStatus }
   - TaskDefinitionArn
   - StartedAt
   - StoppedAt

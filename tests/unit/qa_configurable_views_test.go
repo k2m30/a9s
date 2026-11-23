@@ -14,8 +14,10 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // enrichmentOnlyDetailFixtures maps a resource type's shortName to the Detail
@@ -514,8 +516,21 @@ func TestQA_DetailViewPaths_EC2(t *testing.T) {
 	vd := config.DefaultViewDef("ec2")
 	enrichmentFixtures := enrichmentOnlyDetailFixtures["ec2"]
 
+	ec2Rows, _ := unit.DrainFixtures(t, *resource.FindResourceType("ec2"), demo.NewServiceClients())
 	for _, df := range vd.Detail {
 		path := df.String()
+		if df.Path == "" {
+			// A key-form field reads the Fields value the fetcher writes.
+			t.Run(path, func(t *testing.T) {
+				for _, r := range ec2Rows {
+					if r.Fields[df.Key] != "" {
+						return
+					}
+				}
+				t.Errorf("key-form detail field %q is empty on every demo EC2 row", df.Key)
+			})
+			continue
+		}
 		t.Run(path, func(t *testing.T) {
 			var source any = inst
 			if fixture, ok := enrichmentFixtures[path]; ok {

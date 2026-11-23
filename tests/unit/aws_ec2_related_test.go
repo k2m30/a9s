@@ -381,7 +381,7 @@ func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
 	}
 
 	for _, nav := range fields {
-		items := fieldpath.ExtractFieldList(r.RawStruct, r.Fields, []string{nav.FieldPath}, nil)
+		items := fieldpath.ExtractFieldList(r.RawStruct, r.Fields, []string{nav.FieldPath}, nil, nil)
 		found := false
 		for _, item := range items {
 			if item.Value != "" && item.Value != "-" {

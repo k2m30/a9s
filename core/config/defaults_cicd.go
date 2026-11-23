@@ -51,7 +51,7 @@ func cicdDefaultViews() map[string]ViewDef {
 		},
 		"cb_build_logs": {
 			Detail: []DetailField{
-				{Path: "Timestamp"}, {Path: "IngestionTime"}, {Path: "Message"},
+				{Key: "timestamp", Label: "Timestamp"}, {Key: "ingestion_time", Label: "IngestionTime"}, {Path: "Message"},
 				{Key: "event_id", Label: "Event ID"},
 			},
 		},

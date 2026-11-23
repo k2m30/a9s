@@ -19,7 +19,7 @@ detail_hashes:
   InUse: 911d48e86107d7b4
   CreatedAt: ac4f44b9064dcc14
   RenewalEligibility: 55b9c674902c515d
-  KeyAlgorithm: 4ba0f966a391a489
+  "key:key_algorithm": 0c2dcb2758ee6e76
 list:
   Domain Name:
     path: DomainName
@@ -58,4 +58,4 @@ detail:
   - InUse
   - CreatedAt
   - RenewalEligibility
-  - KeyAlgorithm
+  - { key: key_algorithm, label: KeyAlgorithm }

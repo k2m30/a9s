@@ -13,7 +13,7 @@ func backupDefaultViews() map[string]ViewDef {
 		},
 		"ses": {
 			Detail: []DetailField{
-				{Path: "IdentityName"}, {Path: "IdentityType"},
+				{Path: "IdentityName"}, {Key: "identity_type", Label: "IdentityType"},
 				{Path: "SendingEnabled"}, {Path: "VerificationStatus"},
 			},
 		},

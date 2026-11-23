@@ -39,7 +39,7 @@ func TestNavigableAbsent_AbsentFields_NotNavigable(t *testing.T) {
 					nil, // obj: simulates nil pointer from AWS SDK response
 					nil, // fields: empty (fetcher populated nothing for this path)
 					[]string{path},
-					map[string]string{path: target},
+					map[string]string{path: target}, nil,
 				)
 				if len(items) == 0 {
 					t.Fatalf("ExtractFieldList returned no items for path %q", path)

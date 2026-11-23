@@ -278,7 +278,7 @@ func TestConsoleURL_PerType(t *testing.T) {
 		{
 			name: "dbc-snap", shortName: "dbc-snap", pickID: "rds:acme-docdb-prod-2026-03-20",
 			want: func(row resource.Resource) string {
-				return fmt.Sprintf("https://%s.console.aws.amazon.com/rds/home?region=%s#db-snapshot:id=%s", r, r, url.PathEscape(row.ID))
+				return fmt.Sprintf("https://%s.console.aws.amazon.com/docdb/home?region=%s", r, r)
 			},
 		},
 		{
@@ -769,8 +769,6 @@ func TestConsoleURL_HostileInput_SSMParameterNameEncoding(t *testing.T) {
 	td := consoleURLTypeDef(t, "ssm")
 	row := domain.Resource{ID: "/acme/prod/app/config with space/ключ", Name: "config with space/ключ"}
 	got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID)
-	// ssm keeps slashes AND everything else raw (as emitted) — only the
-	// leading "/" is trimmed.
 	want := "https://us-east-1.console.aws.amazon.com/systems-manager/parameters/acme/prod/app/config with space/ключ/description?region=us-east-1"
 	if got != want {
 		t.Errorf("ssm hostile-input ConsoleURL = %q, want %q", got, want)

@@ -4,9 +4,9 @@ list_hashes:
   Stream: 9e2416213c0e194d
   Message: f19ceb8284129254
 detail_hashes:
-  Timestamp: 0e9ecd8fbdbd1d21
+  "key:timestamp": 848fa5f38b586aee
   Message: d7a5fb00e2f4ecd3
-  IngestionTime: 65bb99ea56129b83
+  "key:ingestion_time": b924ddf3139ea221
   EventId: 0dd67fb5d60808c3
   LogStreamName: bc655e8b39659f68
 list:
@@ -21,8 +21,8 @@ list:
     width: 120
 
 detail:
-  - Timestamp
+  - { key: timestamp, label: Timestamp }
   - Message
-  - IngestionTime
+  - { key: ingestion_time, label: IngestionTime }
   - EventId
   - LogStreamName

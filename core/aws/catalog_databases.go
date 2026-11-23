@@ -67,7 +67,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=false")
+			return consolelink.RDSFamily(r.Fields["engine"], consolelink.RDSInstance, r.ID, region)
 		},
 		Columns: []domain.Column{
 			{Key: "db_identifier", Title: "DB Identifier", Path: "DBInstanceIdentifier", Width: 28},
@@ -81,7 +81,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Children: []domain.ChildViewDef{{
 			ChildType:      "dbi_events",
 			Key:            "enter",
-			ContextKeys:    map[string]string{"db_identifier": "ID"},
+			ContextKeys:    map[string]string{"db_identifier": "ID", "engine": "engine"},
 			DisplayNameKey: "db_identifier",
 		}},
 		Color:          colorDBI,
@@ -292,18 +292,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			engine := strings.ToLower(r.Fields["engine"])
-			if engine == "" {
-				return ""
-			}
-			switch {
-			case strings.HasPrefix(engine, "docdb"):
-				return consolelink.Regional(region, "docdb/home?region="+region+"#cluster-details/"+url.PathEscape(r.ID))
-			case strings.HasPrefix(engine, "neptune"):
-				return consolelink.Regional(region, "neptune/home?region="+region)
-			default:
-				return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=true")
-			}
+			return consolelink.RDSFamily(r.Fields["engine"], consolelink.RDSCluster, r.ID, region)
 		},
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
@@ -657,7 +646,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			return consolelink.Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(r.ID))
+			return consolelink.RDSFamily(r.Fields["engine"], consolelink.RDSInstanceSnapshot, r.ID, region)
 		},
 		Columns: []domain.Column{
 			{Key: "snapshot_id", Title: "Snapshot ID", Path: "DBSnapshotIdentifier", Width: 36},
@@ -704,7 +693,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			return consolelink.Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(r.ID))
+			return consolelink.RDSFamily(r.Fields["engine"], consolelink.RDSClusterSnapshot, r.ID, region)
 		},
 		Columns: []domain.Column{
 			{Key: "snapshot_id", Title: "Snapshot ID", Path: "DBClusterSnapshotIdentifier", Width: 36},
@@ -811,7 +800,7 @@ var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			if db == "" {
 				return ""
 			}
-			return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(db)+";is-cluster=false")
+			return consolelink.RDSFamily(r.Parent["engine"], consolelink.RDSInstance, db, region)
 		},
 		Columns:   resource.DbiEventColumns(),
 		CopyField: "message",

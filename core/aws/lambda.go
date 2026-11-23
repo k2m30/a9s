@@ -62,10 +62,7 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 			lastModified = *fn.LastModified
 		}
 
-		codeSize := ""
-		if fn.CodeSize != 0 {
-			codeSize = formatBytes(fn.CodeSize)
-		}
+		codeSize := formatBytes(fn.CodeSize)
 
 		logGroup := "/aws/lambda/" + functionName
 		if fn.LoggingConfig != nil && fn.LoggingConfig.LogGroup != nil && *fn.LoggingConfig.LogGroup != "" {

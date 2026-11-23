@@ -34,12 +34,17 @@ type Resource struct {
 	// keyed by Finding.Code. Consumed only by the detail view's Attention
 	// section. Nil/empty for rows with no findings or no extra facts.
 	AttentionDetails map[FindingCode]AttentionDetail
+	// Parent is the parent context a child row's drill resolved
+	// (ChildViewDef.ContextKeys), set on every child row its ChildFetcher
+	// returns; nil on a top-level row.
+	Parent ParentContext
 }
 
 // Clone returns a deep copy of r's reference-typed fields — Fields,
-// Findings, and AttentionDetails (including each AttentionDetail's own Rows
-// slice) — so a caller that retains the clone across an ownership boundary
-// (e.g. core/session.RowStore, which hands rows across a two-mutex boundary
+// Findings, AttentionDetails (including each AttentionDetail's own Rows
+// slice) and Parent — so a caller that retains the clone across an
+// ownership boundary (e.g. core/session.RowStore, which hands rows across a
+// two-mutex boundary
 // to a controller's own per-screen state) can never leak an in-place
 // mutation (r.Fields[k] = ..., r.Findings = append(...),
 // r.AttentionDetails[code] = ...) back into whatever r was cloned from, or
@@ -79,6 +84,9 @@ func (r Resource) Clone() Resource {
 			details[code] = ad
 		}
 		r.AttentionDetails = details
+	}
+	if r.Parent != nil {
+		r.Parent = maps.Clone(r.Parent)
 	}
 	return r
 }

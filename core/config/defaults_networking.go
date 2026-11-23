@@ -107,7 +107,7 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"vpc-peer": {
 			Detail: []DetailField{
-				{Path: "VpcPeeringConnectionId"}, {Path: "Status"}, {Path: "ExpirationTime"},
+				{Path: "VpcPeeringConnectionId"}, {Path: "Status.Code", Label: "Status"}, {Path: "Status.Message", Label: "StatusMessage"}, {Path: "ExpirationTime"},
 				{Path: "RequesterVpcInfo"}, {Path: "AccepterVpcInfo"}, {Path: "Tags"},
 			},
 		},
