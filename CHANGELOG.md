@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ELB: "Access Logs: disabled" shows for a load balancer with a listener
     AWS logs (HTTP or HTTPS on an Application Load Balancer, TLS on a
     Network Load Balancer).
+- CloudWatch Logs: the Retention cell and the detail of a Delivery-class log
+  group read "fixed by AWS" instead of "never expire". The detail shows the
+  Retention value the list shows.
+- KMS: the detail of a multi-Region key shows its key type (primary or
+  replica). In `--demo` the replica key that is being created is a replica.
+- `--demo` shows a stopped ECS task whose last health check failed, an
+  Application Load Balancer with access logs off, a Spark Glue job without a
+  security configuration, and a Python shell Glue job whose security
+  configuration leaves encryption off.
 - A secret with several posture defects shows each of them. Before, a secret
   nobody reads, with rotation off and a year-old value, showed only
   "dormant".
@@ -135,6 +144,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An EventBridge rule's Targets list loads every page of targets, and a
+  Lambda function's EventBridge Rules pivot finds a rule that targets it on a
+  later page. Before, both read the first page only and reported it as the
+  whole answer.
+- A KMS key opened from a related pivot shows its multi-Region key type, as
+  the same key opened from the KMS list does.
+- A Transfer Family agreement's Status shows the state AWS reports (Active)
+  when nothing is wrong with it, and the same Status after a restart as
+  before it.
+- A cached finding whose code this version no longer declares is dropped
+  when the cache loads; the next fetch states the row's findings.
 - `ctrl+z` on a list shows exactly the rows its issue count counts. Before, a
   row whose only finding was a Wave 2 warning (an SQS queue with no
   dead-letter queue) was listed although the

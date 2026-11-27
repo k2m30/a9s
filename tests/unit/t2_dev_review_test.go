@@ -195,48 +195,6 @@ func TestT2Dev_FindingsWrittenOnlyInsideTheDoorBody(t *testing.T) {
 	}
 }
 
-// Every type an emit door or an applicability call in core/aws names by a
-// literal is a catalog type, so no finding is judged by a type that does not
-// exist and stands unjudged.
-func TestT2Dev_DoorTypesNameCatalogTypes(t *testing.T) {
-	doors := []string{"emitWave1", "withWave1", "rebuiltWave1", "addWave1Finding", "addSecretScanFinding", "rowAppliesAny", "AppliesToRow", "Applies", "appliesAny", "withState"}
-	sites := map[string]bool{}
-	named := 0
-	for _, p := range t2LoadCoreAWS(t) {
-		for _, f := range p.Syntax {
-			ast.Inspect(f, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok || len(call.Args) == 0 {
-					return true
-				}
-				name := ""
-				switch fn := call.Fun.(type) {
-				case *ast.Ident:
-					name = fn.Name
-				case *ast.SelectorExpr:
-					name = fn.Sel.Name
-				}
-				lit, ok := call.Args[0].(*ast.BasicLit)
-				if !slices.Contains(doors, name) || !ok || lit.Kind != token.STRING {
-					return true
-				}
-				named++
-				if catalog.FindAny(strings.Trim(lit.Value, `"`)) == nil {
-					sites[t2Site(p, lit.Pos())+" "+lit.Value] = true
-				}
-				return true
-			})
-		}
-	}
-	if named < 100 {
-		t.Fatalf("found %d door calls naming a type; the scan lost them", named)
-	}
-	if len(sites) > 0 {
-		list := slices.Sorted(maps.Keys(sites))
-		t.Errorf("%d door calls name no catalog type:\n  %s", len(list), strings.Join(list, "\n  "))
-	}
-}
-
 // A multi-Region replica takes its rotation from its primary key, so the
 // demo replica, whose rotation status reads off, carries no rotation finding,
 // and the classifier names it apart from a key that rotates on its own.

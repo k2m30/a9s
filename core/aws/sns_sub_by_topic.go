@@ -101,7 +101,7 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 
 	findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
 
-	return withWave1("sns_subscriptions", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: endpoint,
 		Fields: map[string]string{

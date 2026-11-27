@@ -415,7 +415,7 @@ func kmsRefContext(ctx context.Context, clients any, cache resource.ResourceCach
 	var err error
 	if c, ok := clients.(*ServiceClients); ok && c != nil && c.KMS != nil {
 		var rows []resource.Resource
-		rows, err = FetchKMSKeysByIDs(ctx, c, missing)
+		rows, err = resource.GetFetchByIDs("kms")(ctx, c, missing)
 		targets = append(targets, rows...)
 	}
 	rc.Targets = targets

@@ -16,6 +16,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 type t561VPCEAPI struct{ endpoints []ec2types.VpcEndpoint }
@@ -46,7 +47,7 @@ func t561Endpoint(id, state, policy string) ec2types.VpcEndpoint {
 
 func t561FetchEndpoint(t *testing.T, state, policy string) resource.Resource {
 	t.Helper()
-	res, err := awsclient.FetchVPCEndpointsPage(context.Background(), t561VPCEAPI{endpoints: []ec2types.VpcEndpoint{t561Endpoint("vpce-0aa11bb22cc33dd44", state, policy)}}, "")
+	res, err := unit.BindPage("vpce")(awsclient.FetchVPCEndpointsPage(context.Background(), t561VPCEAPI{endpoints: []ec2types.VpcEndpoint{t561Endpoint("vpce-0aa11bb22cc33dd44", state, policy)}}, ""))
 	if err != nil {
 		t.Fatalf("FetchVPCEndpointsPage: %v", err)
 	}

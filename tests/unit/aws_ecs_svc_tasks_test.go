@@ -57,14 +57,14 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -193,14 +193,14 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -255,14 +255,14 @@ func TestFetchEcsSvcTasks_Empty(t *testing.T) {
 
 	describeTasksMock := &mockECSDescribeTasksClient{}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"empty-service",
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -282,7 +282,7 @@ func TestFetchEcsSvcTasks_EmptyPageWithNextToken(t *testing.T) {
 	}
 	describeTasksMock := &mockECSDescribeTasksClient{}
 
-	result, err := awsclient.FetchEcsSvcTasks(context.Background(), listTasksMock, describeTasksMock, cluster, "quiet-service", "")
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(context.Background(), listTasksMock, describeTasksMock, cluster, "quiet-service", ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -307,14 +307,14 @@ func TestFetchEcsSvcTasks_ListTasksError(t *testing.T) {
 
 	describeTasksMock := &mockECSDescribeTasksClient{}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
 		"",
-	)
+	))
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -338,14 +338,14 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: internal server error"),
 	}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
 		"",
-	)
+	))
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -384,14 +384,14 @@ func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster",
 		"my-service",
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -436,14 +436,14 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nil-cluster",
 		"nil-service",
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -510,14 +510,14 @@ func TestFetchEcsSvcTasks_RawStruct(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEcsSvcTasks(
+	result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/raw-cluster",
 		"web-service",
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -672,7 +672,7 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 
 	describeMock := &mockBatchingDescribeTasksClient{allTasks: allTasks}
 
-	results, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "arn:aws:ecs:us-east-1:123456789012:cluster/cluster", "my-service", "")
+	results, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "arn:aws:ecs:us-east-1:123456789012:cluster/cluster", "my-service", ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -754,7 +754,7 @@ func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
 		},
 	}
 
-	page1, err := awsclient.FetchEcsSvcTasks(context.Background(), firstPageList, describeMock, cluster, "my-service", "")
+	page1, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(context.Background(), firstPageList, describeMock, cluster, "my-service", ""))
 	if err != nil {
 		t.Fatalf("expected no error building the real cursor, got %v", err)
 	}
@@ -768,7 +768,7 @@ func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
 			outputs: map[string]*ecs.ListTasksOutput{cluster: {TaskArns: []string{}}},
 		},
 	}
-	_, err = awsclient.FetchEcsSvcTasks(context.Background(), wrapper, describeMock, cluster, "my-service", realCursor)
+	_, err = BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(context.Background(), wrapper, describeMock, cluster, "my-service", realCursor))
 	if err != nil {
 		t.Fatalf("expected no error with a real continuation token, got %v", err)
 	}
@@ -809,7 +809,7 @@ func TestFetchEcsSvcTasks_MalformedContinuationToken(t *testing.T) {
 		}
 		describeMock := &mockECSDescribeTasksClient{output: &ecs.DescribeTasksOutput{}}
 
-		result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, cluster, "my-service", "not-valid-json")
+		result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, cluster, "my-service", "not-valid-json"))
 		if err == nil {
 			t.Fatal("expected an error for a non-empty, undecodable continuation token")
 		}
@@ -832,7 +832,7 @@ func TestFetchEcsSvcTasks_MalformedContinuationToken(t *testing.T) {
 			},
 		}
 
-		result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, cluster, "my-service", "")
+		result, err := BindPage("ecs_tasks")(awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, cluster, "my-service", ""))
 		if err != nil {
 			t.Fatalf("expected no error for an empty (first-page) token, got %v", err)
 		}

@@ -23,6 +23,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -110,7 +111,7 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	const profile, region = "savecache-tui-prof", "us-east-1"
 	m := newSaveCacheApp(t, profile, region)
 
-	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave1:s3"}
+	finding := domain.Finding{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave1:s3"}
 	sweepResources := []resource.Resource{
 		{
 			ID:       "bucket-savecache-1",
@@ -137,8 +138,8 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	for _, r := range tf.Rows {
 		if r.ID == "bucket-savecache-1" {
 			found = true
-			if len(r.Findings) != 1 || r.Findings[0].Code != "s3-public-read" {
-				t.Errorf("persisted TUI-swept row Findings = %+v, want 1 finding with Code=%q", r.Findings, "s3-public-read")
+			if len(r.Findings) != 1 || r.Findings[0].Code != "s3.public" {
+				t.Errorf("persisted TUI-swept row Findings = %+v, want 1 finding with Code=%q", r.Findings, "s3.public")
 			}
 		}
 	}

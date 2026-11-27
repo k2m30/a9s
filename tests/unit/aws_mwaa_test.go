@@ -31,7 +31,7 @@ import (
 func fetchMWAADemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
-	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+	result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 	if err == nil || !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
 		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnAirflowDetailsDeniedID, err)
 	}
@@ -298,7 +298,7 @@ func TestFetchMWAAEnvironmentsPage_StatusMappingAllTwelveValues(t *testing.T) {
 				name: mwaaStatusOnlyEnvironment(name, tc.status),
 			}}
 			clients := &awsclient.ServiceClients{MWAA: fake}
-			result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+			result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -350,7 +350,7 @@ func TestFetchMWAAEnvironmentsPage_AccessDeniedIsErrorNotZero(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{MWAA: fake}
 
-	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+	result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("FetchMWAAEnvironmentsPage must return a non-nil error when ListEnvironments is denied — " +
 			"never an empty successful result")
@@ -410,7 +410,7 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{MWAA: fake}
 
-	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+	result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("FetchMWAAEnvironmentsPage must return a composite error when GetEnvironment fails for some environments")
 	}
@@ -467,7 +467,7 @@ var _ awsclient.MWAAAPI = (*mwaaNilEnvironmentFake)(nil)
 
 func TestFetchMWAAEnvironmentsPage_NilEnvironmentInGetEnvironmentOutput(t *testing.T) {
 	clients := &awsclient.ServiceClients{MWAA: &mwaaNilEnvironmentFake{}}
-	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+	result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("FetchMWAAEnvironmentsPage must surface an error when GetEnvironment returns a nil Environment " +
 			"(not panic, not silently drop)")
@@ -510,7 +510,7 @@ var _ awsclient.MWAAAPI = (*mwaaNilSubConfigFake)(nil)
 
 func TestFetchMWAAEnvironmentsPage_NilLoggingAndNetworkConfiguration(t *testing.T) {
 	clients := &awsclient.ServiceClients{MWAA: &mwaaNilSubConfigFake{}}
-	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+	result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 	if err != nil {
 		t.Fatalf("expected no error with nil LoggingConfiguration/NetworkConfiguration, got %v", err)
 	}
@@ -559,7 +559,7 @@ func TestFetchMWAAEnvironmentsPage_WaveThreeAntiTests(t *testing.T) {
 
 func TestFetchMWAAEnvironmentsPage_ResourceIDAndArnMapping(t *testing.T) {
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
-	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
+	result, err := BindPage("mwaa")(awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, ""))
 	if err != nil && !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
 		// The demo set's details-denied fixture makes the fetch return rows plus
 		// a composite error; any other error is a real failure.

@@ -157,7 +157,7 @@ func fetchECSTasksPageWithJoin(
 
 				findings := ecsTaskFindings(status, stopCode, healthStatus)
 
-				r := withWave1("ecs-task", resource.Resource{
+				r := withWave1(resource.Resource{
 					ID:        taskID,
 					Name:      taskID,
 					Fields:    fields,
@@ -167,7 +167,7 @@ func fetchECSTasksPageWithJoin(
 			}
 			rows, batchFailures := keepListed("DescribeTasks", taskArns, ecsTaskRowID, ans, err, func(arn string, err error) resource.Resource {
 				taskID := ecsTaskRowID(arn)
-				r := DegradedDetails("ecs-task", taskID, err)
+				r := degradedRow(taskID, err)
 				r.Fields["task_id"], r.Fields["cluster"], r.Fields["arn"] = taskID, clusterArn, arn
 				return r
 			})

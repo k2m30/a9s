@@ -79,7 +79,7 @@ func (f w3VPCEAPI) DescribeVpcEndpoints(_ context.Context, _ *ec2.DescribeVpcEnd
 
 func w3FetchVPCEs(t *testing.T, eps ...ec2types.VpcEndpoint) []resource.Resource {
 	t.Helper()
-	res, err := awsclient.FetchVPCEndpointsPage(context.Background(), w3VPCEAPI{endpoints: eps}, "")
+	res, err := BindPage("vpce")(awsclient.FetchVPCEndpointsPage(context.Background(), w3VPCEAPI{endpoints: eps}, ""))
 	if err != nil {
 		t.Fatalf("FetchVPCEndpointsPage: %v", err)
 	}

@@ -132,8 +132,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
 
 	probeRes := []resource.Resource{
-		{ID: "res-pe-001", Name: "res-pe-001"},
-		{ID: "res-pe-002", Name: "res-pe-002"},
+		{ID: "res-pe-001", Name: "res-pe-001", Type: shortName},
+		{ID: "res-pe-002", Name: "res-pe-002", Type: shortName},
 	}
 	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.

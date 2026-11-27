@@ -127,7 +127,7 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 		stackArn = *event.StackId
 	}
 
-	return withWave1("cfn_events", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{

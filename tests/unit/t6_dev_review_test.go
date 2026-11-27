@@ -150,8 +150,8 @@ func (t6DevCodeBuild) BatchGetBuilds(context.Context, *codebuild.BatchGetBuildsI
 // the badge is a lower bound with the scan partial.
 func TestT6Dev_RefusedBuildBatchMarksOnlyTheProjectsItHeld(t *testing.T) {
 	rows := []resource.Resource{
-		{ID: "acme-quiet", Name: "acme-quiet", Fields: map[string]string{"last_build": "OK"}},
-		{ID: "acme-busy", Name: "acme-busy", Fields: map[string]string{"last_build": "OK"}},
+		{ID: "acme-quiet", Name: "acme-quiet", Type: "cb", Fields: map[string]string{"last_build": "OK"}},
+		{ID: "acme-busy", Name: "acme-busy", Type: "cb", Fields: map[string]string{"last_build": "OK"}},
 	}
 	a := t6NewApp(t, "cb", &awsclient.ServiceClients{CodeBuild: t6DevCodeBuild{quiet: "acme-quiet"}}, rows, nil, false)
 	ev := a.wave2(t)

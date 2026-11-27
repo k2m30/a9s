@@ -164,7 +164,7 @@ func FetchEcsSvcTasks(
 		}
 		rows, chunkFailures := keepListed("DescribeTasks", chunk, ecsTaskRowID, ans, err, func(arn string, err error) resource.Resource {
 			taskID := ecsTaskRowID(arn)
-			r := DegradedDetails("ecs_tasks", taskID, err)
+			r := degradedRow(taskID, err)
 			r.Fields["task_id"], r.Fields["task_arn"] = taskID, arn
 			return r
 		})
@@ -228,7 +228,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 
 	findings := ecsTaskStructuralFindings(status, stopCode, health)
 
-	return withWave1("ecs_tasks", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   taskIDShort,
 		Name: taskIDShort,
 		Fields: map[string]string{

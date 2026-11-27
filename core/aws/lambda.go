@@ -101,16 +101,16 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 		}
 
 		if isDeprecatedLambdaRuntime(runtime, time.Now()) {
-			emitWave1("lambda", &r, wave1Finding(CodeLambdaDeprecatedRuntime))
+			r = withWave1(r, wave1Finding(CodeLambdaDeprecatedRuntime))
 		}
 		if dlqTargetARN == "" {
-			emitWave1("lambda", &r, wave1Finding(CodeLambdaNoDLQ))
+			r = withWave1(r, wave1Finding(CodeLambdaNoDLQ))
 		}
 
 		// ListFunctions already carries the environment, so a pasted
 		// credential is readable in Wave 1 and colours the row on its own.
 		if fn.Environment != nil {
-			addSecretScanFinding("lambda", &r, CodeLambdaEnvSecret, fn.Environment.Variables)
+			addSecretScanFinding(&r, CodeLambdaEnvSecret, fn.Environment.Variables)
 		}
 
 		resources = append(resources, r)

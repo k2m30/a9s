@@ -20,7 +20,7 @@ import (
 func buildEFSResourcesFromFake() ([]resource.Resource, error) {
 	fake := fakes.NewEFS()
 	return collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchEFSFileSystemsPage(context.Background(), fake, token)
+		return BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), fake, token))
 	})
 }
 
@@ -308,7 +308,7 @@ func TestEFS_NoCloudWatchMetricCalls(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchEFSFileSystemsPage(context.Background(), mock, token)
+		return BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystems must not call CloudWatch; error: %v", err)

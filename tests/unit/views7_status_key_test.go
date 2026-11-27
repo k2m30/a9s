@@ -14,12 +14,14 @@
 package unit_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -48,74 +50,80 @@ type views7StatusCase struct {
 
 // views7StatusCases covers the three shapes a status column comes in, and the
 // finding that outranks all of them.
-var views7StatusCases = []views7StatusCase{
-	{
-		// The column's key IS the lifecycle key: the value is the phrase the
-		// save lane stores there, and nothing else in Fields competes.
-		name:      "the key is the lifecycle key",
-		shortName: "sqs",
-		id:        "https://sqs.us-east-1.amazonaws.com/123456789012/order-processing-queue",
-		fields: map[string]string{
-			"queue_name": "order-processing-queue",
-			"state":      "redrive backlog",
+func views7StatusCases() []views7StatusCase {
+	return []views7StatusCase{
+		{
+			// The column's key IS the lifecycle key: the value is the phrase the
+			// save lane stores there, and nothing else in Fields competes.
+			name:      "the key is the lifecycle key",
+			shortName: "sqs",
+			id:        "https://sqs.us-east-1.amazonaws.com/123456789012/order-processing-queue",
+			fields: map[string]string{
+				"queue_name": "order-processing-queue",
+				"state":      "redrive backlog",
+			},
+			want: "redrive backlog",
 		},
-		want: "redrive backlog",
-	},
-	{
-		// The type declares its status under its own key and the fetcher
-		// writes a lifecycle value too. The declared key is the one the column
-		// names, so it is the one the cell reads.
-		name:      "the type declares its own status key",
-		shortName: "tg",
-		id:        "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/0123456789abcdef",
-		fields: map[string]string{
-			"target_group_name": "acme-web-tg",
-			"health_summary":    "unhealthy targets: 2/5",
-			"state":             "available",
+		{
+			// The type declares its status under its own key and the fetcher
+			// writes a lifecycle value too. The declared key is the one the column
+			// names, so it is the one the cell reads.
+			name:      "the type declares its own status key",
+			shortName: "tg",
+			id:        "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/0123456789abcdef",
+			fields: map[string]string{
+				"target_group_name": "acme-web-tg",
+				"health_summary":    "unhealthy targets: 2/5",
+				"state":             "available",
+			},
+			want: "unhealthy targets: 2/5",
 		},
-		want: "unhealthy targets: 2/5",
-	},
-	{
-		// The same shape with the competing value under "status" rather than
-		// the lifecycle key.
-		name:      "its own status key against a stored status",
-		shortName: "cb",
-		id:        "acme-api-build",
-		fields: map[string]string{
-			"name":       "acme-api-build",
-			"last_build": "last build failed",
-			"status":     "SUCCEEDED",
+		{
+			// The same shape with the competing value under "status" rather than
+			// the lifecycle key.
+			name:      "its own status key against a stored status",
+			shortName: "cb",
+			id:        "acme-api-build",
+			fields: map[string]string{
+				"name":       "acme-api-build",
+				"last_build": "last build failed",
+				"status":     "SUCCEEDED",
+			},
+			want: "last build failed",
 		},
-		want: "last build failed",
-	},
-	{
-		// No key at all, the value is in the struct: vpc has a state table, so
-		// a row with no finding is healthy and its cell is blank, live and
-		// after the save lane has put the state in Fields for the next start.
-		name:      "no key, the value is in the struct",
-		shortName: "vpc",
-		id:        "vpc-0123456789abcdef0",
-		fields:    map[string]string{"name": "acme-prod-vpc"},
-		raw:       views7StatusVPCRaw{VpcId: "vpc-0123456789abcdef0", State: "available"},
-		want:      "",
-	},
-	{
-		// A finding outranks every stored value, on every shape: the phrase is
-		// what the operator is being told about this row.
-		name:      "a finding outranks the stored value",
-		shortName: "tg",
-		id:        "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-api-tg/0123456789abcdef",
-		fields: map[string]string{
-			"target_group_name": "acme-api-tg",
-			"health_summary":    "healthy",
-			"state":             "available",
+		{
+			// No key at all, the value is in the struct: vpc has a state table, so
+			// a row with no finding is healthy and its cell is blank, live and
+			// after the save lane has put the state in Fields for the next start.
+			name:      "no key, the value is in the struct",
+			shortName: "vpc",
+			id:        "vpc-0123456789abcdef0",
+			fields:    map[string]string{"name": "acme-prod-vpc"},
+			raw:       views7StatusVPCRaw{VpcId: "vpc-0123456789abcdef0", State: "available"},
+			want:      "",
 		},
-		findings: []domain.Finding{{
-			Code: "tg-no-healthy-targets", Phrase: "no healthy targets",
-			Severity: domain.SevBroken, Source: "wave1",
-		}},
-		want: "no healthy targets",
-	},
+		{
+			// A finding outranks every stored value, on every shape: the phrase is
+			// what the operator is being told about this row.
+			name:      "a finding outranks the stored value",
+			shortName: "tg",
+			id:        "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-api-tg/0123456789abcdef",
+			fields: map[string]string{
+				"target_group_name": "acme-api-tg",
+				"health_summary":    "healthy",
+				"state":             "available",
+			},
+			findings: []domain.Finding{{
+				Code: "tg.all-targets-unhealthy", Phrase: views7TGPhrase(),
+				Severity: domain.SevBroken, Source: "wave2",
+			}},
+			want: views7TGPhrase(),
+		},
+	}
+}
+
+func views7TGPhrase() string {
+	return strings.Replace(catalog.Phrase("tg.all-targets-unhealthy"), "<N target(s)>", "2 targets", 1)
 }
 
 // views7StatusColumn returns the resolved status column of a type, through the
@@ -138,7 +146,7 @@ func views7StatusColumn(t *testing.T, td *resource.ResourceTypeDef) app.ColumnDe
 // TestStatusCellReadsTheColumnsOwnKey drives the live lane: the row as a
 // fetcher hands it over, and the cell the screen builds from it.
 func TestStatusCellReadsTheColumnsOwnKey(t *testing.T) {
-	for _, c := range views7StatusCases {
+	for _, c := range views7StatusCases() {
 		t.Run(c.name, func(t *testing.T) {
 			td := resource.FindResourceType(c.shortName)
 			if td == nil {
@@ -158,7 +166,7 @@ func TestStatusCellReadsTheColumnsOwnKey(t *testing.T) {
 // the Fields the save wrote, so this is where a save that stores under one key
 // and a cascade that reads another part company.
 func TestStatusCellIsTheSameAfterARestart(t *testing.T) {
-	for _, c := range views7StatusCases {
+	for _, c := range views7StatusCases() {
 		t.Run(c.name, func(t *testing.T) {
 			td := resource.FindResourceType(c.shortName)
 			if td == nil {

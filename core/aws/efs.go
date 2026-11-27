@@ -80,7 +80,7 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 
 		findings, attentionDetails := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets, fs.Encrypted)
 
-		r := withWave1("efs", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   fsID,
 			Name: name,
 			Fields: map[string]string{

@@ -149,7 +149,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 	id := stageName + "/" + actionName
 	status := pipelineActionStatus(actionStatus)
 
-	return withWave1("pipeline_stages", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: actionName,
 		Fields: map[string]string{

@@ -89,7 +89,7 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 				}
 			}
 
-			r := withWave1("cf", resource.Resource{
+			r := withWave1(resource.Resource{
 				ID:   distID,
 				Name: distID,
 				Fields: map[string]string{

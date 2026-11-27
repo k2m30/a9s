@@ -90,7 +90,7 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 
 		findings := computeRedshiftFindings(cluster)
 
-		r := withWave1("redshift", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   clusterID,
 			Name: clusterID,
 			Fields: map[string]string{

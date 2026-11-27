@@ -38,7 +38,7 @@ const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 
 // KMSCreatingReplicaKeyID is a multi-Region replica key in the Creating
 // state, raising kms.state.transitional.
-const KMSCreatingReplicaKeyID = "f1a2b3c4-d5e6-4f70-8a9b-1c2d3e4f5a6b"
+const KMSCreatingReplicaKeyID = "mrk-1e2d3c4b5a6f47a8b9c0d1e2f3a4b5c6"
 
 // KMSReplicaKeyID is an enabled multi-Region replica whose rotation status
 // reads off: its primary sets rotation for it, so it carries no
@@ -90,8 +90,15 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
 			SigningAlgorithms:    []kmstypes.SigningAlgorithmSpec{kmstypes.SigningAlgorithmSpecEcdsaSha256},
 			KeySpec:              kmstypes.KeySpecSymmetricDefault,
-			MultiRegion:          aws.Bool(false),
-			Origin:               kmstypes.OriginTypeAwsKms,
+			MultiRegion:          aws.Bool(true),
+			MultiRegionConfiguration: &kmstypes.MultiRegionConfiguration{
+				MultiRegionKeyType: kmstypes.MultiRegionKeyTypePrimary,
+				PrimaryKey: &kmstypes.MultiRegionKey{
+					Arn:    aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+					Region: aws.String("us-east-1"),
+				},
+			},
+			Origin: kmstypes.OriginTypeAwsKms,
 		},
 		{
 			KeyId:        aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
@@ -179,6 +186,13 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 			Origin:       kmstypes.OriginTypeAwsKms,
 			MultiRegion:  aws.Bool(true),
 			CreationDate: aws.Time(time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)),
+			MultiRegionConfiguration: &kmstypes.MultiRegionConfiguration{
+				MultiRegionKeyType: kmstypes.MultiRegionKeyTypeReplica,
+				PrimaryKey: &kmstypes.MultiRegionKey{
+					Arn:    aws.String("arn:aws:kms:eu-west-1:123456789012:key/" + KMSCreatingReplicaKeyID),
+					Region: aws.String("eu-west-1"),
+				},
+			},
 		},
 		{
 			KeyId:        aws.String(KMSReplicaKeyID),

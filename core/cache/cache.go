@@ -55,6 +55,31 @@ func dropPhraseStatus(shortName string, rows []Row) {
 	}
 }
 
+// dropUndeclaredFindings removes from each row the findings whose code the
+// row's type does not declare. A file another build wrote can carry a code
+// this build retired, and no rule of this build can judge it.
+func dropUndeclaredFindings(shortName string, rows []Row) {
+	td := resource.FindResourceType(resource.CanonicalShortName(shortName))
+	if td == nil {
+		return
+	}
+	declared := make(map[domain.FindingCode]bool, len(td.Findings))
+	for _, def := range td.Findings {
+		declared[def.Code] = true
+	}
+	for i := range rows {
+		var kept []domain.Finding
+		for _, f := range rows[i].Findings {
+			if declared[f.Code] {
+				kept = append(kept, f)
+				continue
+			}
+			delete(rows[i].FindingFirstSeen, f.Code)
+		}
+		rows[i].Findings = kept
+	}
+}
+
 // Row is a render-sufficient snapshot of one list row, persisted alongside
 // the type's TypeFile so a cold start can seed the list screen with real
 // cells and issue markers before any live fetch completes.
@@ -379,6 +404,7 @@ func LoadDirIn(root, profile, region string) *Store {
 			logging.L().Warn("cache skip", "file", path, "reason", fmt.Sprintf("unsupported schema version %d (want 1 to %d)", tf.Version, SchemaVersion))
 			continue
 		}
+		dropUndeclaredFindings(shortName, tf.Rows)
 		// One canonicalization, here at the load boundary: a file named after
 		// a type's alias ("rds.yaml" for "dbi") is a complete TypeFile for
 		// the canonical type, counts and rows together. Keying it under the

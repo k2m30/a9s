@@ -132,7 +132,7 @@ func eniToResource(eni ec2types.NetworkInterface) resource.Resource {
 		}
 	}
 
-	return withWave1("eni", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   eniID,
 		Name: name,
 		Fields: map[string]string{

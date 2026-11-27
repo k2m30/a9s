@@ -40,6 +40,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // =============================================================================
@@ -63,7 +64,7 @@ func TestPR03e_DBIFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: unexpected error: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestPR03e_DBIFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: unexpected error: %v", err)
 	}
@@ -143,7 +144,7 @@ func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: unexpected error: %v", err)
 	}
@@ -356,7 +357,7 @@ func TestPR03e_DBCFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSDBClustersPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbc")(awsclient.FetchRDSDBClustersPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClustersPage: unexpected error: %v", err)
 	}
@@ -383,7 +384,7 @@ func TestPR03e_DBCFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSDBClustersPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbc")(awsclient.FetchRDSDBClustersPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClustersPage: unexpected error: %v", err)
 	}
@@ -468,7 +469,7 @@ func TestPR03e_DBCSnapFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbc-snap")(awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClusterSnapshotsPage: unexpected error: %v", err)
 	}
@@ -500,7 +501,7 @@ func TestPR03e_DBCSnapFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbc-snap")(awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClusterSnapshotsPage: unexpected error: %v", err)
 	}
@@ -629,7 +630,7 @@ func TestPR03e_RedisFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	result, err := unit.BindPage("redis")(awsclient.FetchRedisPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRedisPage: unexpected error: %v", err)
 	}
@@ -660,7 +661,7 @@ func TestPR03e_RedisFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	result, err := unit.BindPage("redis")(awsclient.FetchRedisPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRedisPage: unexpected error: %v", err)
 	}
@@ -788,7 +789,7 @@ func TestPR03e_OpenSearchFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := unit.BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains: unexpected error: %v", err)
 	}
@@ -844,7 +845,7 @@ func TestPR03e_OpenSearchFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := unit.BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains: unexpected error: %v", err)
 	}
@@ -942,7 +943,7 @@ func TestPR03e_DDBFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	result, err := unit.BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, ""))
 	if err != nil {
 		t.Fatalf("FetchDynamoDBTablesPage: unexpected error: %v", err)
 	}
@@ -978,7 +979,7 @@ func TestPR03e_DDBFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	result, err := unit.BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, ""))
 	if err != nil {
 		t.Fatalf("FetchDynamoDBTablesPage: unexpected error: %v", err)
 	}
@@ -1077,7 +1078,7 @@ func TestPR03e_RedshiftFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedshiftClustersPage(context.Background(), mock, "")
+	result, err := unit.BindPage("redshift")(awsclient.FetchRedshiftClustersPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRedshiftClustersPage: unexpected error: %v", err)
 	}
@@ -1109,7 +1110,7 @@ func TestPR03e_RedshiftFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedshiftClustersPage(context.Background(), mock, "")
+	result, err := unit.BindPage("redshift")(awsclient.FetchRedshiftClustersPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRedshiftClustersPage: unexpected error: %v", err)
 	}
@@ -1317,7 +1318,7 @@ func TestPR03e_EFSFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEFSFileSystemsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystemsPage: unexpected error: %v", err)
 	}
@@ -1350,7 +1351,7 @@ func TestPR03e_EFSFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEFSFileSystemsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystemsPage: unexpected error: %v", err)
 	}
@@ -1568,7 +1569,7 @@ func TestPR03e_DBIFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: unexpected error: %v", err)
 	}
@@ -1663,7 +1664,7 @@ func TestPR03e_DBCFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSDBClustersPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbc")(awsclient.FetchRDSDBClustersPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClustersPage: unexpected error: %v", err)
 	}
@@ -1712,7 +1713,7 @@ func TestPR03e_DBCSnapFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("dbc-snap")(awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClusterSnapshotsPage: unexpected error: %v", err)
 	}
@@ -1756,7 +1757,7 @@ func TestPR03e_RedisFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	result, err := unit.BindPage("redis")(awsclient.FetchRedisPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRedisPage: unexpected error: %v", err)
 	}
@@ -1829,7 +1830,7 @@ func TestPR03e_OpenSearchFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := unit.BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains: unexpected error: %v", err)
 	}
@@ -1875,7 +1876,7 @@ func TestPR03e_DDBFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	result, err := unit.BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, ""))
 	if err != nil {
 		t.Fatalf("FetchDynamoDBTablesPage: unexpected error: %v", err)
 	}
@@ -1923,7 +1924,7 @@ func TestPR03e_RedshiftFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedshiftClustersPage(context.Background(), mock, "")
+	result, err := unit.BindPage("redshift")(awsclient.FetchRedshiftClustersPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRedshiftClustersPage: unexpected error: %v", err)
 	}
@@ -2021,7 +2022,7 @@ func TestPR03e_EFSFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEFSFileSystemsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystemsPage: unexpected error: %v", err)
 	}

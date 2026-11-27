@@ -75,7 +75,7 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn 
 	}
 	reasonHuman := humanizeTargetHealthReason(reason)
 
-	return withWave1("tg_health", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   tgHealthRowID(targetID, port, az),
 		Name: targetID,
 		Fields: map[string]string{

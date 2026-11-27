@@ -52,7 +52,7 @@ func w6bCFNStack(name, status string, protection *bool) cfntypes.Stack {
 
 func w6bFetchCFN(t *testing.T, stacks ...cfntypes.Stack) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchCloudFormationStacksPage(context.Background(), &w6bCFNFake{stacks: stacks}, "")
+	out, err := BindPage("cfn")(awsclient.FetchCloudFormationStacksPage(context.Background(), &w6bCFNFake{stacks: stacks}, ""))
 	if err != nil {
 		t.Fatalf("FetchCloudFormationStacksPage: %v", err)
 	}

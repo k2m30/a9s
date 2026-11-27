@@ -65,7 +65,7 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 
 		findings := withState("nat", state, nil)
 
-		r := withWave1("nat", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   natID,
 			Name: name,
 			Fields: map[string]string{

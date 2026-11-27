@@ -96,7 +96,7 @@ func convertAsgActivity(activity asgtypes.Activity, asgName string) resource.Res
 		cause = strings.ReplaceAll(cause, "\r", " ")
 	}
 
-	return withWave1("asg_activities", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{

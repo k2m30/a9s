@@ -138,7 +138,7 @@ func TestT1aDev_EBHealthSpeaksOnlyBesideAReadyEnvironment(t *testing.T) {
 		t.Run(string(tc.status)+"/"+string(tc.health), func(t *testing.T) {
 			const id = "e-acmeaxis0001"
 			fake := &t578EBFake{envs: []ebtypes.EnvironmentDescription{t578EBEnv(id, "acme-checkout-prod", tc.status, tc.health)}}
-			out, err := awsclient.FetchEBEnvironmentsPage(context.Background(), fake, "")
+			out, err := BindPage("eb")(awsclient.FetchEBEnvironmentsPage(context.Background(), fake, ""))
 			if err != nil {
 				t.Fatalf("FetchEBEnvironmentsPage: %v", err)
 			}

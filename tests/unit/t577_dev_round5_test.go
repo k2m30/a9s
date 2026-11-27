@@ -65,7 +65,7 @@ func TestT577Dev_OpenSearchKeepsListOrderAndDropsGone(t *testing.T) {
 		answer: []string{"e", "a", "c"},
 		fail:   map[string]error{"f": t576APIError("OpenSearch", "DescribeDomains", "ResourceNotFoundException", "Domain not found: f")},
 	}
-	rows, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), list, describe, time.Now())
+	rows, err := unit.BindRows("opensearch")(awsclient.FetchOpenSearchDomainsAt(context.Background(), list, describe, time.Now()))
 	var ids []string
 	for _, r := range rows {
 		ids = append(ids, r.ID)
@@ -210,7 +210,7 @@ func TestT577Dev_DegradedRowsAreBuiltOnlyThroughTheOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, builder := range []string{"DegradedDetails", "degradedDetailsFinding"} {
+	for _, builder := range []string{"degradedRow", "markDegraded"} {
 		if len(refs[builder]) == 0 {
 			t.Fatalf("no call of %s found; the guard reads nothing", builder)
 		}
@@ -335,7 +335,7 @@ func TestT577Dev_EveryDegradedRowRecordsItsCode(t *testing.T) {
 }
 
 func TestT577Dev_DemoDeniedAgreementsAreListed(t *testing.T) {
-	result, err := awsclient.FetchTransferAgreements(context.Background(), demo.NewServiceClients().Transfer, fixtures.WarnTransferDetailsDeniedID, "")
+	result, err := unit.BindPage("transfer_agreements")(awsclient.FetchTransferAgreements(context.Background(), demo.NewServiceClients().Transfer, fixtures.WarnTransferDetailsDeniedID, ""))
 	if err == nil || !strings.Contains(err.Error(), "DescribeAgreement") {
 		t.Errorf("error = %v, want the refused DescribeAgreement reported", err)
 	}

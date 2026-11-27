@@ -60,7 +60,7 @@ func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
 		arn = *table.TableArn
 	}
 
-	r := withWave1("ddb", resource.Resource{
+	r := withWave1(resource.Resource{
 		ID:   name,
 		Name: name,
 		Fields: map[string]string{
@@ -107,7 +107,7 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			}
 			r := ddbTableResource(out.Table)
 			return &r, nil
-		}, func(err error) resource.Resource { return DegradedDetails("ddb", tableName, err) })
+		}, func(err error) resource.Resource { return degradedRow(tableName, err) })
 		resources = append(resources, rows...)
 	}
 

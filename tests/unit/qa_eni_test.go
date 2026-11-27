@@ -39,7 +39,7 @@ func TestQA_ENI_FetchSuccess(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token)
+		return BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -92,7 +92,7 @@ func TestQA_ENI_FetchEmpty(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token)
+		return BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -108,7 +108,7 @@ func TestQA_ENI_FetchError(t *testing.T) {
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token)
+		return BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token))
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

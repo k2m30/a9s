@@ -158,7 +158,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 
 		status := classifyLogEventStatus(message)
 
-		r := withWave1("log_events", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   id,
 			Name: name,
 			Fields: map[string]string{

@@ -135,7 +135,7 @@ func convertGlueJobRun(run gluetypes.JobRun) resource.Resource {
 		jobName = *run.JobName
 	}
 
-	return withWave1("glue_runs", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   runID,
 		Name: startedOn,
 		Fields: map[string]string{

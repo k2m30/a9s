@@ -103,7 +103,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
 
 `GetKeyRotationStatus` and the key policy read on the second pass; `KeyState` is already on the row by then and its signals are in §3.1.
 
-- **Signal**: `KeyRotationEnabled==false` on CMK that is not a multi-Region replica (`MultiRegionConfiguration.MultiRegionKeyType=REPLICA`): "You can enable and disable automatic key rotation only on a primary key" (AWS KMS Developer Guide, "Multi-Region keys in AWS KMS").
+- **Signal**: `KeyRotationEnabled==false` on CMK that is not a multi-Region replica (`MultiRegionConfiguration.MultiRegionKeyType=REPLICA`): "You can enable and disable automatic key rotation only on a primary key" (AWS KMS Developer Guide, "Multi-Region keys in AWS KMS"). The detail of every multi-Region key shows `MultiRegionKeyType` (primary or replica), so the operator sees why one key carries this finding and another does not.
   - **State bucket**: Warning.
   - **API call**: `GetKeyRotationStatus` — one per key that can rotate automatically (`KeySpec=SYMMETRIC_DEFAULT`, `Origin=AWS_KMS`, no custom key store). A customer key that cannot rotate automatically gets the signal without the call.
   - **Cost shape**: per-resource.

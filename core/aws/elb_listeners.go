@@ -114,7 +114,7 @@ func convertListener(listener elbtypes.Listener) resource.Resource {
 		certShort = extractCertID(*listener.Certificates[0].CertificateArn)
 	}
 
-	return withWave1("elb_listeners", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   arn,
 		Name: port,
 		Fields: map[string]string{

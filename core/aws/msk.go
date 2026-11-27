@@ -52,7 +52,7 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 
 		findings := withState("msk", state, nil)
 
-		r := withWave1("msk", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   clusterName,
 			Name: clusterName,
 			Fields: map[string]string{

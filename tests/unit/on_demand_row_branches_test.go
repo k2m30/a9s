@@ -109,7 +109,7 @@ func TestTUI_RowEnrichedReachesTheOpenDetail(t *testing.T) {
 	stubEC2Enricher(t, func(resources []resource.Resource) (awsclient.IssueEnricherResult, error) {
 		res := emptyEnricherResult()
 		for _, r := range resources {
-			res.Findings[r.ID] = []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2"}}
+			res.Findings[r.ID] = []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2"}}
 		}
 		return res, nil
 	})
@@ -136,15 +136,15 @@ func TestTUI_RowEnrichedReachesTheOpenDetail(t *testing.T) {
 	}
 	answer := findRowEnriched(t, cmd)
 	// The Attention block sentence-cases the phrase it renders.
-	if before := tuitest.StripANSI(tuitest.Render(m)); strings.Contains(strings.ToLower(before), onDemandPhrase) {
-		t.Fatalf("precondition: the detail already reads %q before the answer is delivered:\n%s", onDemandPhrase, before)
+	if before := tuitest.StripANSI(tuitest.Render(m)); strings.Contains(strings.ToLower(before), onDemandPhrase()) {
+		t.Fatalf("precondition: the detail already reads %q before the answer is delivered:\n%s", onDemandPhrase(), before)
 	}
 
 	m = tuitest.StepModel(m, answer)
 
 	view := tuitest.StripANSI(tuitest.Render(m))
-	if !strings.Contains(strings.ToLower(view), onDemandPhrase) {
-		t.Errorf("the open detail does not show %q after its on-demand answer arrived; view:\n%s", onDemandPhrase, view)
+	if !strings.Contains(strings.ToLower(view), onDemandPhrase()) {
+		t.Errorf("the open detail does not show %q after its on-demand answer arrived; view:\n%s", onDemandPhrase(), view)
 	}
 }
 
@@ -263,9 +263,9 @@ func TestOnDemandAnswer_KeepsItsAttentionDetailsThroughAStaleSweep(t *testing.T)
 	stubEC2Enricher(t, func(resources []resource.Resource) (awsclient.IssueEnricherResult, error) {
 		res := emptyEnricherResult()
 		for _, r := range resources {
-			res.Findings[r.ID] = []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2"}}
+			res.Findings[r.ID] = []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2"}}
 			res.AttentionDetails[r.ID] = map[domain.FindingCode]domain.AttentionDetail{
-				"ec2.impaired": {Rows: []domain.DetailRow{{Label: supportLabel, Value: supportValue}}},
+				onDemandCode: {Rows: []domain.DetailRow{{Label: supportLabel, Value: supportValue}}},
 			}
 		}
 		return res, nil
@@ -285,8 +285,8 @@ func TestOnDemandAnswer_KeepsItsAttentionDetailsThroughAStaleSweep(t *testing.T)
 
 	entries := topAttentionEntries(t, c)
 	joined := strings.Join(entries, " ")
-	if !strings.Contains(joined, onDemandPhrase) {
-		t.Errorf("after a stale sweep the Attention block reads %v, want the finding %q", entries, onDemandPhrase)
+	if !strings.Contains(joined, onDemandPhrase()) {
+		t.Errorf("after a stale sweep the Attention block reads %v, want the finding %q", entries, onDemandPhrase())
 	}
 	if !strings.Contains(joined, supportValue) {
 		t.Errorf("after a stale sweep the Attention block reads %v, want the supporting row %q the answer carried", entries, supportValue)
@@ -335,7 +335,7 @@ func TestOnDemandAnswer_AnsweredRowGoneBeforeTheStaleSweepLands(t *testing.T) {
 	stubEC2Enricher(t, func(resources []resource.Resource) (awsclient.IssueEnricherResult, error) {
 		res := emptyEnricherResult()
 		for _, r := range resources {
-			res.Findings[r.ID] = []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Severity: domain.SevBroken, Source: "wave2:ec2"}}
+			res.Findings[r.ID] = []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Severity: domain.SevBroken, Source: "wave2:ec2"}}
 		}
 		return res, nil
 	})
@@ -400,10 +400,10 @@ func TestOnDemandAnswer_CleanAnswerClearsOnlyThatRowsFindings(t *testing.T) {
 	})
 	c, core, rows := cappedEC2List(t)
 	const supportValue = "instance reachability failed"
-	prior := []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Severity: domain.SevBroken, Source: "wave2:ec2"}}
+	prior := []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Severity: domain.SevBroken, Source: "wave2:ec2"}}
 	details := map[string]map[domain.FindingCode]domain.AttentionDetail{
-		rows[0].ID: {"ec2.impaired": {Rows: []domain.DetailRow{{Label: "Status check", Value: supportValue}}}},
-		rows[1].ID: {"ec2.impaired": {Rows: []domain.DetailRow{{Label: "Status check", Value: supportValue}}}},
+		rows[0].ID: {onDemandCode: {Rows: []domain.DetailRow{{Label: "Status check", Value: supportValue}}}},
+		rows[1].ID: {onDemandCode: {Rows: []domain.DetailRow{{Label: "Status check", Value: supportValue}}}},
 	}
 	c.ApplyIntents([]runtime.UIIntent{runtime.PatchResourceList{
 		ResourceType: "ec2",
@@ -435,8 +435,8 @@ func TestOnDemandAnswer_CleanAnswerClearsOnlyThatRowsFindings(t *testing.T) {
 	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[0].ID); got != "" {
 		t.Errorf("the answered row's Status cell reads %q, want blank: a running instance with no finding is healthy", got)
 	}
-	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[1].ID); got != onDemandPhrase {
-		t.Errorf("the other row's Status cell reads %q, want its own finding %q", got, onDemandPhrase)
+	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[1].ID); got != onDemandPhrase() {
+		t.Errorf("the other row's Status cell reads %q, want its own finding %q", got, onDemandPhrase())
 	}
 }
 
@@ -447,7 +447,7 @@ func TestOnDemandAnswer_TruncatedPageKeepsTheBadgeALowerBound(t *testing.T) {
 	stubEC2Enricher(t, func(resources []resource.Resource) (awsclient.IssueEnricherResult, error) {
 		res := emptyEnricherResult()
 		for _, r := range resources {
-			res.Findings[r.ID] = []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Severity: domain.SevBroken, Source: "wave2:ec2"}}
+			res.Findings[r.ID] = []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Severity: domain.SevBroken, Source: "wave2:ec2"}}
 		}
 		return res, nil
 	})

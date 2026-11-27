@@ -183,7 +183,7 @@ func pw1Instance(id, state, publicIP string, tokens ec2types.HttpTokensState, sg
 
 func pw1FetchEC2(t *testing.T, instances ...ec2types.Instance) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchEC2InstancesPage(context.Background(), &pw1EC2ListFake{instances: instances}, "")
+	out, err := BindPage("ec2")(awsclient.FetchEC2InstancesPage(context.Background(), &pw1EC2ListFake{instances: instances}, ""))
 	if err != nil {
 		t.Fatalf("FetchEC2InstancesPage: %v", err)
 	}
@@ -658,7 +658,7 @@ func pw1InstanceID(n int) string {
 // contract: each ec2 posture code is carried by its named demo row and by no
 // other row, so the demo bench shows one example of each signal.
 func TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding(t *testing.T) {
-	out, err := awsclient.FetchEC2InstancesPage(context.Background(), fakes.NewEC2(), "")
+	out, err := BindPage("ec2")(awsclient.FetchEC2InstancesPage(context.Background(), fakes.NewEC2(), ""))
 	if err != nil {
 		t.Fatalf("FetchEC2InstancesPage(demo): %v", err)
 	}

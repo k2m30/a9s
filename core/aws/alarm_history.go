@@ -92,7 +92,7 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem, alarmName string) re
 		historyData = *item.HistoryData
 	}
 
-	return withWave1("alarm_history", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   eventRowID(at, historyItemType, historySummary, historyData),
 		Name: timestamp,
 		Fields: map[string]string{

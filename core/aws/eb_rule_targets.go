@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
@@ -34,6 +35,9 @@ func FetchEventBridgeRuleTargets(
 	input := &eventbridge.ListTargetsByRuleInput{
 		Rule: &ruleName,
 	}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
 	// EventBusName has a minimum length of 1, so a rule on the default bus
 	// has to omit the field rather than send it empty.
 	if eventBus != "" {
@@ -51,11 +55,17 @@ func FetchEventBridgeRuleTargets(
 		resources = append(resources, convertEventBridgeTarget(target, ruleName, eventBus))
 	}
 
+	next := aws.ToString(output.NextToken)
+	totalHint := len(resources)
+	if next != "" {
+		totalHint = -1
+	}
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: next != "",
+			NextToken:   next,
+			TotalHint:   totalHint,
 			PageSize:    len(resources),
 		},
 	}, nil
@@ -81,7 +91,7 @@ func convertEventBridgeTarget(target ebtypes.Target, ruleName, eventBus string) 
 		roleArn = *target.RoleArn
 	}
 
-	return withWave1("eb_rule_targets", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   targetID,
 		Name: targetID,
 		Fields: map[string]string{

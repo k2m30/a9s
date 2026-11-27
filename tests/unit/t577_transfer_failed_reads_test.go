@@ -79,7 +79,11 @@ func TestT577_TransferAgreements_DescribeDenied_RowsBuiltFromListedAgreement(t *
 		t.Fatalf("precondition: demo server %s lists %d agreements, want 2", fixtures.ProdAS2GatewayID, len(listed.Agreements))
 	}
 
-	result, err := awsclient.FetchTransferAgreements(context.Background(), fake, fixtures.ProdAS2GatewayID, "")
+	ctd := resource.GetChildType(child)
+	if ctd == nil || ctd.ChildFetcher == nil {
+		t.Fatalf("%s has no registered ChildFetcher", child)
+	}
+	result, err := ctd.ChildFetcher(context.Background(), &awsclient.ServiceClients{Transfer: fake}, map[string]string{"server_id": fixtures.ProdAS2GatewayID}, "")
 
 	if err == nil {
 		t.Fatal("FetchTransferAgreements returned nil error with every DescribeAgreement denied; the failure must be reported")
@@ -129,8 +133,8 @@ func TestT577_TransferAgreements_DescribeDenied_RowsBuiltFromListedAgreement(t *
 		if got := t577HasFinding(row.Findings, inactiveCode); got != wantInactive {
 			t.Errorf("%s (Status %s): has %s = %v, want %v", id, la.Status, inactiveCode, got, wantInactive)
 		}
-		if got, want := row.Fields["status"], domain.StatusPhrase(row.Findings); got != want {
-			t.Errorf("%s: status cell = %q, want the phrase of its findings %q", id, got, want)
+		if got, want := app.ExtractCellValue(app.ColumnDef{Key: "status", Title: "Status"}, ctd, row), domain.StatusPhrase(row.Findings); got != want {
+			t.Errorf("%s: Status cell = %q, want the phrase of its findings %q", id, got, want)
 		}
 	}
 }
@@ -139,7 +143,7 @@ func TestT577_TransferAgreements_DescribeAnswered_NoNotInspectedMark(t *testing.
 	child := transferAgreementsChildShortName(t)
 	fake := &t577TransferFake{TransferAPI: fakes.NewTransfer()}
 
-	result, err := awsclient.FetchTransferAgreements(context.Background(), fake, fixtures.ProdAS2GatewayID, "")
+	result, err := BindPage("transfer_agreements")(awsclient.FetchTransferAgreements(context.Background(), fake, fixtures.ProdAS2GatewayID, ""))
 	if err != nil {
 		t.Fatalf("FetchTransferAgreements: %v", err)
 	}

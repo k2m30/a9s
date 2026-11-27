@@ -95,7 +95,7 @@ func convertRDSEvent(event rdstypes.Event) resource.Resource {
 		sourceArn = *event.SourceArn
 	}
 
-	return withWave1("dbi_events", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   eventRowID(at, sourceIdentifier, sourceType, categories, message),
 		Name: timestamp,
 		Fields: map[string]string{

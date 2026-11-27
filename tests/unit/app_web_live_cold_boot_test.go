@@ -16,6 +16,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -297,7 +298,7 @@ func TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile(t *testing.T) {
 	for i := range rows {
 		rows[i] = cache.Row{ID: "bucket-p-" + itoaColdBoot(i), Fields: map[string]string{"region": "us-east-1"}}
 	}
-	rows[0].Findings = []domain.Finding{{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}}
+	rows[0].Findings = []domain.Finding{{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave2:s3"}}
 
 	store := cache.LoadDirForTest("pages-prof", "us-east-1")
 	store.Put("s3", cache.TypeFile{HasResources: true, Count: 55, Exact: true, Rows: rows})
@@ -313,8 +314,8 @@ func TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile(t *testing.T) {
 	if len(tf.Rows) != 55 {
 		t.Errorf("len(tf.Rows) = %d, want 55 — C6 requires ALL loaded pages persisted, not just the first page's 50", len(tf.Rows))
 	}
-	if len(tf.Rows) > 0 && (len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Phrase != "publicly readable") {
-		t.Errorf("tf.Rows[0].Findings = %+v, want 1 finding with Phrase=%q — per-row findings must survive the multi-page persistence", tf.Rows[0].Findings, "publicly readable")
+	if len(tf.Rows) > 0 && (len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Phrase != catalog.Phrase("s3.public")) {
+		t.Errorf("tf.Rows[0].Findings = %+v, want 1 finding with Phrase=%q — per-row findings must survive the multi-page persistence", tf.Rows[0].Findings, catalog.Phrase("s3.public"))
 	}
 }
 
@@ -327,7 +328,7 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 		id := "bucket-cb-" + itoaColdBoot(i)
 		rows[i] = cache.Row{ID: id, Name: id, Fields: map[string]string{"region": "us-east-1"}}
 	}
-	rows[10].Findings = []domain.Finding{{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}}
+	rows[10].Findings = []domain.Finding{{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave2:s3"}}
 
 	store := cache.LoadDirForTest("coldboot-prof", "us-east-1")
 	store.Put("s3", cache.TypeFile{HasResources: true, Count: 55, Exact: true, Rows: rows})

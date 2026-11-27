@@ -88,7 +88,7 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 
 	requesterVPC, requesterOwner := vpcPeerSide(pc.RequesterVpcInfo)
 	accepterVPC, accepterOwner := vpcPeerSide(pc.AccepterVpcInfo)
-	return withWave1("vpc-peer", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{

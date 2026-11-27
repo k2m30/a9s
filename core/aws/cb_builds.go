@@ -82,7 +82,7 @@ func FetchCBBuilds(
 			}
 		}
 		rows, chunkFailures := keepListed("BatchGetBuilds", chunk, listedNameIsID, ans, err, func(id string, err error) resource.Resource {
-			r := DegradedDetails("cb_builds", id, err)
+			r := degradedRow(id, err)
 			r.Fields["build_id"] = id
 			return r
 		})
@@ -184,7 +184,7 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 		}
 	}
 
-	return withWave1("cb_builds", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   buildID,
 		Name: name,
 		Fields: map[string]string{

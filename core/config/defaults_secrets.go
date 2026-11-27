@@ -23,7 +23,7 @@ func secretsDefaultViews() map[string]ViewDef {
 			Detail: []DetailField{
 				{Path: "KeyId"}, {Path: "Arn"}, {Path: "Description"}, {Path: "KeyState"},
 				{Path: "KeyUsage"}, {Path: "KeySpec"}, {Path: "KeyManager"}, {Path: "Enabled"},
-				{Path: "CreationDate"}, {Path: "Origin"}, {Path: "MultiRegion"},
+				{Path: "CreationDate"}, {Path: "Origin"}, {Path: "MultiRegion"}, {Key: "multi_region_key_type", Label: "MultiRegionKeyType"},
 				{Path: "EncryptionAlgorithms"}, {Path: "SigningAlgorithms"},
 			},
 		},

@@ -158,7 +158,7 @@ func readInvocationLog(ctx context.Context, api CWLogsFilterLogEventsAPI, input 
 
 			status := classifyLogEventStatus(message)
 
-			resources = append(resources, withWave1("lambda_invocation_logs", resource.Resource{
+			resources = append(resources, withWave1(resource.Resource{
 				ID:   id,
 				Name: logEventDisplayName(message),
 				Fields: map[string]string{

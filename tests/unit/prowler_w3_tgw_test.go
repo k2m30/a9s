@@ -36,7 +36,7 @@ func (f w3TGWAPI) DescribeTransitGateways(_ context.Context, _ *ec2.DescribeTran
 
 func w3FetchTGWs(t *testing.T, gws ...ec2types.TransitGateway) []resource.Resource {
 	t.Helper()
-	res, err := awsclient.FetchTransitGatewaysPage(context.Background(), w3TGWAPI{gateways: gws}, "")
+	res, err := BindPage("tgw")(awsclient.FetchTransitGatewaysPage(context.Background(), w3TGWAPI{gateways: gws}, ""))
 	if err != nil {
 		t.Fatalf("FetchTransitGatewaysPage: %v", err)
 	}

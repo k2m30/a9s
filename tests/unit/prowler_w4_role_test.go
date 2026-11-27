@@ -162,7 +162,7 @@ func w4Role(name, path, trustDoc string) iamtypes.Role {
 // w4FetchRole runs the real role fetcher over one role and returns it.
 func w4FetchRole(t *testing.T, fake *w4RoleListFake, name string) resource.Resource {
 	t.Helper()
-	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
+	res, err := BindPage("role")(awsclient.FetchIAMRolesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchIAMRolesPage: %v", err)
 	}
@@ -458,7 +458,7 @@ func TestW4RoleInlinePrivEscNegatives(t *testing.T) {
 			roles:   []iamtypes.Role{w4Role("acme-denied-role", "/", w4TrustEC2Only)},
 			listErr: map[string]error{"acme-denied-role": errors.New("AccessDenied")},
 		}
-		res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
+		res, err := BindPage("role")(awsclient.FetchIAMRolesPage(context.Background(), fake, ""))
 		if err == nil {
 			t.Fatal("FetchIAMRolesPage returned no error for a refused ListRolePolicies")
 		}

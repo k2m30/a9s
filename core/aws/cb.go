@@ -65,9 +65,7 @@ func FetchCodeBuildProjectsPage(
 			ans.rows = append(ans.rows, codeBuildProjectResource(project))
 		}
 	}
-	resources, failures := keepListed("BatchGetProjects", listOutput.Projects, listedNameIsID, ans, err, func(name string, err error) resource.Resource {
-		return DegradedDetails("cb", name, err)
-	})
+	resources, failures := keepListed("BatchGetProjects", listOutput.Projects, listedNameIsID, ans, err, degradedRow)
 
 	nextToken := ""
 	isTruncated := false
@@ -192,16 +190,16 @@ func cbSourceLocationCredential(src *cbtypes.ProjectSource) (string, bool) {
 // so a project that is wrong four ways carries four findings.
 func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 	if project.ProjectVisibility == cbtypes.ProjectVisibilityTypePublicRead {
-		addWave1Finding("cb", r, CodeCBPublicBuilds)
+		addWave1Finding(r, CodeCBPublicBuilds)
 	}
 
 	if spec, ok := cbBuildspecFromSource(project.Source); ok {
-		addWave1Finding("cb", r, CodeCBBuildspecFromSource)
+		addWave1Finding(r, CodeCBBuildspecFromSource)
 		addWave1Rows(r, CodeCBBuildspecFromSource, domain.DetailRow{Label: "Buildspec", Value: spec, Tier: "~"})
 	}
 
 	if redacted, ok := cbSourceLocationCredential(project.Source); ok {
-		addWave1Finding("cb", r, CodeCBSourceURLCredential)
+		addWave1Finding(r, CodeCBSourceURLCredential)
 		addWave1Rows(r, CodeCBSourceURLCredential, domain.DetailRow{Label: "Repository", Value: redacted, Tier: "!"})
 	}
 
@@ -217,5 +215,5 @@ func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 			plaintext[aws.ToString(ev.Name)] = aws.ToString(ev.Value)
 		}
 	}
-	addSecretScanFinding("cb", r, CodeCBEnvSecret, plaintext)
+	addSecretScanFinding(r, CodeCBEnvSecret, plaintext)
 }

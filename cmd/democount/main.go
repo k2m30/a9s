@@ -2,10 +2,10 @@
 
 // democount prints the counts a demo session's titles show, read from the
 // same fixture store `a9s --demo` loads: one "<name> <count>" line for the
-// main menu ("resource-types") and for every resource type, in the form
-// the list title prints it ("44", or "50+" when the first page is not the
-// whole list). The smoke scripts take their expected counts from it, so a
-// fixture row added or removed moves the expectation with it.
+// main menu ("resource-types") and for every resource type, as the list title
+// prints it after its first page. The smoke scripts take their expected
+// counts from it, so a fixture row added or removed moves the expectation
+// with it.
 //
 //	go run ./cmd/democount
 package main
@@ -28,25 +28,31 @@ func main() {
 	resource.WireProjection()
 
 	menu := app.New(runtime.Bootstrap(demo.DemoProfile, demo.DemoRegion, resource.AllResourceTypes()))
-	title := menu.MenuFrameTitle()
-	total, ok := strings.CutPrefix(title, "resource-types(")
-	if !ok || !strings.HasSuffix(total, ")") {
-		log.Fatalf("democount: menu title %q is not resource-types(<n>)", title)
-	}
-	fmt.Println("resource-types", strings.TrimSuffix(total, ")"))
+	fmt.Println("resource-types", titleCount("resource-types", menu.MenuFrameTitle()))
 
 	clients := demo.NewServiceClients()
 	for _, td := range resource.AllResourceTypes() {
 		if td.Fetcher == nil {
 			continue
 		}
-		// A partial read still lists the rows it got, so the title counts
-		// them; the demo carries such failures on purpose.
-		page, _ := td.Fetcher(context.Background(), clients, "")
-		suffix := ""
-		if page.Pagination != nil && page.Pagination.IsTruncated {
-			suffix = "+"
-		}
-		fmt.Printf("%s %d%s\n", td.ShortName, len(page.Resources), suffix)
+		fmt.Println(td.ShortName, listCount(clients, td.ShortName))
 	}
+}
+
+func listCount(clients *aws.ServiceClients, shortName string) string {
+	core := runtime.Bootstrap(demo.DemoProfile, demo.DemoRegion, resource.AllResourceTypes())
+	core.Session().Clients = clients
+	c := app.New(core)
+	_, tasks := c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
+	app.DrainSyncPartition(context.Background(), c, tasks, func(k runtime.TaskKind) bool { return k != runtime.KindFetchResources }, nil)
+	return titleCount(shortName, c.ListFrameTitle())
+}
+
+func titleCount(name, title string) string {
+	_, rest, ok := strings.Cut(title, "(")
+	count, _, closed := strings.Cut(rest, ")")
+	if !ok || !closed {
+		log.Fatalf("democount: %s title %q carries no (<count>)", name, title)
+	}
+	return count
 }

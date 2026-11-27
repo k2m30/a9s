@@ -79,7 +79,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 			}
 			return &r, nil
 		}, func(err error) resource.Resource {
-			r := DegradedDetails("sqs", queueName, err)
+			r := degradedRow(queueName, err)
 			r.Fields["queue_name"] = queueName
 			r.Fields["queue_url"] = queueURL
 			return r

@@ -87,7 +87,7 @@ func TestEfsColor(t *testing.T) {
 					FileSystems: []efstypes.FileSystemDescription{fs},
 				},
 			}
-			page, err := awsclient.FetchEFSFileSystemsPage(context.Background(), mock, "")
+			page, err := BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), mock, ""))
 			if err != nil {
 				t.Fatalf("FetchEFSFileSystemsPage: %v", err)
 			}

@@ -107,7 +107,7 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			RawStruct: vol,
 		}
 
-		emitWave1("ebs", &r, ebsFindings(state, attachedTo, created, encrypted)...)
+		r = withWave1(r, ebsFindings(state, attachedTo, created, encrypted)...)
 
 		resources = append(resources, r)
 	}
@@ -266,7 +266,7 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		RawStruct: snap,
 	}
 
-	emitWave1("ebs-snap", &r, withState("ebs-snap", state, ebsSnapStructuralFindings(snap))...)
+	r = withWave1(r, withState("ebs-snap", state, ebsSnapStructuralFindings(snap))...)
 	return r
 }
 

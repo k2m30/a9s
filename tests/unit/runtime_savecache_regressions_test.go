@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/demo"
@@ -350,7 +351,7 @@ func TestAvailabilityCacheLoaded_SeededRowMutation_DoesNotWriteThroughToStore(t 
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "s3"
 
-	seedFindings := []domain.Finding{{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}}
+	seedFindings := []domain.Finding{{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave2:s3"}}
 	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true,
@@ -443,7 +444,7 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 			Name: saveRegID("issue", i),
 			Type: shortName,
 			Findings: []domain.Finding{
-				{Code: "ec2-impaired", Severity: domain.SevBroken, Source: "wave1"},
+				{Code: awsclient.CodeEC2StateStoppedServer, Phrase: catalog.Phrase(awsclient.CodeEC2StateStoppedServer), Severity: domain.SevBroken, Source: "wave1"},
 			},
 		}
 	}

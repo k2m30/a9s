@@ -145,7 +145,7 @@ func TestCoreProbeEnrichment_CacheSnapshotMergesRowStore(t *testing.T) {
 		{ID: "prod-dbi-1", Name: "prod-dbi-1"},
 	}, nil, session.OriginProbe, false)
 	core.Session().RowStore.Observe(sentinelType, []resource.Resource{
-		{ID: "rds:test-snap"},
+		{ID: "rds:test-snap", Type: sentinelType},
 	}, nil, session.OriginProbe, false)
 
 	result := core.ProbeEnrichment(context.Background(), sess.Clients, sentinelType)

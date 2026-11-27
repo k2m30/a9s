@@ -74,7 +74,7 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			}
 		}
 
-		r := withWave1("tgw", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   tgwID,
 			Name: name,
 			Fields: map[string]string{

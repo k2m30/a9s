@@ -18,7 +18,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"logs": {
 			Detail: []DetailField{
 				{Path: "LogGroupName"}, {Path: "LogGroupArn"}, {Path: "LogGroupClass"},
-				{Key: "stored_bytes", Label: "StoredBytes"}, {Path: "RetentionInDays"}, {Path: "MetricFilterCount"},
+				{Key: "stored_bytes", Label: "StoredBytes"}, {Key: "retention", Label: "Retention"}, {Path: "MetricFilterCount"},
 				{Path: "DeletionProtectionEnabled"}, {Key: "creation_time", Label: "CreationTime"},
 				{Path: "KmsKeyId"}, {Path: "DataProtectionStatus"},
 			},

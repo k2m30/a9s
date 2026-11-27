@@ -61,7 +61,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		}
 
 		listed := func(row AthenaWorkGroupRow, outputLocation, costCap string) resource.Resource {
-			return withWave1("athena", resource.Resource{
+			return withWave1(resource.Resource{
 				ID:   wgName,
 				Name: wgName,
 				Fields: map[string]string{
@@ -84,7 +84,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		unread := func(err error) resource.Resource {
 			r := listed(AthenaWorkGroupRow{WorkGroupSummary: wg}, "", "")
 			r.Fields[athenaConfigUnreadField] = "true"
-			emitWave1("athena", &r, degradedDetailsFinding("athena", err))
+			r = markDegraded(r, err)
 			return r
 		}
 		if getAPI == nil {

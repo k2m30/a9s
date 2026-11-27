@@ -85,7 +85,7 @@ func TestOpenSearch_Fetch_HealthyHappyPath(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	// A fixed clock keeps the AutomatedUpdateDate comparison independent of the
 	// wall clock.
 	fixedNow := time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)
-	resources, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), listMock, describeMock, fixedNow)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomainsAt(context.Background(), listMock, describeMock, fixedNow))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestOpenSearch_Fetch_UpdateAvailableFutureDateSilent(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -340,7 +340,7 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -382,7 +382,7 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -504,7 +504,7 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -547,7 +547,7 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -580,7 +580,7 @@ func TestOpenSearch_Fetch_Wave3ClusterHealthIsOutOfScope(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}
@@ -618,7 +618,7 @@ func TestOpenSearch_Fetch_DescribeDomainsBatchError_KeepsListedDomainsAsDegraded
 		err: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "User is not authorized to perform: es:DescribeDomains"},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 	if err == nil {
 		t.Fatal("expected a non-nil composite error when the DescribeDomains batch call itself fails, got nil")
 	}

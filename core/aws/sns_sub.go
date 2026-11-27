@@ -67,7 +67,7 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 
 		findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
 
-		r := withWave1("sns-sub", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   snsSubRowID(subscriptionArn, topicArn, protocol, endpoint),
 			Name: topicName,
 			Fields: map[string]string{

@@ -113,7 +113,7 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 			RawStruct: zone,
 		}
 
-		emitWave1("r53", &r, r53ZoneFindings(recordCount)...)
+		r = withWave1(r, r53ZoneFindings(recordCount)...)
 
 		resources = append(resources, r)
 	}

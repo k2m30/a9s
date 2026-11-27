@@ -126,7 +126,7 @@ func TestT2Dev_Wave2DoorWithholdsAFindingForAnExcludedKind(t *testing.T) {
 func TestT2Dev_WithheldFindingLeavesNoSupportingRows(t *testing.T) {
 	db := t2DBInstance("acme-orders-maz-instance-2", "mysql", "8.0.39", "acme-orders-maz")
 	db.MultiAZ = aws.Bool(false)
-	res, err := awsclient.FetchRDSInstancesPage(context.Background(), &t2RDSFake{instances: []rdstypes.DBInstance{db}}, "")
+	res, err := unit.BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), &t2RDSFake{instances: []rdstypes.DBInstance{db}}, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: %v", err)
 	}

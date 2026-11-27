@@ -58,7 +58,7 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 			}
 		}
 
-		r := withWave1("vpce", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   vpceID,
 			Name: serviceName,
 			Fields: map[string]string{

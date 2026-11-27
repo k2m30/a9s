@@ -36,7 +36,7 @@ import (
 func fetchTransferDemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
-	result, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
+	result, err := BindPage("transfer")(awsclient.FetchTransferServersPage(context.Background(), clients, ""))
 	if err != nil && !strings.Contains(err.Error(), fixtures.WarnTransferDetailsDeniedID) {
 		t.Fatalf("expected only the details-denied composite error, got %v", err)
 	}
@@ -287,7 +287,7 @@ func TestFetchTransferServersPage_MultiStackOrdered(t *testing.T) {
 
 func TestFetchTransferServersPage_DetailsDeniedRich(t *testing.T) {
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
-	result, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
+	result, err := BindPage("transfer")(awsclient.FetchTransferServersPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("expected a composite error naming the details-denied server, got nil")
 	}
@@ -335,7 +335,7 @@ func TestFetchTransferServersPage_ListDeniedIsError(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Transfer: fake}
 
-	result, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
+	result, err := BindPage("transfer")(awsclient.FetchTransferServersPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("FetchTransferServersPage must return a non-nil error when ListServers is denied — never an empty successful result")
 	}
@@ -393,7 +393,7 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Transfer: fake}
 
-	result, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
+	result, err := BindPage("transfer")(awsclient.FetchTransferServersPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("FetchTransferServersPage must return a composite error when DescribeServer fails for some servers")
 	}
@@ -456,7 +456,7 @@ func TestFetchTransferServersPage_WaveThreeAntiTests(t *testing.T) {
 
 	fake := &fakeTransferServers{Listed: []transfertypes.ListedServer{listed}, Described: &described}
 	clients := &awsclient.ServiceClients{Transfer: fake}
-	single, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
+	single, err := BindPage("transfer")(awsclient.FetchTransferServersPage(context.Background(), clients, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -481,7 +481,7 @@ func TestFetchTransferServersPage_ResourceIDAndArnMapping(t *testing.T) {
 
 func fetchTransferAgreementsForServer(t *testing.T, serverID string) []resource.Resource {
 	t.Helper()
-	result, err := awsclient.FetchTransferAgreements(context.Background(), fakes.NewTransfer(), serverID, "")
+	result, err := BindPage("transfer_agreements")(awsclient.FetchTransferAgreements(context.Background(), fakes.NewTransfer(), serverID, ""))
 	if err != nil {
 		t.Fatalf("FetchTransferAgreements(%s) returned error: %v", serverID, err)
 	}

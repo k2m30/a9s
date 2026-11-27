@@ -52,7 +52,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 			}
 			r := buildEKSResource(name, out.Cluster, versions)
 			return &r, nil
-		}, func(err error) resource.Resource { return DegradedDetails("eks", name, err) })
+		}, func(err error) resource.Resource { return degradedRow(name, err) })
 		resources = append(resources, rows...)
 	}
 
@@ -136,7 +136,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 	}
 
 	findings, issueRows := eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
-	emitWave1("eks", &r, findings...)
+	r = withWave1(r, findings...)
 	if len(r.Findings) > 0 {
 		// The rows belong to whichever finding built them — the failed state
 		// folds them in, an active cluster leaves them on the health-issue

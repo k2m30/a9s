@@ -16,6 +16,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -172,7 +173,7 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 				ID:   "i-0disk0000001",
 				Name: "disk-row",
 				Findings: []domain.Finding{
-					{Code: "ec2-stopped-with-eip", Phrase: "stopped, has EIP", Severity: domain.SevWarn, Source: "wave2:ec2"},
+					{Code: "ec2.scheduled-event", Phrase: catalog.Phrase("ec2.scheduled-event"), Severity: domain.SevWarn, Source: "wave2:ec2"},
 				},
 			},
 		},
@@ -193,8 +194,8 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 	if len(findings) != 1 {
 		t.Fatalf("tf.Rows[0].Findings has %d entries, want 1", len(findings))
 	}
-	if findings[0].Phrase != "stopped, has EIP" || findings[0].Severity != domain.SevWarn {
-		t.Errorf("finding = %+v, want Phrase=%q Severity=SevWarn", findings[0], "stopped, has EIP")
+	if want := catalog.Phrase("ec2.scheduled-event"); findings[0].Phrase != want || findings[0].Severity != domain.SevWarn {
+		t.Errorf("finding = %+v, want Phrase=%q Severity=SevWarn", findings[0], want)
 	}
 }
 

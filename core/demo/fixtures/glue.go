@@ -21,17 +21,19 @@ type GlueFixtures struct {
 	TagsByResourceARN map[string]map[string]string
 }
 
-// glueSecurityConfigName is the demo security configuration every job but
-// GlueNoSecurityConfig attaches. It is a real entry in SecurityConfigurations
+// glueSecurityConfigName is the demo security configuration the jobs that
+// encrypt everything attach. It is a real entry in SecurityConfigurations
 // below, which the glue:kms related-panel pivot resolves.
 const glueSecurityConfigName = "acme-glue-security-config"
 
-// GlueSecurityConfigOff is the one demo job whose security configuration
-// (GlueLegacySecurityConfig) turns S3, CloudWatch and job bookmark
-// encryption off; every other job's configuration encrypts all three.
+// GlueLegacySecurityConfig turns S3, CloudWatch and job bookmark encryption
+// off. GlueSecurityConfigOff, a streaming job, and GluePythonShellWeakConfig,
+// a Python shell job that cannot use bookmarks, attach it; every other job
+// that names a configuration encrypts all three.
 const (
-	GlueSecurityConfigOff    = "acme-etl-clickstream"
-	GlueLegacySecurityConfig = "acme-glue-legacy-config"
+	GlueSecurityConfigOff     = "acme-etl-clickstream"
+	GlueLegacySecurityConfig  = "acme-glue-legacy-config"
+	GluePythonShellWeakConfig = "acme-data-catalog-crawler"
 )
 
 func mustParseGlueTime(s string) time.Time {
@@ -103,9 +105,7 @@ var sharedGlueFixtures = shared(func() *GlueFixtures {
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("pythonshell"),
 				},
-				// GlueNoSecurityConfig: without a SecurityConfiguration,
-				// output, logs and bookmarks are not encrypted with a key
-				// the account controls.
+				SecurityConfiguration: aws.String(GlueLegacySecurityConfig),
 				DefaultArguments: map[string]string{
 					"--enable-continuous-cloudwatch-log": "true",
 					"--job-language":                     "python",
@@ -152,6 +152,26 @@ var sharedGlueFixtures = shared(func() *GlueFixtures {
 				},
 				DefaultArguments: map[string]string{
 					"--job-language": "python",
+				},
+			},
+			// GlueNoSecurityConfig: without a SecurityConfiguration, a Spark
+			// job's output and logs are not encrypted with a key the account
+			// controls.
+			{
+				Name:            aws.String(GlueNoSecurityConfig),
+				Role:            aws.String("acme-glue-role"),
+				GlueVersion:     aws.String("4.0"),
+				WorkerType:      gluetypes.WorkerTypeG1x,
+				NumberOfWorkers: aws.Int32(4),
+				MaxRetries:      1,
+				CreatedOn:       aws.Time(mustParseGlueTime("2025-10-02T08:00:00+00:00")),
+				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-02-11T10:30:00+00:00")),
+				Command: &gluetypes.JobCommand{
+					Name: aws.String("glueetl"),
+				},
+				DefaultArguments: map[string]string{
+					"--enable-continuous-cloudwatch-log": "true",
+					"--job-language":                     "python",
 				},
 			},
 			// Issue: latest JobRun=ERROR → Broken (job script threw an unhandled exception)
@@ -290,7 +310,7 @@ func NewGlueFixtures() *GlueFixtures {
 // that condition.
 const (
 	// GlueNoSecurityConfig — the job names no security configuration.
-	GlueNoSecurityConfig = "acme-data-catalog-crawler"
+	GlueNoSecurityConfig = "acme-etl-sessions"
 	// GlueLoggingOff — continuous CloudWatch logging is not turned on.
 	GlueLoggingOff = "acme-etl-clickstream"
 	// GlueArgumentSecret — a default argument value looks like a credential.
@@ -301,5 +321,5 @@ const (
 )
 
 func init() {
-	Register(Pin{ShortName: "glue", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "glue", Rows: 7, Issues: 3, CoverageGaps: []string{"dim"}})
 }

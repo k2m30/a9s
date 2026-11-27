@@ -91,7 +91,7 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 
 		findings, attentionDetails := computeDBIFindings(db, now)
 
-		r := withWave1("dbi", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   dbIdentifier,
 			Name: dbIdentifier,
 			Fields: map[string]string{

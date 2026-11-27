@@ -114,13 +114,13 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 		findings = append(findings, wave1Finding(transferCodeAgreementInactive))
 	}
 
-	return withWave1("transfer_agreements", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
 			"agreement_id":    id,
 			"description":     aws.ToString(agreement.Description),
-			"status":          domain.StatusPhrase(findings),
+			"status":          string(agreement.Status),
 			"local_profile":   aws.ToString(agreement.LocalProfileId),
 			"partner_profile": aws.ToString(agreement.PartnerProfileId),
 			"base_directory":  aws.ToString(agreement.BaseDirectory),
@@ -141,21 +141,19 @@ func buildTransferAgreementDegradedResource(listed transfertypes.ListedAgreement
 	if listed.Status == transfertypes.AgreementStatusTypeInactive {
 		findings = append(findings, wave1Finding(transferCodeAgreementInactive))
 	}
-	findings = append(findings, degradedDetailsFinding("transfer_agreements", err))
-
-	return withWave1("transfer_agreements", resource.Resource{
+	return markDegraded(withWave1(resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
 			"agreement_id":    id,
 			"description":     aws.ToString(listed.Description),
-			"status":          domain.StatusPhrase(findings),
+			"status":          string(listed.Status),
 			"local_profile":   aws.ToString(listed.LocalProfileId),
 			"partner_profile": aws.ToString(listed.PartnerProfileId),
 			"server_id":       serverID,
 		},
 		RawStruct: &listed,
-	}, findings...)
+	}, findings...), err)
 }
 
 // enrichTransferAgreement is the on-demand DetailEnrich for the Agreements
@@ -213,7 +211,7 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 		enriched.Fields["partner_profile"] = partnerAs2ID
 	}
 
-	enriched = rebuiltWave1("transfer_agreements", enriched, slices.Concat(res.Findings, localCertFindings, partnerCertFindings)...)
+	enriched = rebuiltWave1(enriched, slices.Concat(res.Findings, localCertFindings, partnerCertFindings)...)
 
 	// The enriched detail is returned either way — a profile that did not
 	// resolve must not blank the agreement. The error travels with it so the

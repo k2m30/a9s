@@ -58,7 +58,7 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 			logValidation = "true"
 		}
 
-		r := withWave1("trail", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   trailName,
 			Name: trailName,
 			Fields: map[string]string{

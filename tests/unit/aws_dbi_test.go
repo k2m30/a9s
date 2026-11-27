@@ -31,7 +31,7 @@ func findDBI(t *testing.T, id string) rdstypes.DBInstance {
 func fetchSingle(t *testing.T, inst rdstypes.DBInstance) (status string, fields map[string]string, findings []domain.Finding) {
 	t.Helper()
 	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestDBI_Fetch_NoCISFlagsField(t *testing.T) {
 func fetchSingleResource(t *testing.T, inst rdstypes.DBInstance) resource.Resource {
 	t.Helper()
 	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)
 	}
@@ -496,7 +496,7 @@ func findDBIFromAll(t *testing.T, id string) rdstypes.DBInstance {
 func TestDBI_Fetch_DetailFieldsPopulated(t *testing.T) {
 	inst := findDBI(t, fixtures.ProdDbiID)
 	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	result, err := BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)
 	}

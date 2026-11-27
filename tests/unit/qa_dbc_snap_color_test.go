@@ -99,7 +99,7 @@ func TestDbcSnapColor(t *testing.T) {
 					DBClusterSnapshots: []rdstypes.DBClusterSnapshot{snap},
 				},
 			}
-			page, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+			page, err := BindPage("dbc-snap")(awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, ""))
 			if err != nil {
 				t.Fatalf("FetchRDSDBClusterSnapshotsPage: %v", err)
 			}

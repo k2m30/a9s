@@ -4,6 +4,9 @@ package aws
 
 import (
 	"context"
+	"maps"
+	"slices"
+	"testing"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -56,13 +59,122 @@ func ctRegionOfWebACL(r domain.Resource) string { return wafRegionOf(r.Fields["s
 // catches double-install bugs in tests where one TestMain forgot to use the
 // same source slice as another.
 func Install() {
-	catalog.SetTypes(allTopLevelTypes())
-	catalog.SetChildTypes(allChildTypes())
+	catalog.SetTypes(bindTypes(allTopLevelTypes()))
+	catalog.SetChildTypes(bindTypes(allChildTypes()))
 	// Production consumers read the catalog via resource.Get* wrappers.
 	// Those wrappers consult per-surface test-only override tables first
 	// (populated via resource.Set*ForTest / AppendRelated, which panic
 	// outside test binaries), so in production the catalog installed here is
 	// the only source.
+}
+
+// bindTypes binds every function of a type that returns rows to the type it
+// is registered under: each row it returns carries that type and has passed
+// the Wave 1 door, whichever producer built it.
+func bindTypes(types []catalog.ResourceTypeDef) []catalog.ResourceTypeDef {
+	for i := range types {
+		td := &types[i]
+		short := td.ShortName
+		bind := func(rows []resource.Resource) { bindRows(short, rows) }
+		bindPage := func(fetch domain.PaginatedFetcher) domain.PaginatedFetcher {
+			if fetch == nil {
+				return nil
+			}
+			return func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {
+				res, err := fetch(ctx, clients, token)
+				bind(res.Resources)
+				return res, err
+			}
+		}
+		td.Fetcher = bindPage(td.Fetcher)
+		td.AvailabilityFetcher = bindPage(td.AvailabilityFetcher)
+		if fetch := td.FilteredFetcher; fetch != nil {
+			td.FilteredFetcher = func(ctx context.Context, clients any, filter map[string]string, token string) (resource.FetchResult, error) {
+				res, err := fetch(ctx, clients, filter, token)
+				bind(res.Resources)
+				return res, err
+			}
+		}
+		if fetch := td.ChildFetcher; fetch != nil {
+			td.ChildFetcher = func(ctx context.Context, clients any, parent domain.ParentContext, token string) (resource.FetchResult, error) {
+				res, err := fetch(ctx, clients, parent, token)
+				bind(res.Resources)
+				return res, err
+			}
+		}
+		if fetch := td.FetchByIDs; fetch != nil {
+			td.FetchByIDs = func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+				rows, err := fetch(ctx, clients, ids)
+				bind(rows)
+				return rows, err
+			}
+		}
+		if stub := td.StubCreator; stub != nil {
+			td.StubCreator = func(id string) domain.Resource {
+				rows := []resource.Resource{stub(id)}
+				bind(rows)
+				return rows[0]
+			}
+		}
+		if enrich := td.DetailEnrich; enrich != nil {
+			td.DetailEnrich = func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
+				before := slices.Clone(res.Findings)
+				out, err := enrich(ctx, clients, res)
+				if !domain.DetailResultApplies(err) {
+					return out, err
+				}
+				return rebindEnriched(short, before, out), err
+			}
+		}
+	}
+	return types
+}
+
+func bindRows(shortName string, rows []resource.Resource) {
+	for i := range rows {
+		rows[i].Type = shortName
+		resolveDegraded(shortName, &rows[i])
+		emitWave1(&rows[i])
+	}
+}
+
+// rebindEnriched passes through the Wave 1 door only the findings a detail
+// enricher added to a bound row. The findings the row came in with were judged
+// where they were raised, by Wave 1, Wave 2 or a build that wrote the disk
+// cache, and stand as they are.
+func rebindEnriched(shortName string, before []domain.Finding, out resource.Resource) resource.Resource {
+	resolveDegraded(shortName, &out)
+	var raised []domain.Finding
+	for _, f := range out.Findings {
+		if !slices.Contains(before, f) {
+			raised = append(raised, f)
+		}
+	}
+	if len(raised) == 0 {
+		return out
+	}
+	out.Type = shortName
+	added := rebuiltWave1(out, raised...)
+	added.AttentionDetails = maps.Clone(out.AttentionDetails)
+	emitWave1(&added)
+	kept := make([]domain.Finding, 0, len(out.Findings))
+	for _, f := range out.Findings {
+		if slices.Contains(before, f) || slices.Contains(added.Findings, f) {
+			kept = append(kept, f)
+		}
+	}
+	out = rebuiltWave1(out, kept...)
+	out.AttentionDetails = added.AttentionDetails
+	return out
+}
+
+// BindForTest is what the registration does to the rows a function of
+// shortName returns, for a test that calls such a function directly.
+func BindForTest(shortName string, rows []resource.Resource) {
+	if !testing.Testing() {
+		panic("BindForTest called outside a test binary")
+	}
+	bindRows(shortName, rows)
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into

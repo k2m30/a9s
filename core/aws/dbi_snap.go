@@ -114,7 +114,7 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 
 		findings := ComputeDBISnapStatusAndIssues(snap)
 
-		r := withWave1("dbi-snap", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   snapshotID,
 			Name: snapshotID,
 			Fields: map[string]string{

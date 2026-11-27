@@ -148,7 +148,7 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 		redriveDate = item.RedriveDate.UTC().Format("2006-01-02 15:04")
 	}
 
-	return withWave1("sfn_executions", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   name,
 		Name: name,
 		Fields: map[string]string{

@@ -57,6 +57,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // =============================================================================
@@ -236,7 +237,7 @@ func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: &pr03bEKSFake{listMock, describeMock}}, "")
+	result, err := unit.BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: &pr03bEKSFake{listMock, describeMock}}, ""))
 	if err != nil {
 		t.Fatalf("FetchEKSClustersPage: unexpected error: %v", err)
 	}
@@ -272,7 +273,7 @@ func TestPR03b_EKSFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: &pr03bEKSFake{listMock, describeMock}}, "")
+	result, err := unit.BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: &pr03bEKSFake{listMock, describeMock}}, ""))
 	if err != nil {
 		t.Fatalf("FetchEKSClustersPage: unexpected error: %v", err)
 	}
@@ -390,7 +391,7 @@ func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchAutoScalingGroupsPage: unexpected error: %v", err)
 	}
@@ -424,7 +425,7 @@ func TestPR03b_ASGFetcher_DeletingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchAutoScalingGroupsPage: unexpected error: %v", err)
 	}
@@ -484,7 +485,7 @@ func TestPR03b_EBFetcher_GreenEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEBEnvironmentsPage(context.Background(), mock, "")
+	result, err := unit.BindPage("eb")(awsclient.FetchEBEnvironmentsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchEBEnvironmentsPage: unexpected error: %v", err)
 	}
@@ -626,7 +627,7 @@ func TestPR03b_AMIFetcher_AvailableEmitsNoFinding(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+		return unit.BindPage("ami")(awsclient.FetchAMIsPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("FetchAMIs: unexpected error: %v", err)
@@ -661,7 +662,7 @@ func TestPR03b_AMIFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+		return unit.BindPage("ami")(awsclient.FetchAMIsPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("FetchAMIs: unexpected error: %v", err)
@@ -815,7 +816,7 @@ func TestPR03b_ENIFetcher_InUseEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchNetworkInterfacesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchNetworkInterfacesPage: unexpected error: %v", err)
 	}
@@ -847,7 +848,7 @@ func TestPR03b_ENIFetcher_AttachingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchNetworkInterfacesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchNetworkInterfacesPage: unexpected error: %v", err)
 	}
@@ -1048,7 +1049,7 @@ func TestPR03b_ENIFetcher_RequesterManagedSuppressesAvailableFinding(t *testing.
 		},
 	}
 
-	result, err := awsclient.FetchNetworkInterfacesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchNetworkInterfacesPage: unexpected error: %v", err)
 	}
@@ -1080,7 +1081,7 @@ func TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchNetworkInterfacesPage(context.Background(), mock, "")
+	result, err := unit.BindPage("eni")(awsclient.FetchNetworkInterfacesPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("FetchNetworkInterfacesPage: unexpected error: %v", err)
 	}
@@ -1138,7 +1139,7 @@ func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 				},
 			}
 
-			result, err := awsclient.FetchEBEnvironmentsPage(context.Background(), mock, "")
+			result, err := unit.BindPage("eb")(awsclient.FetchEBEnvironmentsPage(context.Background(), mock, ""))
 			if err != nil {
 				t.Fatalf("FetchEBEnvironmentsPage: unexpected error: %v", err)
 			}

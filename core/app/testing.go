@@ -7,6 +7,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
+// WriteLockedForTest reports whether some goroutine holds the controller's
+// write lock, for a test that asks it from inside code the controller runs.
+func (c *Controller) WriteLockedForTest() bool {
+	if c.mu.TryRLock() {
+		c.mu.RUnlock()
+		return false
+	}
+	return true
+}
+
 // ApplyResourcesLoaded is a test-support seam that seeds the controller's
 // resource cache directly, bypassing the task-result lane. It mirrors the
 // task-result handler that runs when resources are fetched via the normal

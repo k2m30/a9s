@@ -162,14 +162,14 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	// bookmark encryption all live on the security configuration a job either
 	// names or does not, so a job naming none fails all three at once.
 	if aws.ToString(job.SecurityConfiguration) == "" {
-		addWave1Finding("glue", r, CodeGlueNoSecurityConfiguration)
+		addWave1Finding(r, CodeGlueNoSecurityConfiguration)
 	}
 
 	// The flag is a string, so "false" is off exactly as surely as absent.
 	// Glue 5.0 streams Spark executor output without it, so the argument is
 	// only something to add on 4.0 and earlier.
 	if glueVersionBefore5(aws.ToString(job.GlueVersion)) && job.DefaultArguments[glueContinuousLogArgument] != "true" {
-		addWave1Finding("glue", r, CodeGlueContinuousLoggingOff)
+		addWave1Finding(r, CodeGlueContinuousLoggingOff)
 		addWave1Rows(r, CodeGlueContinuousLoggingOff, domain.DetailRow{
 			Label: "Argument to add", Value: glueContinuousLogArgument, Tier: "~",
 		})
@@ -182,5 +182,5 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	for k, v := range job.DefaultArguments {
 		args[strings.TrimPrefix(k, "--")] = v
 	}
-	addSecretScanFinding("glue", r, CodeGlueArgumentSecret, args)
+	addSecretScanFinding(r, CodeGlueArgumentSecret, args)
 }

@@ -75,7 +75,7 @@ func w2DBIInstance(id string) rdstypes.DBInstance {
 
 func w2DBIFetch(t *testing.T, now time.Time, instances ...rdstypes.DBInstance) map[string]resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchRDSInstancesPageAt(context.Background(), &w2RDSInstancesFake{instances: instances}, "", now)
+	out, err := BindPage("dbi")(awsclient.FetchRDSInstancesPageAt(context.Background(), &w2RDSInstancesFake{instances: instances}, "", now))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPageAt: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestW2DBIDeletingInstanceEmitsNoWave2Finding(t *testing.T) {
 	deleting.Engine = aws.String("mysql")
 	deleting.EngineVersion = aws.String("5.7.44")
 
-	out, err := awsclient.FetchRDSInstancesPageAt(context.Background(), &w2RDSInstancesFake{instances: []rdstypes.DBInstance{deleting}}, "", w2DBINow)
+	out, err := BindPage("dbi")(awsclient.FetchRDSInstancesPageAt(context.Background(), &w2RDSInstancesFake{instances: []rdstypes.DBInstance{deleting}}, "", w2DBINow))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPageAt: %v", err)
 	}

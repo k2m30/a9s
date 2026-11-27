@@ -70,7 +70,7 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 
 		findings := withState("elb", state, nil)
 
-		r := withWave1("elb", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   lbName,
 			Name: lbName,
 			Fields: map[string]string{

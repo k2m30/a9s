@@ -147,9 +147,7 @@ func FetchOpenSearchDomainsAt(
 				ans.rows = append(ans.rows, openSearchDomainRow(domain, now))
 			}
 		}
-		rows, batchFailures := keepListed("DescribeDomains", batch, listedNameIsID, ans, err, func(name string, err error) resource.Resource {
-			return DegradedDetails("opensearch", name, err)
-		})
+		rows, batchFailures := keepListed("DescribeDomains", batch, listedNameIsID, ans, err, degradedRow)
 		resources = append(resources, rows...)
 		failures = append(failures, batchFailures...)
 	}
@@ -204,7 +202,7 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 	enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
 	nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
 
-	r := withWave1("opensearch", resource.Resource{
+	r := withWave1(resource.Resource{
 		ID:   domainName,
 		Name: domainName,
 		Fields: map[string]string{

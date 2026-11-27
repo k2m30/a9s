@@ -37,7 +37,7 @@ import (
 // fails the test.
 func fetchLTDemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), ""))
 	if err == nil || !strings.Contains(err.Error(), fixtures.WarnLTDeniedID) {
 		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnLTDeniedID, err)
 	}
@@ -284,7 +284,7 @@ func TestFetchLaunchTemplatesPage_UnencryptedNilSilent(t *testing.T) {
 			},
 		},
 	}
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -333,7 +333,7 @@ func TestFetchLaunchTemplatesPage_IMDSv1_EndpointDisabled_NoFinding(t *testing.T
 			},
 		},
 	}
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -366,7 +366,7 @@ func TestFetchLaunchTemplatesPage_MultiStackOrdered(t *testing.T) {
 // appended; the composite error names the id.
 
 func TestFetchLaunchTemplatesPage_DetailsDeniedRich(t *testing.T) {
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), ""))
 	if err == nil {
 		t.Fatal("expected a composite error naming the details-denied template, got nil")
 	}
@@ -426,7 +426,7 @@ func TestFetchLaunchTemplatesPage_ListDeniedIsError(t *testing.T) {
 			Message: "You are not authorized to perform ec2:DescribeLaunchTemplates",
 		},
 	}
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fake, ""))
 	if err == nil {
 		t.Fatal("FetchLaunchTemplatesPage must return a non-nil error when DescribeLaunchTemplates is denied — never an empty successful result")
 	}
@@ -480,7 +480,7 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 			"lt-partial-missing": &smithy.GenericAPIError{Code: "InternalError", Message: "internal error"},
 		},
 	}
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fake, ""))
 	if err == nil {
 		t.Fatal("FetchLaunchTemplatesPage must return a composite error when DescribeLaunchTemplateVersions fails for some templates")
 	}
@@ -567,7 +567,7 @@ func TestFetchLaunchTemplatesPage_UsesDefaultVersionNotFirstListed(t *testing.T)
 			},
 		},
 	}
-	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	result, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -640,7 +640,7 @@ func TestFetchLaunchTemplatesPage_WaveThreeAntiTests(t *testing.T) {
 			},
 		},
 	}
-	single, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	single, err := BindPage("lt")(awsclient.FetchLaunchTemplatesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -658,7 +658,7 @@ func TestFetchLaunchTemplatesPage_WaveThreeAntiTests(t *testing.T) {
 // the actual shipped fixture graph rather than a synthetic stand-in.
 func ltAMICache(t *testing.T) resource.ResourceCache {
 	t.Helper()
-	result, err := awsclient.FetchAMIsPage(context.Background(), fakes.NewEC2(), "")
+	result, err := BindPage("ami")(awsclient.FetchAMIsPage(context.Background(), fakes.NewEC2(), ""))
 	if err != nil {
 		t.Fatalf("FetchAMIsPage: %v", err)
 	}

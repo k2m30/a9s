@@ -109,7 +109,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 
 	findings, issueRows := ngFindings(status, healthIssuesCount, issueCodes)
 
-	r := withWave1("ng", resource.Resource{
+	r := withWave1(resource.Resource{
 		ID:   ngRowID(ngClusterName, nodegroupName),
 		Name: nodegroupName,
 		Fields: map[string]string{
@@ -148,7 +148,7 @@ func ngRowID(clusterName, ngName string) string {
 // RawStruct, they survive the disk cache: without them a warm row makes
 // ng→eks, ng→ec2 and ng→ebs answer a confident zero instead of "not read".
 func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource {
-	r := DegradedDetails("ng", ngRowID(clusterName, ngName), err)
+	r := degradedRow(ngRowID(clusterName, ngName), err)
 	// DegradedDetails names the row after its id; a node group displays under
 	// the bare name, exactly as a full row does.
 	r.Name = ngName

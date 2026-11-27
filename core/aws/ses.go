@@ -43,7 +43,7 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 
 		findings := sesIdentityFindings(identity)
 
-		r := withWave1("ses", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   identityName,
 			Name: identityName,
 			Fields: map[string]string{

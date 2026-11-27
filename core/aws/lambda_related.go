@@ -6,6 +6,7 @@ package aws
 import (
 	"cmp"
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -309,27 +310,34 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	var reads rowReads
 	ruleList, capped := fanOut(ruleList)
 	truncated = truncated || capped
+	fetch := resource.GetPaginatedChildFetcher("eb_rule_targets")
 	for _, ruleRes := range ruleList {
-		parentCtx := map[string]string{
+		parentCtx := resource.ParentContext{
 			"rule_name": ruleRes.Fields["name"],
 			"event_bus": ruleRes.Fields["event_bus"],
 		}
-		targets, err := FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, "")
+		targets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]resource.Resource, *string, error) {
+			page, err := fetch(ctx, c, parentCtx, aws.ToString(token))
+			if err != nil {
+				return nil, nil, err
+			}
+			if page.Pagination == nil || page.Pagination.NextToken == "" {
+				return page.Resources, nil, nil
+			}
+			return page.Resources, &page.Pagination.NextToken, nil
+		})
+		if slices.ContainsFunc(targets, func(tgt resource.Resource) bool {
+			arn := tgt.Fields["target_arn"]
+			return arn != "" && lambdaRefNamesFunction(arn, res.ID, rc)
+		}) {
+			idSet[ruleRes.ID] = struct{}{}
+		}
 		if err != nil {
 			reads.fail(ruleRes.ID, err)
 			continue
 		}
 		reads.read++
-		for _, tgt := range targets.Resources {
-			arn := tgt.Fields["target_arn"]
-			if arn == "" {
-				continue
-			}
-			if lambdaRefNamesFunction(arn, res.ID, rc) {
-				idSet[ruleRes.ID] = struct{}{}
-				break
-			}
-		}
+		truncated = truncated || !complete
 	}
 	ids := make([]string, 0, len(idSet))
 	for id := range idSet {

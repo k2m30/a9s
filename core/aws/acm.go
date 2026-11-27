@@ -136,7 +136,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 
 		keyAlgorithm := acmKeyAlgorithmWords(string(cert.KeyAlgorithm))
 
-		r := withWave1("acm", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   id,
 			Name: domainName,
 			Fields: map[string]string{

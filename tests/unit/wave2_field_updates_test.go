@@ -38,9 +38,12 @@ import (
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // tgHealthFakeW2 implements ELBv2API for target-group health testing.
@@ -847,7 +850,7 @@ func TestEC2_HealthColumnReadsInstanceStatus(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchEC2InstancesPage(context.Background(), fake, "")
+	result, err := BindPage("ec2")(awsclient.FetchEC2InstancesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1004,7 +1007,7 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchDocDBClustersPage(context.Background(), fake, "")
+	result, err := BindPage("dbc")(awsclient.FetchDocDBClustersPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1095,9 +1098,8 @@ func TestFetchSecrets_WritesStatus(t *testing.T) {
 	}
 }
 
-// ssmFake implements SSMDescribeParametersAPI for risk test.
 type ssmFake struct {
-	awsclient.SSMDescribeParametersAPI
+	awsclient.SSMAPI
 	params []ssmtypes.ParameterMetadata
 }
 
@@ -1109,34 +1111,67 @@ func (f *ssmFake) DescribeParameters(
 	return &ssm.DescribeParametersOutput{Parameters: f.params}, nil
 }
 
-// TestFetchSSM_WritesRisk verifies that FetchSSMParametersPage sets
-// Fields["risk"] == "stale" for a SecureString parameter whose LastModifiedDate
-// is more than 365 days ago.
-func TestFetchSSM_WritesRisk(t *testing.T) {
-	staleDate := time.Now().Add(-400 * 24 * time.Hour) // 400 days ago
-	fake := &ssmFake{
-		params: []ssmtypes.ParameterMetadata{
-			{
-				Name:             aws.String("/prod/db-password"),
-				Type:             ssmtypes.ParameterTypeSecureString,
-				LastModifiedDate: &staleDate,
-			},
-		},
+// A SecureString's value is encrypted with KMS, so a credential's name on one
+// is no plaintext exposure; a String's value is stored as plain text. Each
+// ssm fact is stated once, by its finding.
+func TestFetchSSM_StatusCellShowsStaleAndPlaintextFindings(t *testing.T) {
+	stale := time.Now().Add(-400 * 24 * time.Hour)
+	fresh := time.Now().Add(-10 * 24 * time.Hour)
+	fake := &ssmFake{params: []ssmtypes.ParameterMetadata{
+		{Name: aws.String("/acme/prod/app/feature-flags"), Type: ssmtypes.ParameterTypeSecureString, LastModifiedDate: &stale, Version: 3},
+		{Name: aws.String("/acme/prod/db/password"), Type: ssmtypes.ParameterTypeString, LastModifiedDate: &fresh, Version: 1},
+		{Name: aws.String("/acme/prod/db/admin-password"), Type: ssmtypes.ParameterTypeSecureString, LastModifiedDate: &fresh, Version: 2},
+		{Name: aws.String("/acme/prod/app/region"), Type: ssmtypes.ParameterTypeString, LastModifiedDate: &fresh, Version: 1},
+	}}
+	td := resource.FindResourceType("ssm")
+	if td == nil || td.Fetcher == nil {
+		t.Fatal("ssm has no bound Fetcher")
 	}
-
-	result, err := awsclient.FetchSSMParametersPage(context.Background(), fake, "")
+	page, err := td.Fetcher(context.Background(), &awsclient.ServiceClients{SSM: fake}, "")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("ssm fetcher: %v", err)
+	}
+	rows := map[string]resource.Resource{}
+	for _, r := range page.Resources {
+		rows[r.ID] = r
+		if v, ok := r.Fields["risk"]; ok {
+			t.Errorf("%s carries a risk field %q", r.ID, v)
+		}
 	}
 
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	sess := session.New()
+	sess.Profile = "example-readonly"
+	sess.Region = "us-east-1"
+	c := newBlessedController(t, runtime.New(sess, nil))
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ssm"})
+	c.ApplyResourcesLoaded("ssm", page.Resources, nil, false)
+	body := c.Snapshot().Body.List
+	if body == nil || body.StatusCol < 0 {
+		t.Fatal("ssm list has no Status column")
+	}
+	cells := map[string]string{}
+	for _, row := range body.Rows {
+		cells[row.ResourceID] = row.Cells[body.StatusCol]
 	}
 
-	r := result.Resources[0]
-	risk := r.Fields["risk"]
-	if risk != "stale" {
-		t.Errorf("ssm risk = %q, want %q — coder must compute a stale risk for SecureString parameters not modified in >365 days", risk, "stale")
+	for id, code := range map[string]domain.FindingCode{
+		"/acme/prod/app/feature-flags": "ssm.value.stale",
+		"/acme/prod/db/password":       "ssm.value.plaintext-sensitive",
+	} {
+		fs := rows[id].Findings
+		if len(fs) != 1 || fs[0].Code != code || fs[0].Phrase == "" {
+			t.Errorf("%s: findings %v, want %s alone", id, fs, code)
+			continue
+		}
+		if cells[id] != fs[0].Phrase {
+			t.Errorf("%s: Status cell %q, want %q", id, cells[id], fs[0].Phrase)
+		}
+	}
+	for _, id := range []string{"/acme/prod/db/admin-password", "/acme/prod/app/region"} {
+		if len(rows[id].Findings) != 0 || cells[id] != "" {
+			t.Errorf("%s: findings %v, Status cell %q; want none and blank", id, rows[id].Findings, cells[id])
+		}
 	}
 }
 
@@ -1171,7 +1206,7 @@ func TestFetchACM_WritesDaysLeft(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchACMCertificatesPage(context.Background(), fake, "")
+	result, err := BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1223,7 +1258,7 @@ func TestFetchAMI_WritesDeprecated(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAMIsPage(context.Background(), fake, "")
+	result, err := BindPage("ami")(awsclient.FetchAMIsPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

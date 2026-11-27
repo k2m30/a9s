@@ -127,7 +127,7 @@ func TestOpenSearchColor(t *testing.T) {
 					DomainStatusList: []ostypes.DomainStatus{d},
 				},
 			}
-			resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+			resources, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock))
 			if err != nil {
 				t.Fatalf("FetchOpenSearchDomains: %v", err)
 			}

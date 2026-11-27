@@ -136,6 +136,11 @@ const (
 	// outlives; every other task names a definition the fixture registers.
 	ECSTaskDefinitionUnreadable = "0a1b2c3d4e5f60010001000100010007"
 
+	// ECSTaskStoppedUnhealthy is the task the service scheduler replaced after it
+	// failed its container health check. AWS keeps the last health status on a
+	// stopped task, and the row shows the stop alone.
+	ECSTaskStoppedUnhealthy = "0a1b2c3d4e5f60010001000100010008"
+
 	ecsDeniedTaskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/legacy-collector:1"
 )
 
@@ -703,6 +708,23 @@ func buildECSTasks() []ecstypes.Task {
 			StoppedAt:         aws.Time(mustTime("2026-03-19T11:15:00Z")),
 			StoppedReason:     aws.String("Your Spot Task was interrupted"),
 			StopCode:          ecstypes.TaskStopCodeSpotInterruption,
+			AvailabilityZone:  aws.String("us-east-1c"),
+		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/" + ECSTaskStoppedUnhealthy),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("STOPPED"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/log-aggregator:7"),
+			LaunchType:        ecstypes.LaunchTypeEc2,
+			Cpu:               aws.String("512"),
+			Memory:            aws.String("1024"),
+			Group:             aws.String("service:log-aggregator"),
+			StartedAt:         aws.Time(mustTime("2026-03-18T06:00:00Z")),
+			StoppedAt:         aws.Time(mustTime("2026-03-18T09:40:00Z")),
+			StoppedReason:     aws.String("Task failed container health checks"),
+			StopCode:          ecstypes.TaskStopCodeServiceSchedulerInitiated,
+			HealthStatus:      ecstypes.HealthStatusUnhealthy,
 			AvailabilityZone:  aws.String("us-east-1c"),
 		},
 		// Issue: lastStatus=STOPPED, StopCode=TaskFailedToStart → Broken
@@ -1290,5 +1312,5 @@ const ECSTaskDeletedID = "a3b8c9d0e1f2a8b9c0d1e2f3"
 func init() {
 	Register(Pin{ShortName: "ecs", Rows: 8, Issues: 5, CoverageGaps: []string{"dim", "ecs.warn.details_denied"}})
 	Register(Pin{ShortName: "ecs-svc", Rows: 28, Issues: 8, CoverageGaps: []string{"dim", "ecs-svc.warn.details_denied"}})
-	Register(Pin{ShortName: "ecs-task", Rows: 21, Issues: 9, CoverageGaps: []string{"ecs-task.warn.details_denied"}})
+	Register(Pin{ShortName: "ecs-task", Rows: 22, Issues: 9, CoverageGaps: []string{"ecs-task.warn.details_denied"}})
 }

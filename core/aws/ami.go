@@ -167,7 +167,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 	if img.Public != nil && *img.Public {
 		posture = append(posture, wave1Finding(CodeAMIPublic))
 	}
-	emitWave1("ami", &r, withState("ami", state, posture)...)
+	r = withWave1(r, withState("ami", state, posture)...)
 	if hasFinding(r.Findings, CodeAMIPublic) {
 		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "yes", Tier: "!"})
 	}

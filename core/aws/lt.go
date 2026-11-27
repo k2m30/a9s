@@ -100,10 +100,10 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 				return nil, UnusableAnswerErr{Call: "DescribeLaunchTemplateVersions", Field: "default version"}
 			}
 			ver := out.LaunchTemplateVersions[0]
-			r := ltResource(tpl, ver, nil)
+			r := ltResource(tpl, ver)
 			return &r, nil
 		}, func(err error) resource.Resource {
-			return ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", err)})
+			return markDegraded(ltResource(tpl, ec2types.LaunchTemplateVersion{}), err)
 		})
 		resources = append(resources, rows...)
 	}
@@ -119,17 +119,15 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 	}, tally.err("lt: DescribeLaunchTemplateVersions")
 }
 
-// ltResource constructs a Resource from the list LaunchTemplate, its
-// "$Default" LaunchTemplateVersion, and the caller-computed findings — the
-// healthy path passes none, since its findings all come from Wave 2; the
-// degraded path passes the shared details-denied finding alongside a
-// zero-value ver. RawStruct is *LTRaw for both.
-func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion, findings []domain.Finding) resource.Resource {
+// ltResource constructs a Resource from the list LaunchTemplate and its
+// "$Default" LaunchTemplateVersion; the degraded path passes a zero-value
+// ver. Its findings all come from Wave 2.
+func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion) resource.Resource {
 	id := aws.ToString(tpl.LaunchTemplateId)
 	name := aws.ToString(tpl.LaunchTemplateName)
 
 	raw := &LTRaw{Template: tpl, DefaultVersion: ver}
-	return withWave1("lt", resource.Resource{
+	return resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{
@@ -140,7 +138,7 @@ func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion,
 			"created":         ltFormatTime(tpl.CreateTime),
 		},
 		RawStruct: raw,
-	}, findings...)
+	}
 }
 
 // ltFormatTime formats *time.Time as the house "Created" column format

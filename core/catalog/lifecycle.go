@@ -184,6 +184,21 @@ func Declares(shortName string, code domain.FindingCode) bool {
 	return ok
 }
 
+// Judge is the rule both emit doors apply to a finding raised on a row of the
+// type shortName: AppliesToRow, for a code the type declares. A code an
+// installed type does not declare has no rule to stand by, so raising it is a
+// defect in the code that raised it and Judge panics. A type the catalog does
+// not hold declares nothing to judge by.
+func Judge(shortName string, code domain.FindingCode, r domain.Resource) bool {
+	name := strings.ToLower(shortName)
+	if _, installed := rowTypes[name]; installed {
+		if _, declared := decls[declKey{name, code}]; !declared {
+			panic("catalog: " + shortName + " raises " + string(code) + ", which it does not declare")
+		}
+	}
+	return AppliesToRow(shortName, code, r)
+}
+
 // AppliesToRow is Applies for a row of the type shortName, in the lifecycle
 // its status field holds. The state finding that value raises stands whatever
 // the class, since it is the lifecycle value itself; a code the type does not

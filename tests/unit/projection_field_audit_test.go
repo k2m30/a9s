@@ -16,6 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/projection"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ func loadEC2Resources(t *testing.T) []domain.Resource {
 	t.Helper()
 	clients := demo.NewServiceClients()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
+		return unit.BindPage("ec2")(awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token))
 	})
 	if err != nil {
 		t.Fatalf("FetchEC2InstancesPage: %v", err)
@@ -234,7 +235,7 @@ func collectTagItems(sections []domain.Section) []domain.Item {
 func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 	clients := demo.NewServiceClients()
 	roles, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchIAMRolesPage(context.Background(), clients.IAM, token)
+		return unit.BindPage("role")(awsclient.FetchIAMRolesPage(context.Background(), clients.IAM, token))
 	})
 	if err != nil {
 		t.Fatalf("FetchIAMRoles: %v", err)

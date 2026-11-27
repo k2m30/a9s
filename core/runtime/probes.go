@@ -1027,7 +1027,7 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	}
 
 	result, err := e.Fn(probeCtx, clients, resources, cacheSnap)
-	keepApplicable(shortName, resources, &result)
+	keepApplicable(resources, &result)
 	if !answeredNobody(result, err) {
 		writeDeclaredFields(shortName, resources, &result)
 	}
@@ -1080,11 +1080,14 @@ func writeDeclaredFields(shortName string, handed []resource.Resource, result *a
 }
 
 // keepApplicable is the Wave 2 emit door: of the findings an enricher raised
-// on a row it was handed, only those catalog.AppliesToRow allows for the row's
-// lifecycle and kind reach the session. An account-wide answer keyed by an ID
-// outside handed passes unjudged.
-func keepApplicable(shortName string, handed []resource.Resource, result *awsclient.IssueEnricherResult) {
+// on a row it was handed, only those catalog.Judge allows for the
+// lifecycle and kind of the row, under the row's own type, reach the session.
+// An account-wide answer keyed by an ID outside handed passes unjudged.
+func keepApplicable(handed []resource.Resource, result *awsclient.IssueEnricherResult) {
 	for _, r := range handed {
+		if r.Type == "" {
+			panic(fmt.Sprintf("keepApplicable: row %q carries no type", r.ID))
+		}
 		fs, ok := result.Findings[r.ID]
 		if !ok {
 			continue
@@ -1092,7 +1095,7 @@ func keepApplicable(shortName string, handed []resource.Resource, result *awscli
 		details := result.AttentionDetails[r.ID]
 		kept := make([]domain.Finding, 0, len(fs))
 		for _, f := range fs {
-			if !catalog.AppliesToRow(shortName, f.Code, r) || !keepApplicableRows(shortName, f.Code, r, details) {
+			if !catalog.Judge(r.Type, f.Code, r) || !keepApplicableRows(f.Code, r, details) {
 				delete(details, f.Code)
 				continue
 			}
@@ -1105,14 +1108,14 @@ func keepApplicable(shortName string, handed []resource.Resource, result *awscli
 // keepApplicableRows reports false for a finding that came with supporting
 // rows when its declaration excludes every one of them for r's kind: the
 // finding has nothing left to say there.
-func keepApplicableRows(shortName string, code domain.FindingCode, r resource.Resource, details map[domain.FindingCode]domain.AttentionDetail) bool {
+func keepApplicableRows(code domain.FindingCode, r resource.Resource, details map[domain.FindingCode]domain.AttentionDetail) bool {
 	ad, ok := details[code]
 	if !ok || len(ad.Rows) == 0 {
 		return true
 	}
 	rows := make([]domain.DetailRow, 0, len(ad.Rows))
 	for _, row := range ad.Rows {
-		if catalog.RowApplies(shortName, code, row.Label, r) {
+		if catalog.RowApplies(r.Type, code, row.Label, r) {
 			rows = append(rows, row)
 		}
 	}

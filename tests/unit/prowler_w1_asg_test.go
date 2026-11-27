@@ -141,7 +141,7 @@ func pw1LaunchConfig(name string) asgtypes.LaunchConfiguration {
 
 func pw1FetchASGs(t *testing.T, groups ...asgtypes.AutoScalingGroup) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), &pw1ASGListFake{groups: groups}, "")
+	out, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), &pw1ASGListFake{groups: groups}, ""))
 	if err != nil {
 		t.Fatalf("FetchAutoScalingGroupsPage: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestASG_LaunchConfigurationErrorMarksTheAffectedGroups(t *testing.T) {
 // TestASG_DemoBench_EachSignalHasExactlyOneWitness pins the demo fixture
 // contract for the six asg signals.
 func TestASG_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
-	out, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), fakes.NewASG(), "")
+	out, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), fakes.NewASG(), ""))
 	if err != nil {
 		t.Fatalf("FetchAutoScalingGroupsPage(demo): %v", err)
 	}

@@ -15,6 +15,4 @@ const (
 	riskAdminPolicy      = "admin policy"
 	riskPrivEsc          = "privilege escalation"
 	riskUnattached       = "unattached"
-	riskStaleValue       = "stale"
-	riskPlaintextValue   = "plaintext"
 )

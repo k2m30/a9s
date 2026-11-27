@@ -29,9 +29,9 @@ func navigateToDBIList(m tui.Model) tui.Model {
 // resources for use as simulated fetch results in rerun/overlap tests.
 func rerunDBIResources() []resource.Resource {
 	return []resource.Resource{
-		{ID: "db-prod-1", Name: "db-prod-1", Fields: map[string]string{"db_instance_id": "db-prod-1", "status": "available"}},
-		{ID: "db-prod-2", Name: "db-prod-2", Fields: map[string]string{"db_instance_id": "db-prod-2", "status": "available"}},
-		{ID: "db-staging-1", Name: "db-staging-1", Fields: map[string]string{"db_instance_id": "db-staging-1", "status": "available"}},
+		{ID: "db-prod-1", Type: "dbi", Name: "db-prod-1", Fields: map[string]string{"db_instance_id": "db-prod-1", "status": "available"}},
+		{ID: "db-prod-2", Type: "dbi", Name: "db-prod-2", Fields: map[string]string{"db_instance_id": "db-prod-2", "status": "available"}},
+		{ID: "db-staging-1", Type: "dbi", Name: "db-staging-1", Fields: map[string]string{"db_instance_id": "db-staging-1", "status": "available"}},
 	}
 }
 

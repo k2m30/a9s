@@ -108,7 +108,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 
 		findings := withState("vpc", state, nil)
 
-		r := withWave1("vpc", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   vpcID,
 			Name: name,
 			Fields: map[string]string{

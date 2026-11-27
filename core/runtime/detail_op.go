@@ -66,10 +66,9 @@ type DetailOperation struct {
 // core/app's beginDetailWorkloadLocked calls this under Controller.mu.
 func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, region string, refresh bool) (op DetailOperation, tasks []TaskRequest) {
 	id := c.session.DetailOpGen.Bump()
-	// Live fetchers (e.g. S3, CloudTrail events) may leave res.Type empty;
-	// the operation is the single identity downstream code (e.g. RunRelatedDef's
-	// ct-events lazy-add exemption) trusts, so it must carry a real type even
-	// when the caller's own resource value doesn't.
+	// A row built outside the catalog's bound functions carries no type; the
+	// operation is the identity downstream code trusts, so it takes the type
+	// the detail was opened under.
 	if res.Type == "" {
 		res.Type = resourceType
 	}

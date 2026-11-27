@@ -114,6 +114,6 @@ func addECRPostureFindings(r *resource.Resource, repo ecrtypes.Repository) {
 	// as "anything that is not IMMUTABLE".
 	switch repo.ImageTagMutability {
 	case ecrtypes.ImageTagMutabilityMutable, ecrtypes.ImageTagMutabilityMutableWithExclusion:
-		addWave1Finding("ecr", r, CodeECRMutableTags)
+		addWave1Finding(r, CodeECRMutableTags)
 	}
 }

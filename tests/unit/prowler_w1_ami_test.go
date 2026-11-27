@@ -58,7 +58,7 @@ func pw1Image(id string, public *bool) ec2types.Image {
 
 func pw1FetchAMIs(t *testing.T, fake *pw1AMIFake) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchAMIsPage(context.Background(), fake, "")
+	out, err := BindPage("ami")(awsclient.FetchAMIsPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchAMIsPage: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestAMI_Public_CoexistsWithLifecycleFinding(t *testing.T) {
 // TestAMI_DemoBench_OnlyWitnessIsPublic pins that the demo bench shows exactly
 // one public AMI, the named fixture row.
 func TestAMI_DemoBench_OnlyWitnessIsPublic(t *testing.T) {
-	out, err := awsclient.FetchAMIsPage(context.Background(), fakes.NewEC2(), "")
+	out, err := BindPage("ami")(awsclient.FetchAMIsPage(context.Background(), fakes.NewEC2(), ""))
 	if err != nil {
 		t.Fatalf("FetchAMIsPage(demo): %v", err)
 	}

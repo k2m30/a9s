@@ -70,7 +70,7 @@ func w6bGlueJob(name string) gluetypes.Job {
 
 func w6bFetchGlue(t *testing.T, jobs ...gluetypes.Job) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchGlueJobsPage(context.Background(), &w6bGlueFake{jobs: jobs}, "")
+	out, err := BindPage("glue")(awsclient.FetchGlueJobsPage(context.Background(), &w6bGlueFake{jobs: jobs}, ""))
 	if err != nil {
 		t.Fatalf("FetchGlueJobsPage: %v", err)
 	}

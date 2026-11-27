@@ -286,7 +286,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 			}
 		}
 
-		r := withWave1("sg", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   groupID,
 			Name: groupName,
 			Fields: map[string]string{

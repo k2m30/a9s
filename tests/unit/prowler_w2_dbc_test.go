@@ -94,7 +94,7 @@ func w2AuroraCluster(id string) rdstypes.DBCluster {
 
 func w2DocDBFetch(t *testing.T, clusters ...docdbtypes.DBCluster) map[string]resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchDocDBClustersPage(context.Background(), &w2DocDBClustersFake{clusters: clusters}, "")
+	out, err := BindPage("dbc")(awsclient.FetchDocDBClustersPage(context.Background(), &w2DocDBClustersFake{clusters: clusters}, ""))
 	if err != nil {
 		t.Fatalf("FetchDocDBClustersPage: %v", err)
 	}
@@ -103,7 +103,7 @@ func w2DocDBFetch(t *testing.T, clusters ...docdbtypes.DBCluster) map[string]res
 
 func w2AuroraFetch(t *testing.T, clusters ...rdstypes.DBCluster) map[string]resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchRDSDBClustersPage(context.Background(), &w2RDSClustersFake{clusters: clusters}, "")
+	out, err := BindPage("dbc")(awsclient.FetchRDSDBClustersPage(context.Background(), &w2RDSClustersFake{clusters: clusters}, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSDBClustersPage: %v", err)
 	}

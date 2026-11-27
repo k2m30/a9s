@@ -55,7 +55,7 @@ func w2EFSFileSystem(id, name string) efstypes.FileSystemDescription {
 
 func w2EFSFetch(t *testing.T, fss ...efstypes.FileSystemDescription) map[string]resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchEFSFileSystemsPage(context.Background(), &w2EFSListFake{fileSystems: fss}, "")
+	out, err := BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), &w2EFSListFake{fileSystems: fss}, ""))
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystemsPage: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestW2EFSDeletingFileSystemEmitsNoWave2Finding(t *testing.T) {
 	deleting := w2EFSFileSystem("fs-0acme00000000009", "acme-old")
 	deleting.LifeCycleState = efstypes.LifeCycleStateDeleting
 
-	out, err := awsclient.FetchEFSFileSystemsPage(context.Background(), &w2EFSListFake{fileSystems: []efstypes.FileSystemDescription{deleting}}, "")
+	out, err := BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), &w2EFSListFake{fileSystems: []efstypes.FileSystemDescription{deleting}}, ""))
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystemsPage: %v", err)
 	}

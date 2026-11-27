@@ -48,7 +48,7 @@ func TestT1aDev_StateWitnessesAfterTheSweep(t *testing.T) {
 		"redshift":   {36, 30},
 		"vpc":        {9, 2},
 		"opensearch": {15, 12},
-		"ecs-task":   {21, 11},
+		"ecs-task":   {22, 11},
 	} {
 		got, ok := counts[short]
 		if !ok {

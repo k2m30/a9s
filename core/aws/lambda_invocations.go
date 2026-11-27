@@ -357,7 +357,7 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 		name = name[:8]
 	}
 
-	return withWave1("lambda_invocations", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   report.requestID,
 		Name: name,
 		Fields: map[string]string{

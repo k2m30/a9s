@@ -65,7 +65,7 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+		return BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -145,7 +145,7 @@ func TestFetchAutoScalingGroups_ErrorResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+		return BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token))
 	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
@@ -163,7 +163,7 @@ func TestFetchAutoScalingGroups_EmptyResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+		return BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -193,7 +193,7 @@ func TestFetchAutoScalingGroupsPage_PopulatesInstancesUnhealthyCount(t *testing.
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestFetchAutoScalingGroupsPage_PopulatesInServiceCount(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestFetchAutoScalingGroupsPage_PopulatesSuspendedProcesses(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestFetchAutoScalingGroupsPage_ZeroInstances(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestFetchAutoScalingGroupsPage_NoSuspendedProcesses(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	result, err := BindPage("asg")(awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, ""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

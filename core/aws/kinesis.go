@@ -53,7 +53,7 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 
 		findings := withState("kinesis", rawStatus, nil)
 
-		r := withWave1("kinesis", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   streamName,
 			Name: streamName,
 			Fields: map[string]string{

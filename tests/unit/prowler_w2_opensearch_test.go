@@ -83,7 +83,7 @@ func w2OSDomain(name string) ostypes.DomainStatus {
 func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource.Resource, awsclient.IssueEnricherResult) {
 	t.Helper()
 	fake := &w2OSFake{domains: domains}
-	rs, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), fake, fake, w2OSNow)
+	rs, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomainsAt(context.Background(), fake, fake, w2OSNow))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomainsAt: %v", err)
 	}

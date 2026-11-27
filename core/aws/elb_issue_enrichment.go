@@ -258,7 +258,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if r.ID == "" || lbARN == "" {
 			return
 		}
-		listeners, err := allELBListeners(ctx, clients.ELBv2, lbARN)
+		listeners, err := allELBListeners(ctx, clients, lbARN)
 		var protocols map[string][]string
 		var policiesErr error
 		if policiesAPI != nil && slices.ContainsFunc(listeners, func(l elbtypes.Listener) bool { return elbListenerSecurityPolicy(l) != "" }) {
@@ -318,9 +318,10 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 // pages, and a cleartext listener on the second page is as exposed as one on
 // the first; the walk is bounded by PerParentPageCap like every other
 // per-parent sweep.
-func allELBListeners(ctx context.Context, api ELBv2DescribeListenersAPI, lbARN string) ([]elbtypes.Listener, error) {
+func allELBListeners(ctx context.Context, clients *ServiceClients, lbARN string) ([]elbtypes.Listener, error) {
+	fetch := resource.GetPaginatedChildFetcher("elb_listeners")
 	listeners, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]elbtypes.Listener, *string, error) {
-		page, err := FetchELBListeners(ctx, api, map[string]string{"load_balancer_arn": lbARN}, aws.ToString(token))
+		page, err := fetch(ctx, clients, resource.ParentContext{"load_balancer_arn": lbARN}, aws.ToString(token))
 		if err != nil {
 			return nil, nil, err
 		}

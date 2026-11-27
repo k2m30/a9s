@@ -79,7 +79,7 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 			// be read, so the counts are unknown rather than empty.
 			r.Fields["scan_status"] = "?"
 			r.Fields["finding_counts"] = "?"
-			emitWave1("ecr_images", &r, wave1Finding(CodeECRImageScanUnread))
+			r = withWave1(r, wave1Finding(CodeECRImageScanUnread))
 		}
 		resources = append(resources, r)
 	}
@@ -246,7 +246,7 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 
 	status := computeImageStatus(img)
 
-	return withWave1("ecr_images", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   digest,
 		Name: name,
 		Fields: map[string]string{

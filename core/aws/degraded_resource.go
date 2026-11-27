@@ -15,13 +15,13 @@
 // (degradedAuthDenial — AccessDenied/AccessDeniedException, or EC2's
 // UnauthorizedOperation) is a "details denied" row; everything else — nil
 // error, throttling, cancellation, nil response body — is a "details
-// unavailable" row. degradedDetailsFinding is the one place that decides
-// which.
+// unavailable" row. markDegraded is the one place that decides which, and
+// binding the row is the one place that turns it into the type's finding.
 //
 // Every list-then-describe fetcher (N+1 or batch) MUST keep a row for every
 // listed name through keepListed (or describeTally.one), building the degraded
-// row with DegradedDetails or degradedDetailsFinding only in the function it
-// hands them, and declare both
+// row with degradedRow or markDegraded only in the function it hands them,
+// and declare both
 // DetailsDeniedFindingDef and DetailsUnavailableFindingDef on its catalog
 // literal, so the phrase, severity, and finding-code shape can never diverge
 // per type.
@@ -30,7 +30,7 @@ package aws
 import (
 	"errors"
 	"maps"
-	"strings"
+	"testing"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -51,23 +51,10 @@ func DetailsDeniedCode(shortName string) domain.FindingCode {
 	return domain.FindingCode(shortName + ".warn.details_denied")
 }
 
-// detailsDeniedFinding builds the shared details-denied Finding for shortName.
-func detailsDeniedFinding(shortName string) domain.Finding {
-	code := DetailsDeniedCode(shortName)
-	return wave1Finding(code)
-}
-
 // DetailsUnavailableCode returns the per-type FindingCode for the neutral
 // degraded row ("<shortName>.warn.details_unavailable").
 func DetailsUnavailableCode(shortName string) domain.FindingCode {
 	return domain.FindingCode(shortName + ".warn.details_unavailable")
-}
-
-// detailsUnavailableFinding builds the shared details-unavailable Finding
-// for shortName.
-func detailsUnavailableFinding(shortName string) domain.Finding {
-	code := DetailsUnavailableCode(shortName)
-	return wave1Finding(code)
 }
 
 // DegradedFindingField is where DegradedDetails records the code of the
@@ -90,24 +77,34 @@ func degradedAuthDenial(err error) bool {
 	return IsAccessDenied(err) || ErrCodeIs(err, "UnauthorizedOperation")
 }
 
-// degradedDetailsFinding classifies a per-item describe failure: an
-// authorization denial (degradedAuthDenial) renders the "details denied"
-// finding; everything else — nil error (absent from a batch response),
-// throttling, cancellation, a nil response body — renders the neutral
-// "details unavailable" finding. "You can't see it" (denied) and "it didn't
-// come back" (unavailable) are different facts and must never share one
-// phrase.
-func degradedDetailsFinding(shortName string, err error) domain.Finding {
+// The two causes a fetcher records in DegradedFindingField before its row is
+// bound. Each is the code of the type's degraded finding without the type's
+// prefix, so a bound field, which holds the whole code, is never one of them.
+const (
+	degradedCauseDenied      = "warn.details_denied"
+	degradedCauseUnavailable = "warn.details_unavailable"
+)
+
+// markDegraded records on r that the per-item describe behind it failed with
+// err (nil for a row absent from the response). An authorization denial
+// (degradedAuthDenial) is "details denied"; everything else — throttling,
+// cancellation, a nil response body — is the neutral "details unavailable".
+// "You can't see it" and "it didn't come back" are different facts and never
+// share one phrase. Binding the row turns the cause into the finding its type
+// declares for it.
+func markDegraded(r resource.Resource, err error) resource.Resource {
+	fields := make(map[string]string, len(r.Fields)+1)
+	maps.Copy(fields, r.Fields)
+	fields[DegradedFindingField] = degradedCauseUnavailable
 	if degradedAuthDenial(err) {
-		return detailsDeniedFinding(shortName)
+		fields[DegradedFindingField] = degradedCauseDenied
 	}
-	return detailsUnavailableFinding(shortName)
+	r.Fields = fields
+	return r
 }
 
-// DegradedDetails builds the name-only row an N+1 fetcher emits when the
-// per-item describe for id failed or came back empty. err is the describe
-// call's error (nil for an absent-from-response row); it decides whether the
-// row renders "details denied" or "details unavailable".
+// degradedRow is the name-only row an N+1 fetcher emits when the per-item
+// describe for id failed or came back empty.
 //
 // RawStruct stays nil on purpose. A synthetic struct carrying only the name
 // is assertable, so every pivot that reads a field off the struct would find
@@ -116,16 +113,36 @@ func degradedDetailsFinding(shortName string, err error) domain.Finding {
 // DegradedRowAnswer, which answers any zero on such a row Unknown. Identity a
 // pivot can legitimately use goes in Fields, which the disk cache preserves
 // and RawStruct does not.
+func degradedRow(id string, err error) resource.Resource {
+	return markDegraded(resource.Resource{ID: id, Name: id, Fields: map[string]string{"name": id}}, err)
+}
+
+// resolveDegraded turns the cause markDegraded recorded on a row of shortName
+// into that type's degraded finding, and records the finding's code in its
+// place. A row already resolved, or never marked, is left as it is.
+func resolveDegraded(shortName string, r *resource.Resource) {
+	cause := r.Fields[DegradedFindingField]
+	if cause != degradedCauseDenied && cause != degradedCauseUnavailable {
+		return
+	}
+	code := domain.FindingCode(shortName + "." + cause)
+	fields := maps.Clone(r.Fields)
+	fields[DegradedFindingField] = string(code)
+	r.Fields = fields
+	if !hasFinding(r.Findings, code) {
+		*r = withWave1(*r, wave1Finding(code))
+	}
+}
+
+// DegradedDetails is degradedRow as a row of shortName carries it once bound,
+// for a test that builds one directly.
 func DegradedDetails(shortName, id string, err error) resource.Resource {
-	finding := degradedDetailsFinding(shortName, err)
-	return withWave1(shortName, resource.Resource{
-		ID:   id,
-		Name: id,
-		Fields: map[string]string{
-			"name":               id,
-			DegradedFindingField: string(finding.Code),
-		},
-	}, []domain.Finding{finding}...)
+	if !testing.Testing() {
+		panic("DegradedDetails called outside a test binary")
+	}
+	r := degradedRow(id, err)
+	resolveDegraded(shortName, &r)
+	return r
 }
 
 type listedAnswer struct {
@@ -166,7 +183,7 @@ func keepListed(op string, names []string, idOf func(name string) string, ans li
 		if ans.gone[name] || IsNotFoundErr(err) || errors.Is(err, errNotInList) {
 			continue
 		}
-		r := stampDegraded(degraded(name, err))
+		r := degraded(name, err)
 		rows = append(rows, r)
 		if err != nil {
 			failures = append(failures, FailedCall(r.ID, err))
@@ -181,24 +198,6 @@ func keepListed(op string, names []string, idOf func(name string) string, ans li
 		}
 	}
 	return rows, failures
-}
-
-// stampDegraded records on r the code of the degraded finding its builder
-// added, so every reader that keys on DegradedFindingField — the Wave-2
-// describedRow gate, DegradedRowAnswer, a row rebuilt from Fields — knows
-// the row whichever builder made it.
-func stampDegraded(r resource.Resource) resource.Resource {
-	for _, f := range r.Findings {
-		code := string(f.Code)
-		if strings.HasSuffix(code, ".warn.details_denied") || strings.HasSuffix(code, ".warn.details_unavailable") {
-			fields := make(map[string]string, len(r.Fields)+1)
-			maps.Copy(fields, r.Fields)
-			fields[DegradedFindingField] = code
-			r.Fields = fields
-			return r
-		}
-	}
-	return r
 }
 
 func listedNameIsID(name string) string { return name }

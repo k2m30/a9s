@@ -51,7 +51,7 @@ func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status stri
 	listStub := &ddbListStub{names: []string{name}}
 	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{name: table}}
 
-	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	result, err := BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, ""))
 	if err != nil {
 		t.Fatalf("FetchDynamoDBTablesPage error: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestDDB_Fetch_NilTable_SkipDoNotCrash(t *testing.T) {
 
 	// ghost-table stays as a name-only degraded row (a listed table never
 	// vanishes) and the failure aggregates into the composite error.
-	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	result, err := BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, ""))
 	if err == nil || !strings.Contains(err.Error(), "ghost-table") {
 		t.Fatalf("composite error must name ghost-table, got: %v", err)
 	}

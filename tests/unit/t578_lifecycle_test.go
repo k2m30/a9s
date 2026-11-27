@@ -247,7 +247,7 @@ var t578DBIPostureCodes = []domain.FindingCode{
 
 func t578FetchDBI(t *testing.T, db rdstypes.DBInstance) resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchRDSInstancesPage(context.Background(), &t578RDSFake{dbs: []rdstypes.DBInstance{db}}, "")
+	out, err := BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), &t578RDSFake{dbs: []rdstypes.DBInstance{db}}, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: %v", err)
 	}
@@ -313,12 +313,12 @@ func t1aExposedCluster(t *testing.T, lane, id, status string) resource.Resource 
 		c.engine = "docdb"
 		d := c.docdb()
 		d.DeletionProtection, d.StorageEncrypted = aws.Bool(false), aws.Bool(false)
-		res, err = awsclient.FetchDocDBClustersPage(context.Background(), t1aDocDBClusters{[]docdbtypes.DBCluster{d}}, "")
+		res, err = BindPage("dbc")(awsclient.FetchDocDBClustersPage(context.Background(), t1aDocDBClusters{[]docdbtypes.DBCluster{d}}, ""))
 	} else {
 		c.engine = "aurora-postgresql"
 		r := c.rds()
 		r.DeletionProtection, r.StorageEncrypted = aws.Bool(false), aws.Bool(false)
-		res, err = awsclient.FetchRDSDBClustersPage(context.Background(), t1aRDSClusters{[]rdstypes.DBCluster{r}}, "")
+		res, err = BindPage("dbc")(awsclient.FetchRDSDBClustersPage(context.Background(), t1aRDSClusters{[]rdstypes.DBCluster{r}}, ""))
 	}
 	if err != nil {
 		t.Fatalf("%s lane: %v", lane, err)
@@ -408,7 +408,7 @@ func t578RedshiftCluster(id, status string) redshifttypes.Cluster {
 
 func t578FetchRedshift(t *testing.T, fake *t578RedshiftFake) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchRedshiftClustersPage(context.Background(), fake, "")
+	out, err := BindPage("redshift")(awsclient.FetchRedshiftClustersPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchRedshiftClustersPage: %v", err)
 	}
@@ -603,7 +603,7 @@ func TestT578EB_EndedEnvironmentsSkipHealthAndLiveOnesAreAddressedByID(t *testin
 		causesByID:   map[string][]string{liveID: {liveCause}},
 		causesByName: map[string][]string{sharedName: {liveCause}, "acme-batch-old": {"None of the instances are sending data."}},
 	}
-	out, err := awsclient.FetchEBEnvironmentsPage(context.Background(), fake, "")
+	out, err := BindPage("eb")(awsclient.FetchEBEnvironmentsPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchEBEnvironmentsPage: %v", err)
 	}
@@ -680,7 +680,7 @@ func TestT578EFS_NoMountTargetsOnlyOnAvailable(t *testing.T) {
 	} {
 		t.Run(string(tc.state), func(t *testing.T) {
 			id := "fs-0t578" + string(tc.state)
-			out, err := awsclient.FetchEFSFileSystemsPage(context.Background(), &t578EFSFake{fss: []efstypes.FileSystemDescription{t578FileSystem(id, tc.state, 0)}}, "")
+			out, err := BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), &t578EFSFake{fss: []efstypes.FileSystemDescription{t578FileSystem(id, tc.state, 0)}}, ""))
 			if err != nil {
 				t.Fatalf("FetchEFSFileSystemsPage: %v", err)
 			}
@@ -694,7 +694,7 @@ func TestT578EFS_NoMountTargetsOnlyOnAvailable(t *testing.T) {
 	}
 
 	const id = "fs-0t578available"
-	out, err := awsclient.FetchEFSFileSystemsPage(context.Background(), &t578EFSFake{fss: []efstypes.FileSystemDescription{t578FileSystem(id, efstypes.LifeCycleStateAvailable, 0)}}, "")
+	out, err := BindPage("efs")(awsclient.FetchEFSFileSystemsPage(context.Background(), &t578EFSFake{fss: []efstypes.FileSystemDescription{t578FileSystem(id, efstypes.LifeCycleStateAvailable, 0)}}, ""))
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystemsPage: %v", err)
 	}

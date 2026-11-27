@@ -60,13 +60,13 @@ func TestFetchCBBuilds_Basic(t *testing.T) {
 		"project_name": "my-project",
 	}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -211,13 +211,13 @@ func TestFetchCBBuilds_EmptyProject(t *testing.T) {
 		"project_name": "empty-project",
 	}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -237,13 +237,13 @@ func TestFetchCBBuilds_EmptyPageWithNextToken(t *testing.T) {
 	}
 	batchMock := &mockCodeBuildBatchGetBuildsClient{}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		map[string]string{"project_name": "quiet-project"},
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -274,13 +274,13 @@ func TestFetchCBBuilds_ListError(t *testing.T) {
 		"project_name": "error-project",
 	}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -311,13 +311,13 @@ func TestFetchCBBuilds_BatchError(t *testing.T) {
 		"project_name": "batch-error-project",
 	}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -363,13 +363,13 @@ func TestFetchCBBuilds_Duration(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -415,13 +415,13 @@ func TestFetchCBBuilds_InProgressDuration(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -466,13 +466,13 @@ func TestFetchCBBuilds_SourceVersionShort(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -513,13 +513,13 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -608,13 +608,13 @@ func TestFetchCBBuilds_LogFields(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -662,13 +662,13 @@ func TestFetchCBBuilds_LogFieldsNil(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -719,13 +719,13 @@ func TestFetchCBBuilds_Pagination(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -750,13 +750,13 @@ func TestFetchCBBuilds_ParentContext(t *testing.T) {
 		"project_name": "specific-project-name",
 	}
 
-	_, err := awsclient.FetchCBBuilds(
+	_, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -791,13 +791,13 @@ func TestFetchCBBuilds_RawStruct(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	result, err := awsclient.FetchCBBuilds(
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
 		"",
-	)
+	))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -920,7 +920,7 @@ func TestFetchCBBuilds_ContinuationToken(t *testing.T) {
 		"project_name": "my-project",
 	}
 
-	result, err := awsclient.FetchCBBuilds(context.Background(), wrapper, batchMock, parentCtx, "my-continuation-token")
+	result, err := BindPage("cb_builds")(awsclient.FetchCBBuilds(context.Background(), wrapper, batchMock, parentCtx, "my-continuation-token"))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

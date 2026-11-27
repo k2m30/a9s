@@ -74,6 +74,9 @@ const (
 	ELBKeepsInvalidHeaders = "acme-dev-web"
 	// ELBPlainHTTP serves an HTTP listener that does not redirect to HTTPS.
 	ELBPlainHTTP = "auth-service-alb"
+	// ELBAccessLogsOff writes no access logs, although its HTTP listeners serve
+	// the requests an Application Load Balancer logs.
+	ELBAccessLogsOff = ELBPlainHTTP
 	// ELBPlainTCPListener is the network-load-balancer half of the same
 	// signal: a TCP listener on a port nothing encrypts by convention. Port
 	// 443 is NOT that port — a TCP listener there is TLS passthrough, and the
@@ -159,6 +162,10 @@ func buildWitnessAttributes(f *ELBFixtures) {
 	f.LoadBalancerAttributes[lbARNByName(f.LoadBalancers, ELBKeepsInvalidHeaders)] = []elbv2types.LoadBalancerAttribute{
 		{Key: aws.String("routing.http.desync_mitigation_mode"), Value: aws.String("defensive")},
 		{Key: aws.String("routing.http.drop_invalid_header_fields.enabled"), Value: aws.String("false")},
+	}
+	f.LoadBalancerAttributes[lbARNByName(f.LoadBalancers, ELBAccessLogsOff)] = []elbv2types.LoadBalancerAttribute{
+		{Key: aws.String("access_logs.s3.enabled"), Value: aws.String("false")},
+		{Key: aws.String("deletion_protection.enabled"), Value: aws.String("true")},
 	}
 }
 

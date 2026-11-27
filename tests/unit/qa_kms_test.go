@@ -77,7 +77,7 @@ func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, ""))
 	resources := result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -129,7 +129,7 @@ func TestFetchKMSKeys_ListKeysError(t *testing.T) {
 	describeKeyMock := &mockKMSDescribeKeyClient{}
 	listAliasesMock := &mockKMSListAliasesClient{}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, ""))
 	resources := result.Resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
@@ -148,7 +148,7 @@ func TestFetchKMSKeys_EmptyResponse(t *testing.T) {
 	describeKeyMock := &mockKMSDescribeKeyClient{}
 	listAliasesMock := &mockKMSListAliasesClient{}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, ""))
 	resources := result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -188,7 +188,7 @@ func TestFetchKMSKeys_NoAliasForKey(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, ""))
 	resources := result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -306,7 +306,7 @@ func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, ""))
 	resources := result.Resources
 	// FetchKMSKeysPage folds a per-key DescribeKey failure into a composite
 	// error via AggregateFailures — same never-silent-skip contract as the
@@ -347,7 +347,7 @@ func TestFetchKMSKeys_DescribeKeyAllFail(t *testing.T) {
 		output: &kms.ListAliasesOutput{Aliases: []kmstypes.AliasListEntry{}},
 	}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, ""))
 	resources := result.Resources
 	// FetchKMSKeysPage folds every DescribeKey failure into a composite
 	// error (AggregateFailures) rather than swallowing it — matching the

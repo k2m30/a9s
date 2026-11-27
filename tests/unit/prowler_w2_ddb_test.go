@@ -62,7 +62,7 @@ func w2DDBFetch(t *testing.T, tables ...*ddbtypes.TableDescription) map[string]r
 		fake.tables[n] = tb
 		fake.order = append(fake.order, n)
 	}
-	out, err := awsclient.FetchDynamoDBTablesPage(context.Background(), fake, fake, "")
+	out, err := BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), fake, fake, ""))
 	if err != nil {
 		t.Fatalf("FetchDynamoDBTablesPage: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestW2DDBDeletingTableEmitsNoWave2Finding(t *testing.T) {
 		tables: map[string]*ddbtypes.TableDescription{"acme-old": deleting},
 		order:  []string{"acme-old"},
 	}
-	out, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, listStub, "")
+	out, err := BindPage("ddb")(awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, listStub, ""))
 	if err != nil {
 		t.Fatalf("FetchDynamoDBTablesPage: %v", err)
 	}

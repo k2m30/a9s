@@ -11,7 +11,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -25,8 +27,8 @@ func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	finding := domain.Finding{
-		Code:     "s3-public-read",
-		Phrase:   "publicly readable",
+		Code:     "s3.public",
+		Phrase:   catalog.Phrase("s3.public"),
 		Severity: domain.SevBroken,
 		Source:   "wave2:s3",
 	}
@@ -74,8 +76,8 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	finding := domain.Finding{
-		Code:     "s3-public-read",
-		Phrase:   "publicly readable",
+		Code:     "s3.public",
+		Phrase:   catalog.Phrase("s3.public"),
 		Severity: domain.SevBroken,
 		// A Wave-2 finding absent from an incoming row is carried forward
 		// (carryWave2ForRows, the flicker guard); only a Wave-1 finding's absence
@@ -125,8 +127,8 @@ func TestCacheFirstSeen_ReappearingFindingFreshStamp(t *testing.T) {
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	finding := domain.Finding{
-		Code:     "s3-public-read",
-		Phrase:   "publicly readable",
+		Code:     "s3.public",
+		Phrase:   catalog.Phrase("s3.public"),
 		Severity: domain.SevBroken,
 		// Wave-1: a carried-forward Wave-2 finding would make the reappearance
 		// indistinguishable from never having left.
@@ -203,8 +205,8 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 	}
 
 	savedAt := time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC)
-	findingA := domain.Finding{Code: "vpc-no-flow-logs", Phrase: "flow logs disabled", Severity: domain.SevWarn}
-	findingB := domain.Finding{Code: "vpc-default-sg-open", Phrase: "default SG allows all", Severity: domain.SevBroken}
+	findingA := domain.Finding{Code: "vpc.no-flow-logs", Phrase: catalog.Phrase("vpc.no-flow-logs"), Severity: catalog.Severity("vpc.no-flow-logs")}
+	findingB := domain.Finding{Code: awsclient.CodeVPCStatePending, Phrase: catalog.Phrase(awsclient.CodeVPCStatePending), Severity: catalog.Severity(awsclient.CodeVPCStatePending)}
 
 	v1File := cache.TypeFile{
 		Version:      1,
@@ -267,8 +269,14 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 // with no state table (eip) keeps its status key across the step.
 func TestCacheSchema_PrePhraseStatusIsDroppedOnLoad(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	public := domain.Finding{Code: "dbi.warn.publicly_accessible", Phrase: "public endpoint", Severity: domain.SevWarn, Source: "wave1"}
-	file := func(version int, status string) cache.TypeFile {
+	finding := func(code domain.FindingCode) domain.Finding {
+		return domain.Finding{Code: code, Phrase: catalog.Phrase(code), Severity: catalog.Severity(code), Source: "wave1"}
+	}
+	own := map[string]domain.Finding{
+		"dbi": finding(awsclient.CodeDBIPubliclyAccessible),
+		"eip": finding(awsclient.CodeEIPUnassociated),
+	}
+	file := func(version int, status string, public domain.Finding) cache.TypeFile {
 		return cache.TypeFile{
 			Version: version, HasResources: true, Count: 1, Exact: true,
 			Rows: []cache.Row{{
@@ -294,7 +302,8 @@ func TestCacheSchema_PrePhraseStatusIsDroppedOnLoad(t *testing.T) {
 			if err := os.MkdirAll(d, 0700); err != nil {
 				t.Fatalf("creating cache dir: %v", err)
 			}
-			writeTypeFile(t, d, tc.short, file(tc.version, tc.stored))
+			public := own[tc.short]
+			writeTypeFile(t, d, tc.short, file(tc.version, tc.stored, public))
 			tf, ok := cache.LoadDirForTest(tc.profile, "us-east-1").Type(tc.short)
 			if !ok || len(tf.Rows) != 1 {
 				t.Fatalf("version %d %s file did not load one row", tc.version, tc.short)

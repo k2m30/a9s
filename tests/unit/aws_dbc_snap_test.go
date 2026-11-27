@@ -161,7 +161,7 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			mock := &dbcSnapDocDBSinglePageMock{
 				output: &docdb.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{tc.snap}},
 			}
-			result, err := awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), mock, "")
+			result, err := BindPage("dbc-snap")(awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), mock, ""))
 			if err != nil {
 				t.Fatalf("FetchDocDBClusterSnapshotsPage: unexpected error: %v", err)
 			}
@@ -307,7 +307,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			mock := &dbcSnapRDSSinglePageMock{
 				output: &rds.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: []rdstypes.DBClusterSnapshot{tc.snap}},
 			}
-			result, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+			result, err := BindPage("dbc-snap")(awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, ""))
 			if err != nil {
 				t.Fatalf("FetchRDSDBClusterSnapshotsPage: unexpected error: %v", err)
 			}

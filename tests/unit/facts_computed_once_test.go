@@ -26,6 +26,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // --- SSM plaintext classifier ----------------------------------------------
@@ -59,7 +60,7 @@ func factsParam(name string, typ ssmtypes.ParameterType, modified time.Time) ssm
 func TestSSMStatusCellAndColourComeFromOneClassifier(t *testing.T) {
 	recent := time.Now().Add(-30 * 24 * time.Hour)
 	stale := time.Now().Add(-2 * 365 * 24 * time.Hour)
-	out, err := awsclient.FetchSSMParametersPage(context.Background(), factsSSMFake{params: []ssmtypes.ParameterMetadata{
+	out, err := unit.BindPage("ssm")(awsclient.FetchSSMParametersPage(context.Background(), factsSSMFake{params: []ssmtypes.ParameterMetadata{
 		factsParam("/prod/orders/db/password", ssmtypes.ParameterTypeString, recent),
 		factsParam("/prod/orders/db_password", ssmtypes.ParameterTypeString, recent),
 		factsParam("/prod/orders/stripe/token", ssmtypes.ParameterTypeString, recent),
@@ -67,7 +68,7 @@ func TestSSMStatusCellAndColourComeFromOneClassifier(t *testing.T) {
 		factsParam("/prod/orders/feature_flags", ssmtypes.ParameterTypeString, stale),
 		factsParam("/prod/orders/signing_secret", ssmtypes.ParameterTypeSecureString, stale),
 		factsParam("/prod/orders/api_token", ssmtypes.ParameterTypeSecureString, recent),
-	}}, "")
+	}}, ""))
 	if err != nil {
 		t.Fatalf("FetchSSMParametersPage: %v", err)
 	}
@@ -224,10 +225,10 @@ func TestDBClusterFindingsAreTheSameThroughBothSDKs(t *testing.T) {
 				},
 			}
 			viaDocDB := factsFindingsOf(t, "docdb", func() (resource.FetchResult, error) {
-				return awsclient.FetchDocDBClustersPage(context.Background(), factsDocDBFake{clusters: []docdbtypes.DBCluster{doc}}, "")
+				return unit.BindPage("dbc")(awsclient.FetchDocDBClustersPage(context.Background(), factsDocDBFake{clusters: []docdbtypes.DBCluster{doc}}, ""))
 			})
 			viaRDS := factsFindingsOf(t, "rds", func() (resource.FetchResult, error) {
-				return awsclient.FetchRDSDBClustersPage(context.Background(), factsRDSFake{clusters: []rdstypes.DBCluster{rdsCluster}}, "")
+				return unit.BindPage("dbc")(awsclient.FetchRDSDBClustersPage(context.Background(), factsRDSFake{clusters: []rdstypes.DBCluster{rdsCluster}}, ""))
 			})
 			if strings.Join(viaDocDB, "\n") != strings.Join(viaRDS, "\n") {
 				t.Errorf("findings differ by SDK:\n  docdb: %v\n  rds:   %v", viaDocDB, viaRDS)

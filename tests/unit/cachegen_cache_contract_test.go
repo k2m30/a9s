@@ -18,6 +18,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -131,11 +132,11 @@ func TestPairDirectory_DistinctProfiles_NeverShareOneDirectory(t *testing.T) {
 	}
 }
 
-func cachegenWave2Finding(code string) domain.Finding {
+func cachegenWave2Finding(code domain.FindingCode) domain.Finding {
 	return domain.Finding{
-		Code:     domain.FindingCode(code),
-		Phrase:   "encryption not confirmed",
-		Severity: domain.SevBroken,
+		Code:     code,
+		Phrase:   catalog.Phrase(code),
+		Severity: catalog.Severity(code),
 		Source:   "wave2:s3",
 	}
 }
@@ -148,7 +149,7 @@ func TestEnrichmentFailure_KeepsCachedWave2Findings(t *testing.T) {
 
 	_, core, _ := newCachegenController(t, "cachegen-enrichfail", "us-east-1")
 	rows := cachegenRows(1, "bucket-fail")
-	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3-enc-unknown")}
+	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3.public-access-block-incomplete")}
 	core.ObserveRows("s3", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
 
 	core.HandleEvent(messages.EnrichmentChecked{
@@ -174,8 +175,8 @@ func TestEnrichmentPartial_KeepsFindingsForUninspectedIDs(t *testing.T) {
 	_, core, _ := newCachegenController(t, "cachegen-enrichpartial", "us-east-1")
 	rows := cachegenRows(2, "bucket-partial")
 	answered, uninspected := rows[0].ID, rows[1].ID
-	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3-enc-unknown")}
-	rows[1].Findings = []domain.Finding{cachegenWave2Finding("s3-enc-unknown")}
+	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3.public-access-block-incomplete")}
+	rows[1].Findings = []domain.Finding{cachegenWave2Finding("s3.public-access-block-incomplete")}
 	core.ObserveRows("s3", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
 
 	core.HandleEvent(messages.EnrichmentChecked{
@@ -390,7 +391,7 @@ func TestSaveProjection_Wave2Broken_IsPersistedAsAnIssue(t *testing.T) {
 
 	_, core, _ := newCachegenController(t, "cachegen-brokensave", "us-east-1")
 	rows := cachegenRows(1, "bucket-broken")
-	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3-public-read")}
+	rows[0].Findings = []domain.Finding{cachegenWave2Finding("s3.public")}
 	// In production a row only carries a "wave2:s3" finding after the
 	// enricher answered for the type, which is what latches this. Both save
 	// lanes write IssuesKnown from the latch, not from the findings on the
@@ -669,8 +670,8 @@ func TestEnrichmentFailure_KeepsRenderedFindingOnTheList(t *testing.T) {
 	rows := cachegenRows(1, "bucket-render")
 	id := rows[0].ID
 	rows[0].Findings = []domain.Finding{{
-		Code:     "s3-public-read",
-		Phrase:   "publicly accessible",
+		Code:     "s3.public",
+		Phrase:   catalog.Phrase("s3.public"),
 		Severity: domain.SevBroken,
 		Source:   "wave2:s3",
 	}}
@@ -733,7 +734,7 @@ func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
 		rows := cachegenRows(5, "bucket-heal")
 		crows := make([]cache.Row, len(rows))
 		for i := range rows {
-			rows[i].Findings = []domain.Finding{cachegenWave2Finding("s3-public-read")}
+			rows[i].Findings = []domain.Finding{cachegenWave2Finding("s3.public")}
 			crows[i] = cache.Row{ID: rows[i].ID, Name: rows[i].Name, Findings: rows[i].Findings}
 		}
 		seed := cache.LoadDirForTest(profile, "us-east-1")
@@ -887,8 +888,8 @@ func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
 	uninspected, answered := rows[0].ID, rows[1].ID
 	for i := range rows {
 		rows[i].Findings = []domain.Finding{{
-			Code:     "s3-public-read",
-			Phrase:   "publicly accessible",
+			Code:     "s3.public",
+			Phrase:   catalog.Phrase("s3.public"),
 			Severity: domain.SevBroken,
 			Source:   "wave2:s3",
 		}}
@@ -898,7 +899,7 @@ func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
 
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Findings:     map[string][]domain.Finding{answered: {cachegenWave2Finding("s3-public-read")}},
+		Findings:     map[string][]domain.Finding{answered: {cachegenWave2Finding("s3.public")}},
 		TruncatedIDs: map[string]string{uninspected: ""},
 		Err:          errors.New("operation timed out"),
 	})

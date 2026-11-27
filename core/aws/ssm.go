@@ -62,7 +62,7 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			description = *param.Description
 		}
 
-		r := withWave1("ssm", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   paramName,
 			Name: paramName,
 			Fields: map[string]string{
@@ -74,7 +74,6 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			},
 			RawStruct: param,
 		}, ssmColorFindings(paramName, param.LastModifiedDate)...)
-		r.Fields["risk"] = ssmRiskWord(r.Findings)
 
 		resources = append(resources, r)
 	}
@@ -126,24 +125,6 @@ func ssmKind(r domain.Resource) string {
 		return string(p.Type)
 	}
 	return r.Fields["type"]
-}
-
-// ssmRiskWord is the Status column's word for what ssmColorFindings found,
-// the one the risk vocabulary (risk_column.go) spells for an operator. It is
-// what a row rebuilt from its cached Fields shows, having no findings of its
-// own to word.
-func ssmRiskWord(findings []domain.Finding) string {
-	top, ok := domain.TopFinding(findings)
-	if !ok {
-		return ""
-	}
-	switch top.Code {
-	case ssmCodePlaintextSensitive:
-		return riskPlaintextValue
-	case ssmCodeStaleValue:
-		return riskStaleValue
-	}
-	return ""
 }
 
 // RevealSSMParameter calls the SSM GetParameter API with decryption enabled

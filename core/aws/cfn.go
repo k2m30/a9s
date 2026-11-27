@@ -60,7 +60,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 		secretRows := secretScanRows(cfnStackOutputs(stack))
 		protection, outputSecret := cfnPostureOf(stack, len(secretRows) > 0)
 
-		r := withWave1("cfn", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   stackName,
 			Name: stackName,
 

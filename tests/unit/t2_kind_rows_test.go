@@ -145,7 +145,7 @@ func t2GlueJob(name, command, glueVersion, secConfig string) gluetypes.Job {
 
 func t2GlueRows(t *testing.T, fake *t2GlueFake) map[string]resource.Resource {
 	t.Helper()
-	res, err := awsclient.FetchGlueJobsPage(context.Background(), fake, "")
+	res, err := unit.BindPage("glue")(awsclient.FetchGlueJobsPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchGlueJobsPage: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestT2SSM_StaleValueAppliesToSecureStringOnly(t *testing.T) {
 		t2Param("/acme/app/session-key", ssmtypes.ParameterTypeSecureString, 10),
 		t2Param("/acme/db/password", ssmtypes.ParameterTypeString, 400),
 	}}
-	res, err := awsclient.FetchSSMParametersPage(context.Background(), fake, "")
+	res, err := unit.BindPage("ssm")(awsclient.FetchSSMParametersPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchSSMParametersPage: %v", err)
 	}
@@ -407,7 +407,7 @@ func TestT2DBI_ClusterMembersDoNotCarryClusterManagedFindings(t *testing.T) {
 		t2DBInstance("acme-ledger-maz-instance-2", "postgres", "16.1", "acme-ledger-maz"),
 		t2DBInstance("acme-legacy-pg", "postgres", "16.1", ""),
 	}}
-	res, err := awsclient.FetchRDSInstancesPage(context.Background(), fake, "")
+	res, err := unit.BindPage("dbi")(awsclient.FetchRDSInstancesPage(context.Background(), fake, ""))
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage: %v", err)
 	}

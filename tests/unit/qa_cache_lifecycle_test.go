@@ -26,7 +26,7 @@
 //
 // A fetcher reports a resolved Wave-1 issue by omitting its finding from a
 // fresh fetch (a bucket that stops being publicly readable stops carrying the
-// s3-public-read finding), so the silent-swap finding carry
+// s3.public finding), so the silent-swap finding carry
 // (core/app/list_body.go) must not re-attach a Wave-1 finding to an incoming
 // row that carries none.
 package unit
@@ -41,6 +41,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -249,7 +250,7 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 		t.Fatal("no KindFetchResources task dispatched on list-open — test assumption broken")
 	}
 
-	finding := domain.Finding{Code: "s3-public-read", Phrase: "public read", Severity: domain.SevBroken, Source: "wave1"}
+	finding := domain.Finding{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave1"}
 	fresh := []resource.Resource{
 		newS3Resource("bucket-s1-1", region, "active", finding),
 		newS3Resource("bucket-s1-2", region, "active"),
@@ -309,8 +310,8 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 			t.Errorf("persisted bucket-s1-1.Fields[%q] = %q (present=%v), want a non-empty materialized value", key, v, present)
 		}
 	}
-	if len(r1.Findings) != 1 || r1.Findings[0].Code != "s3-public-read" {
-		t.Errorf("persisted bucket-s1-1.Findings = %+v, want 1 finding with Code=s3-public-read", r1.Findings)
+	if len(r1.Findings) != 1 || r1.Findings[0].Code != "s3.public" {
+		t.Errorf("persisted bucket-s1-1.Findings = %+v, want 1 finding with Code=s3.public", r1.Findings)
 	}
 	r2, ok := lifecycleFindRow(tf.Rows, "bucket-s1-2")
 	if !ok {
@@ -333,7 +334,7 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "lifecycle-s2-prof", "us-east-1"
 
-	finding := domain.Finding{Code: "s3-public-read", Phrase: "public read", Severity: domain.SevBroken, Source: "wave1"}
+	finding := domain.Finding{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave1"}
 	world := []resource.Resource{
 		newS3Resource("bucket-s2-1", region, "active", finding),
 		newS3Resource("bucket-s2-2", region, "active"),
@@ -456,8 +457,8 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "lifecycle-s3-prof", "us-east-1"
 
-	brokenFinding := domain.Finding{Code: "s3-public-read", Phrase: "public read", Severity: domain.SevBroken, Source: "wave1"}
-	newBrokenFinding := domain.Finding{Code: "s3-encryption-disabled", Phrase: "encryption disabled", Severity: domain.SevBroken, Source: "wave1"}
+	brokenFinding := domain.Finding{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave1"}
+	newBrokenFinding := brokenFinding
 
 	oldWorld := []resource.Resource{
 		newS3Resource("bucket-s3-removed", region, "active"),

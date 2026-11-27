@@ -76,7 +76,7 @@ func FetchRolePolicies(
 			policyArn = *p.PolicyArn
 		}
 
-		managed = append(managed, withWave1("role_policies", resource.Resource{
+		managed = append(managed, withWave1(resource.Resource{
 			ID:   policyArn,
 			Name: policyName,
 			Fields: map[string]string{
@@ -102,7 +102,7 @@ func FetchRolePolicies(
 
 	var inline []resource.Resource
 	for _, name := range inlineOutput.PolicyNames {
-		inline = append(inline, withWave1("role_policies", resource.Resource{
+		inline = append(inline, withWave1(resource.Resource{
 			ID:   name,
 			Name: name,
 			Fields: map[string]string{

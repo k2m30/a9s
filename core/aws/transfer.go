@@ -100,7 +100,7 @@ func buildTransferResource(server *transfertypes.DescribedServer) resource.Resou
 	id := aws.ToString(server.ServerId)
 	findings := computeTransferFindings(server)
 
-	return withWave1("transfer", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
@@ -143,10 +143,8 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 func buildTransferDegradedResource(listed transfertypes.ListedServer, err error) resource.Resource {
 	id := aws.ToString(listed.ServerId)
 
-	findings := append(withState("transfer", string(listed.State), nil), degradedDetailsFinding("transfer", err))
-
 	raw := listed
-	return withWave1("transfer", resource.Resource{
+	return markDegraded(withWave1(resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
@@ -159,5 +157,5 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer, err error)
 			"arn":                    aws.ToString(listed.Arn),
 		},
 		RawStruct: &raw,
-	}, findings...)
+	}, withState("transfer", string(listed.State), nil)...), err)
 }

@@ -57,7 +57,7 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 
 		actionsCount := len(alarm.AlarmActions)
 
-		r := withWave1("alarm", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   alarmName,
 			Name: alarmName,
 			Fields: map[string]string{
@@ -76,7 +76,7 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 		// in the console. Nil means DescribeAlarms did not resolve the switch,
 		// which is not evidence that it is off.
 		if alarm.ActionsEnabled != nil && !*alarm.ActionsEnabled {
-			addWave1Finding("alarm", &r, CodeAlarmActionsDisabled)
+			addWave1Finding(&r, CodeAlarmActionsDisabled)
 			// The phrase already says the actions are off; the row says how
 			// much is wired behind the switch — every transition, not just
 			// the one alarm.no_actions is scoped to.

@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// A timing pin that measures the code.
-//
-// "The lock is held for under 35 ms" is a statement about the machine the
-// suite happens to run on. It is green on an idle bench and red beside a full
-// -race run, and neither reading says whether the row work is under the lock.
-//
-// What matters is a proportion: absorbing a fetch result does a lot
-// of work, and only the swap of the built body may happen with the lock held.
-// A fraction is read off two clocks that move together, so a loaded machine
-// stretches both and the verdict does not change.
+// Absorbing a fetch result does a lot of work per row, and every reader of the
+// controller waits while its write lock is held. The row work is pure, so it
+// runs with the lock free and only the built body is swapped in under it.
 package unit
 
 import (
@@ -17,34 +10,18 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
-
-// views7LockedFraction is the largest share of an absorption that may pass
-// with the controller lock held. It separates two shapes, not two machines:
-// doing the row work under the lock spends about a third to a half of the
-// absorption there (0.46 ordinary, 0.30 under -race), and swapping a body
-// built outside it spends 0.05 to 0.07 in either build.
-//
-// What the probe times is a blocked reader's wait, which is the hold plus
-// whatever the scheduler added, and on a busy runner the second term is not
-// small: this read 0.20 on a loaded macOS runner where the swap shape is 0.07.
-// So the noise is measured on the same probe with nothing to block against and
-// taken off the reading, rather than assumed to scale with the absorption.
-const views7LockedFraction = 0.2
 
 // wipfixEC2Rows returns n rows in the shape the ec2 fetcher writes.
 func wipfixEC2Rows(n int) []resource.Resource {
@@ -63,115 +40,62 @@ func wipfixEC2Rows(n int) []resource.Resource {
 	return rows
 }
 
-// views7AbsorbSpans absorbs n rows on a fresh controller and returns the
-// longest a concurrent lock-taking reader was blocked, and how long the whole
-// absorption took. The probe is Controller.GetListLane — an RLock and two
-// pointer reads — so what blocks it is the writer's hold and nothing else.
-func views7AbsorbSpans(t *testing.T, n int) (held, total time.Duration) {
-	t.Helper()
-	c := newTestController(t)
-	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	rows := wipfixEC2Rows(n)
+// TestLargeFetchAbsorb_RowWorkRunsWithTheLockFree: every cell a page's rows
+// produce is built while no goroutine holds the controller's write lock, and
+// the body that build produced is the one the list shows.
+func TestLargeFetchAbsorb_RowWorkRunsWithTheLockFree(t *testing.T) {
+	const short = "views7-absorb-probe"
+	const n = 6000
+	var c *app.Controller
+	built, locked := 0, 0
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
+		Name:      "Absorb probe",
+		ShortName: short,
+		Columns:   []domain.Column{{Key: "name", Title: "Name", Width: 30}},
+		CellDecorators: map[string]func(domain.Resource, string) string{
+			"name": func(_ domain.Resource, v string) string {
+				built++
+				if c.WriteLockedForTest() {
+					locked++
+				}
+				return v
+			},
+		},
+	})
+	t.Cleanup(func() { resource.CleanupChildTypeForTest(short) })
 
-	var stop atomic.Bool
-	worst := make(chan time.Duration, 1)
-	go func() {
-		var longest time.Duration
-		for !stop.Load() {
-			start := time.Now()
-			c.GetListLane()
-			if d := time.Since(start); d > longest {
-				longest = d
-			}
-		}
-		worst <- longest
-	}()
-
-	// Let the probe loop reach steady state so its own first-call costs are
-	// not read as contention.
-	time.Sleep(5 * time.Millisecond)
-
-	start := time.Now()
-	_, _ = handlePage(c, messages.ResourcesLoaded{
-		ResourceType: "ec2",
+	c = newTestController(t)
+	c.PushChildListScreen(short)
+	rows := make([]resource.Resource, n)
+	for i := range rows {
+		id := "probe-" + strconv.Itoa(i)
+		rows[i] = resource.Resource{ID: id, Name: id, Fields: map[string]string{"name": id}}
+	}
+	vs, _ := handlePage(c, messages.ResourcesLoaded{
+		ResourceType: short,
 		Resources:    rows,
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
-		Provenance:   messages.FetchProvenanceCanonicalList,
+		Provenance:   messages.FetchProvenanceChild,
 	})
-	total = time.Since(start)
 
-	stop.Store(true)
-	held = <-worst
-
-	if body := c.Snapshot().Body.List; body == nil || len(body.Rows) != n {
+	if body := vs.Body.List; body == nil || len(body.Rows) != n {
 		got := 0
 		if body != nil {
 			got = len(body.Rows)
 		}
-		t.Fatalf("the list holds %d rows after absorbing %d — keeping work off the lock must not lose it", got, n)
+		t.Fatalf("the list holds %d rows after absorbing %d", got, n)
 	}
-	return held, total
-}
-
-// views7ProbeNoise runs the same probe loop against an idle controller for the
-// same kind of window, and returns the longest it waited. Nothing holds the
-// write lock, so whatever it measures is the scheduler, not a hold.
-func views7ProbeNoise(t *testing.T) time.Duration {
-	t.Helper()
-	c := newTestController(t)
-	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-
-	var stop atomic.Bool
-	worst := make(chan time.Duration, 1)
-	go func() {
-		var longest time.Duration
-		for !stop.Load() {
-			start := time.Now()
-			c.GetListLane()
-			if d := time.Since(start); d > longest {
-				longest = d
-			}
-		}
-		worst <- longest
-	}()
-	time.Sleep(50 * time.Millisecond)
-	stop.Store(true)
-	return <-worst
-}
-
-// views7MinLockedShare returns the smallest locked share observed over a few
-// absorptions, with the probe's own scheduler noise taken off each reading. A
-// blocked reader's wait is the writer's hold plus whatever the scheduler
-// added, never less, so the smallest reading is the closest one to the hold.
-func views7MinLockedShare(t *testing.T, n int) (share float64, held, total time.Duration) {
-	t.Helper()
-	noise := views7ProbeNoise(t)
-	share = math.MaxFloat64
-	for range 3 {
-		h, tot := views7AbsorbSpans(t, n)
-		if tot <= 0 {
-			t.Fatalf("absorbing %d rows took no measurable time", n)
-		}
-		attributable := max(h-noise, 0)
-		if s := float64(attributable) / float64(tot); s < share {
-			share, held, total = s, attributable, tot
-		}
+	if built < n {
+		t.Fatalf("absorbing %d rows built %d cells; the probe column was not rendered", n, built)
 	}
-	return share, held, total
-}
-
-// TestLargeFetchAbsorb_LockIsHeldForASmallPartOfTheAbsorb: the two sizes are
-// what separates a swap from row work: a swap is a small share of a larger
-// absorption and a smaller share of a larger one still, while row work under
-// the lock is nearly all of either.
-func TestLargeFetchAbsorb_LockIsHeldForASmallPartOfTheAbsorb(t *testing.T) {
-	for _, n := range []int{6000, 12000} {
-		share, held, total := views7MinLockedShare(t, n)
-		if share > views7LockedFraction {
-			t.Errorf("absorbing %d rows spent %.0f%% of the absorption with the controller lock held "+
-				"(%v of %v) — the row work is pure in-memory and belongs outside the lock, with only the "+
-				"built body swapped under it", n, share*100, held, total)
-		}
+	if locked > 0 {
+		t.Errorf("absorbing %d rows built %d of %d cells with the controller's write lock held; "+
+			"the row work belongs outside the lock, with only the built body swapped under it", n, locked, built)
+	}
+	before := built
+	_ = c.Snapshot()
+	if built != before {
+		t.Errorf("the snapshot after the absorb rebuilt %d cells; the body built off the lock was not the one installed", built-before)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -37,6 +38,10 @@ func TestT9aDev_RewriteReplacesTheFileWhole(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// On Windows a FileInfo from Stat reads its file identity from the path at
+	// the first comparison, so it is compared once here, while the path still
+	// names the original.
+	_ = os.SameFile(before, before)
 	if err = config.EnsureViewsDir(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +61,9 @@ func TestT9aDev_RewriteReplacesTheFileWhole(t *testing.T) {
 }
 
 func TestT9aDev_FailedRewriteLeavesTheOriginal(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("a Windows directory is writable whatever its mode bits say; os.Chmod sets only the read-only attribute")
+	}
 	def := t9aDefaults(t, "ec2")
 	dir := t.TempDir()
 	if err := config.EnsureViewsDir(dir); err != nil {

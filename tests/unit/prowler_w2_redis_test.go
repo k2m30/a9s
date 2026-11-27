@@ -59,7 +59,7 @@ func w2RedisGroup(id string) ectypes.ReplicationGroup {
 
 func w2RedisFetch(t *testing.T, groups ...ectypes.ReplicationGroup) map[string]resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchRedisPage(context.Background(), &w2RedisFake{groups: groups}, "")
+	out, err := BindPage("redis")(awsclient.FetchRedisPage(context.Background(), &w2RedisFake{groups: groups}, ""))
 	if err != nil {
 		t.Fatalf("FetchRedisPage: %v", err)
 	}

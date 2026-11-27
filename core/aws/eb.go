@@ -77,7 +77,7 @@ func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI,
 			envArn = *env.EnvironmentArn
 		}
 
-		r := withWave1("eb", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   envID,
 			Name: envName,
 			Fields: map[string]string{

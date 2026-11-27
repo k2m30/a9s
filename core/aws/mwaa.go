@@ -121,7 +121,7 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 		createdAt = env.CreatedAt.Format(time.RFC3339)
 	}
 
-	return withWave1("mwaa", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   name,
 		Name: name,
 		Fields: map[string]string{
@@ -168,14 +168,7 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 // Environment body); it decides whether the row renders mwaa's own "details
 // denied" sentence or the neutral "details unavailable" one.
 func buildMWAADegradedResource(name string, err error) resource.Resource {
-	finding := degradedDetailsFinding("mwaa", err)
-	return withWave1("mwaa", resource.Resource{
-		ID:   name,
-		Name: name,
-		Fields: map[string]string{
-			"name": name,
-		},
-	}, []domain.Finding{finding}...)
+	return degradedRow(name, err)
 }
 
 // computeMWAAFindings builds the ordered Finding slice for one environment:

@@ -115,7 +115,7 @@ func convertCfnResource(summary cfntypes.StackResourceSummary) resource.Resource
 		lastUpdated = summary.LastUpdatedTimestamp.UTC().Format("2006-01-02 15:04")
 	}
 
-	return withWave1("cfn_resources", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   logicalResourceID,
 		Name: logicalResourceID,
 		Fields: map[string]string{

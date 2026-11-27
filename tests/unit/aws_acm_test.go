@@ -49,7 +49,7 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -166,7 +166,7 @@ func TestFetchACMCertificates_SameDomainDistinctARN_UniqueIDs(t *testing.T) {
 		},
 	}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -191,7 +191,7 @@ func TestFetchACMCertificates_ErrorResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
@@ -209,7 +209,7 @@ func TestFetchACMCertificates_EmptyResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -239,7 +239,7 @@ func TestFetchACMCertificates_ExpiresWithin30Days_WarnFinding(t *testing.T) {
 		},
 	}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -285,7 +285,7 @@ func TestFetchACMCertificates_ExpiresWithin7Days_BrokenFinding(t *testing.T) {
 		},
 	}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -332,7 +332,7 @@ func TestFetchACMCertificates_OrphanNotExpired_WarnFinding(t *testing.T) {
 		},
 	}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -378,7 +378,7 @@ func TestFetchACMCertificates_HealthyIssuedCert_NoFindings(t *testing.T) {
 		},
 	}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+		return BindPage("acm")(awsclient.FetchACMCertificatesPage(context.Background(), mock, token))
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

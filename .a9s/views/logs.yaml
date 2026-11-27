@@ -12,7 +12,7 @@ detail_hashes:
   LogGroupArn: a8597024ca73a7d7
   LogGroupClass: fe9e86bbd9710e81
   "key:stored_bytes": 2454b4f582e0a9ed
-  RetentionInDays: af8dc8a5dcbc8166
+  "key:retention": 37911c5cda4ec714
   MetricFilterCount: 8f544b5e99098bf7
   DeletionProtectionEnabled: 96d62c4fd6f7de47
   "key:creation_time": 0606da4def3eaff7
@@ -48,7 +48,7 @@ detail:
   - LogGroupArn
   - LogGroupClass
   - { key: stored_bytes, label: StoredBytes }
-  - RetentionInDays
+  - { key: retention, label: Retention }
   - MetricFilterCount
   - DeletionProtectionEnabled
   - { key: creation_time, label: CreationTime }

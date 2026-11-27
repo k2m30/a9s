@@ -48,7 +48,7 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 	}
 
 	clients := &awsclient.ServiceClients{EKS: newMockEKSFull(listMock, describeMock, nil, nil)}
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
+	result, err := BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), clients, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -125,7 +125,7 @@ func TestFetchEKSClusters_ListClustersError(t *testing.T) {
 	describeMock := &mockEKSDescribeClusterClient{}
 
 	clients := &awsclient.ServiceClients{EKS: newMockEKSFull(listMock, describeMock, nil, nil)}
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
+	result, err := BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -143,7 +143,7 @@ func TestFetchEKSClusters_EmptyResponse(t *testing.T) {
 	describeMock := &mockEKSDescribeClusterClient{}
 
 	clients := &awsclient.ServiceClients{EKS: newMockEKSFull(listMock, describeMock, nil, nil)}
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
+	result, err := BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), clients, ""))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -229,7 +229,7 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 
 	clients := &awsclient.ServiceClients{EKS: eksFake}
 
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
+	result, err := BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), clients, ""))
 
 	if err == nil {
 		t.Fatal("FetchEKSClustersPage must return a non-nil error when DescribeCluster fails for a cluster")
@@ -273,7 +273,7 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 // fetcher rather than a hand-built Health struct.
 func TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow(t *testing.T) {
 	clients := demo.NewServiceClients()
-	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
+	result, err := BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(), clients, ""))
 	if err != nil && len(result.Resources) == 0 {
 		t.Fatalf("FetchEKSClustersPage: %v", err)
 	}

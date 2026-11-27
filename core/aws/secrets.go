@@ -68,7 +68,7 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			secretStatus = secretsStateDeleted
 		}
 
-		r := withWave1("secrets", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   secretName,
 			Name: secretName,
 			Fields: map[string]string{

@@ -55,7 +55,7 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 
 		findings := withState("igw", state, nil)
 
-		r := withWave1("igw", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   igwID,
 			Name: name,
 			Fields: map[string]string{

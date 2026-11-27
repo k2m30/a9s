@@ -17,6 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -25,13 +26,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-const onDemandPhrase = "system check failed"
+// onDemandCode is a Wave 2 code ec2 declares: a failing instance status check.
+const onDemandCode domain.FindingCode = "ec2.instance-status-impaired"
+
+func onDemandPhrase() string { return catalog.Phrase(onDemandCode) }
 
 // The pair newTestControllerAndCore's session carries.
 const onDemandProfile, onDemandRegion = "demo", "us-east-1"
 
-// onDemandEC2Enricher answers "system check failed" for every row it is
-// asked about and records what it was asked.
 func onDemandEC2Enricher(t *testing.T, asked *[][]string) {
 	t.Helper()
 	awsclient.SetWave2EnricherForTest(t, "ec2", awsclient.IssueEnricher{Fn: func(_ context.Context, _ *awsclient.ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
@@ -44,7 +46,7 @@ func onDemandEC2Enricher(t *testing.T, asked *[][]string) {
 		}
 		for _, r := range resources {
 			ids = append(ids, r.ID)
-			res.Findings[r.ID] = []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2"}}
+			res.Findings[r.ID] = []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Detail: "The instance failed its system status check.", Severity: domain.SevBroken, Source: "wave2:ec2"}}
 		}
 		*asked = append(*asked, ids)
 		return res, nil
@@ -121,8 +123,8 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 
 	entries := topAttentionEntries(t, c)
 	joined := strings.Join(entries, " ")
-	if !strings.Contains(joined, onDemandPhrase) {
-		t.Errorf("the opened row's Attention block reads %v, want the finding %q the on-demand check found", entries, onDemandPhrase)
+	if !strings.Contains(joined, onDemandPhrase()) {
+		t.Errorf("the opened row's Attention block reads %v, want the finding %q the on-demand check found", entries, onDemandPhrase())
 	}
 	if strings.Contains(strings.ToLower(joined), domain.NotInspectedPhrase) {
 		t.Errorf("the opened row still reads %q after its checks ran: %v", domain.NotInspectedPhrase, entries)
@@ -138,8 +140,8 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 
 	c.Apply(app.Action{Kind: app.ActionBack})
 	body := c.Snapshot().Body.List
-	if got := statusCellFor(t, *body, rows[0].ID); got != onDemandPhrase {
-		t.Errorf("the opened row's Status cell = %q, want %q — the list and the detail must agree", got, onDemandPhrase)
+	if got := statusCellFor(t, *body, rows[0].ID); got != onDemandPhrase() {
+		t.Errorf("the opened row's Status cell = %q, want %q — the list and the detail must agree", got, onDemandPhrase())
 	}
 	if got := statusCellFor(t, *body, rows[1].ID); got != domain.NotInspectedPhrase {
 		t.Errorf("the other capped row's Status cell = %q, want %q", got, domain.NotInspectedPhrase)
@@ -166,8 +168,8 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 		t.Errorf("after a stale sweep the uninspected set is %v, want only %q capped", set, rows[1].ID)
 	}
 	body = c.Snapshot().Body.List
-	if got := statusCellFor(t, *body, rows[0].ID); got != onDemandPhrase {
-		t.Errorf("after a stale sweep the answered row's Status cell = %q, want %q", got, onDemandPhrase)
+	if got := statusCellFor(t, *body, rows[0].ID); got != onDemandPhrase() {
+		t.Errorf("after a stale sweep the answered row's Status cell = %q, want %q", got, onDemandPhrase())
 	}
 	if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 1 {
 		t.Errorf("after a stale sweep the store carries %v for the answered row, want its one finding", got)
@@ -219,7 +221,7 @@ func TestCappedRow_AnswerKeepsTheOtherRowsFindingOnDisk(t *testing.T) {
 	rows := uninspectedEC2Rows()
 	c.ApplyResourcesLoaded("ec2", rows, nil, false)
 	core.ObserveRows("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
-	prior := []domain.Finding{{Code: "ec2.stopped", Phrase: "stopped by the operator", Severity: domain.SevWarn, Source: "wave2:ec2"}}
+	prior := []domain.Finding{{Code: "ec2.scheduled-event", Phrase: catalog.Phrase("ec2.scheduled-event"), Severity: domain.SevWarn, Source: "wave2:ec2"}}
 	sweepSaveAfterEnrichment(t, core, c, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings:     map[string][]domain.Finding{rows[1].ID: prior},
@@ -297,7 +299,7 @@ func TestCappedRow_AnswerLeavesTheOtherOpenDetailAlone(t *testing.T) {
 	var asked [][]string
 	onDemandEC2Enricher(t, &asked)
 	c, core, rows := cappedEC2List(t)
-	prior := []domain.Finding{{Code: "ec2.stopped", Phrase: "stopped by the operator", Severity: domain.SevWarn, Source: "wave2:ec2"}}
+	prior := []domain.Finding{{Code: "ec2.scheduled-event", Phrase: catalog.Phrase("ec2.scheduled-event"), Severity: domain.SevWarn, Source: "wave2:ec2"}}
 	c.ApplyIntents([]runtime.UIIntent{runtime.PatchResourceList{
 		ResourceType: "ec2",
 		Enrichment:   &runtime.ListEnrichmentPatch{Findings: map[string][]domain.Finding{rows[1].ID: prior}, TruncatedIDs: core.EnrichmentTruncatedIDs("ec2")},
@@ -308,13 +310,13 @@ func TestCappedRow_AnswerLeavesTheOtherOpenDetailAlone(t *testing.T) {
 	}})
 	c.EnsureDetailState(rows[1], "ec2")
 	c.ApplyIntents([]runtime.UIIntent{runtime.PatchDetail{ResourceType: "ec2", EnrichmentFindings: map[string][]domain.Finding{rows[1].ID: prior}}})
-	if entries := topAttentionEntries(t, c); !strings.Contains(strings.Join(entries, " "), "stopped by the operator") {
+	if entries := topAttentionEntries(t, c); !strings.Contains(strings.ToLower(strings.Join(entries, " ")), prior[0].Phrase) {
 		t.Fatalf("precondition: the underlying detail reads %v, want its finding", entries)
 	}
 
 	openDetailWithWorkload(t, c, core, rows[0])
 	c.Apply(app.Action{Kind: app.ActionBack})
-	if entries := topAttentionEntries(t, c); !strings.Contains(strings.Join(entries, " "), "stopped by the operator") {
+	if entries := topAttentionEntries(t, c); !strings.Contains(strings.ToLower(strings.Join(entries, " ")), prior[0].Phrase) {
 		t.Errorf("one row's answer cleared the other open detail's finding: %v", entries)
 	}
 }
@@ -338,7 +340,7 @@ func TestCappedRow_OnDemandRefusalNamesTheCall(t *testing.T) {
 	c, core, rows := cappedEC2List(t)
 	// The row carries a finding an earlier sweep found; a refused re-check
 	// is no answer and must not fold it away.
-	prior := []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Severity: domain.SevBroken, Source: "wave2:ec2"}}
+	prior := []domain.Finding{{Code: onDemandCode, Phrase: onDemandPhrase(), Severity: domain.SevBroken, Source: "wave2:ec2"}}
 	c.ApplyIntents([]runtime.UIIntent{runtime.PatchResourceList{
 		ResourceType: "ec2",
 		Enrichment:   &runtime.ListEnrichmentPatch{Findings: map[string][]domain.Finding{rows[0].ID: prior}, TruncatedIDs: core.EnrichmentTruncatedIDs("ec2")},

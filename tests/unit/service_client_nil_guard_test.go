@@ -61,6 +61,7 @@ func TestServiceClientFieldsAreCheckedBeforeUse(t *testing.T) {
 	uses := map[string][]use{}
 	callers := map[string][]string{}
 	fetchers := map[string]bool{}
+	wrapped := t12WrappedProducers(t570LoadAWS(t))
 	t570EachFunc(t, func(pkg *packages.Package, path string, fn *ast.FuncDecl) {
 		info := pkg.TypesInfo
 		name := fn.Name.Name
@@ -89,6 +90,9 @@ func TestServiceClientFieldsAreCheckedBeforeUse(t *testing.T) {
 			case *ast.CallExpr:
 				if id, ok := x.Fun.(*ast.Ident); ok {
 					callers[id.Name] = append(callers[id.Name], name)
+				}
+				for _, p := range t12BoundCallees(info, wrapped, x) {
+					callers[p] = append(callers[p], name)
 				}
 				var operands []ast.Expr
 				if sel, isSel := x.Fun.(*ast.SelectorExpr); isSel {
@@ -285,12 +289,16 @@ func awsCallers(t *testing.T) map[string]bool {
 	t.Helper()
 	direct := map[string]bool{}
 	callers := map[string][]string{}
+	wrapped := t12WrappedProducers(t570LoadAWS(t))
 	t570EachFunc(t, func(pkg *packages.Package, _ string, fn *ast.FuncDecl) {
 		info := pkg.TypesInfo
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
+			}
+			for _, p := range t12BoundCallees(info, wrapped, call) {
+				callers[p] = append(callers[p], fn.Name.Name)
 			}
 			switch f := call.Fun.(type) {
 			case *ast.Ident:
@@ -335,6 +343,7 @@ func awsCallers(t *testing.T) map[string]bool {
 // as read or over a part of it.
 func TestPerRowReverseScansAreCapped(t *testing.T) {
 	calls := awsCallers(t)
+	wrapped := t12WrappedProducers(t570LoadAWS(t))
 	var found []string
 	t570EachFunc(t, func(pkg *packages.Package, path string, fn *ast.FuncDecl) {
 		base := filepath.Base(path)
@@ -376,6 +385,9 @@ func TestPerRowReverseScansAreCapped(t *testing.T) {
 			callsAWS := false
 			ast.Inspect(rng.Body, func(m ast.Node) bool {
 				if call, isCall := m.(*ast.CallExpr); isCall {
+					for _, p := range t12BoundCallees(info, wrapped, call) {
+						callsAWS = callsAWS || calls[p]
+					}
 					switch f := call.Fun.(type) {
 					case *ast.Ident:
 						callsAWS = callsAWS || calls[f.Name]

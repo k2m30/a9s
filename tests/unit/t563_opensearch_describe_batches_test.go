@@ -91,7 +91,7 @@ func t563AssertDescribedRow(t *testing.T, r resource.Resource) {
 func TestT563_OpenSearchDescribesSevenDomainsInBatchesOfFive(t *testing.T) {
 	fake := &osBatchLimitFake{domains: t563OpenSearchRegion()}
 
-	rows, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), fake, fake, time.Now())
+	rows, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomainsAt(context.Background(), fake, fake, time.Now()))
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomainsAt: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestT563_OpenSearchDescribesSevenDomainsInBatchesOfFive(t *testing.T) {
 func TestT563_OpenSearchFailedBatchDegradesOnlyItsOwnNames(t *testing.T) {
 	fake := &osBatchLimitFake{domains: t563OpenSearchRegion(), failName: "logs-1"}
 
-	rows, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), fake, fake, time.Now())
+	rows, err := BindRows("opensearch")(awsclient.FetchOpenSearchDomainsAt(context.Background(), fake, fake, time.Now()))
 	if err == nil {
 		t.Errorf("a denied batch must surface as a partial failure, got nil error")
 	}

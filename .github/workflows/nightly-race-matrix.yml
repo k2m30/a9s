@@ -13,6 +13,7 @@ jobs:
   race:
     name: Race (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -24,10 +25,12 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
         with:
           go-version-file: go.mod
+      - name: Install make
+        if: runner.os == 'Windows'
+        run: choco install make --no-progress -y
       - name: Run tests with race detector
-        # Windows under the race detector needs about 18 minutes; macOS and
-        # Ubuntu about 8. The ceiling leaves the same margin for all three.
-        run: go test -race ./tests/unit/... -timeout 2400s -shuffle=on
+        # The ceiling is sized for macos-latest (3 CPU, 7 GB), the slowest runner.
+        run: make test-race RACE_TIMEOUT=5400s
 
   open-issue-on-failure:
     name: Report failure

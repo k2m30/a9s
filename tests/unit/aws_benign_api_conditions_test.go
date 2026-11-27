@@ -293,7 +293,7 @@ func TestFetchKMSKeysPage_PerKeyAccessDeniedDoesNotContributeToCompositeError(t 
 	}
 	clients := &awsclient.ServiceClients{KMS: fake}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), clients, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), clients, ""))
 	if err != nil {
 		t.Fatalf("a per-key AccessDeniedException must not contribute to the composite fetch error, got: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestFetchKMSKeysPage_AccessDeniedKeyRowCarriesOwnerFinding(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{KMS: fake}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), clients, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), clients, ""))
 	if err != nil {
 		t.Fatalf("unexpected composite error: %v", err)
 	}
@@ -365,7 +365,7 @@ func TestFetchKMSKeysPage_ThrottleAndServerErrorsStillContributeToCompositeError
 	}
 	clients := &awsclient.ServiceClients{KMS: fake}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), clients, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("expected a non-nil composite error: throttle/server errors must still contribute")
 	}
@@ -402,7 +402,7 @@ func TestFetchKMSKeysPage_MixedAccessDeniedAndThrottleErrors(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{KMS: fake}
 
-	result, err := awsclient.FetchKMSKeysPage(context.Background(), clients, "")
+	result, err := BindPage("kms")(awsclient.FetchKMSKeysPage(context.Background(), clients, ""))
 	if err == nil {
 		t.Fatal("expected a non-nil composite error from the throttle failure alone")
 	}

@@ -110,7 +110,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Reveal: revealWithClients(func(ctx context.Context, c *ServiceClients, resourceID string) (string, error) {
 			return RevealSSMParameter(ctx, c.SSM, resourceID)
 		}),
-		FieldKeys: []string{"name", "type", "version", "last_modified", "description", "risk"},
+		FieldKeys: []string{"name", "type", "version", "last_modified", "description"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ssm")},
@@ -127,7 +127,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Name:           "KMS Keys",
 		ShortName:      "kms",
 		RefToID:        kmsRefToID,
-		HumanizeFields: []string{"status", "KeyManager", "KeySpec", "KeyState", "KeyUsage", "Origin"},
+		HumanizeFields: []string{"status", "KeyManager", "KeySpec", "KeyState", "KeyUsage", "Origin", "MultiRegionKeyType"},
 		Aliases:        []string{"kms", "keys"},
 		Category:       "SECRETS & CONFIG",
 		CloudTrailKey:  "ResourceName:ID",
@@ -152,7 +152,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Fetcher:                fetcherWithClients(FetchKMSKeysPage),
 		Wave2:                  IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
 		FetchByIDs:             fetchByIDsWithClients(FetchKMSKeysByIDs),
-		FieldKeys:              []string{"alias", "key_id", "arn", "status", "description", "aliases", "degraded_finding", "name"},
+		FieldKeys:              []string{"alias", "key_id", "arn", "status", "description", "aliases", "multi_region_key_type", "degraded_finding", "name"},
 		IssueEnricherFieldKeys: []string{"rotation_enabled"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true, Truncated: true, Mirror: true},

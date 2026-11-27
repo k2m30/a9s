@@ -126,7 +126,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 	if policy.Arn != nil {
 		arn = *policy.Arn
 	}
-	return withWave1("policy", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   arn,
 		Name: policyName,
 		Fields: map[string]string{

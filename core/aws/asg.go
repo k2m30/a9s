@@ -135,7 +135,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			!asgChecksELBHealth(aws.ToString(asg.HealthCheckType)) {
 			posture = append(posture, wave1Finding(CodeASGNoELBHealthCheck))
 		}
-		emitWave1("asg", &r, withState("asg", status, posture)...)
+		r = withWave1(r, withState("asg", status, posture)...)
 		if hasFinding(r.Findings, CodeASGLegacyLaunchConfig) {
 			addWave1Rows(&r, CodeASGLegacyLaunchConfig, domain.DetailRow{
 				Label: "Launch configuration", Value: *asg.LaunchConfigurationName, Tier: "~",

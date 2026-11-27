@@ -24,8 +24,9 @@ test:
 # The ceiling is the heaviest loaded race time of tests/unit, 1224s with four
 # race runs of it and an integration run sharing the machine, plus 20%,
 # rounded up to the next 100s; docs/development-process.md has the runs.
+RACE_TIMEOUT ?= 1500s
 test-race:
-	go test ./... -count=1 -timeout 1500s -race -shuffle=on
+	go test ./... -count=1 -timeout $(RACE_TIMEOUT) -race -shuffle=on
 
 # Captures wall time of `make test` and writes test-budget.json. The CI
 # `test-budget` job (.github/workflows/ci.yml) runs this, then invokes

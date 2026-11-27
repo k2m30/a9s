@@ -17,6 +17,7 @@ detail_hashes:
   CreationDate: 9de39562d22bb856
   Origin: 4241b6652a3011e0
   MultiRegion: 7bf159255bc164a1
+  "key:multi_region_key_type": 29dea7cf0e73fc0d
   EncryptionAlgorithms: c140468d3249c14c
   SigningAlgorithms: 33531c1e5da45fa5
 list:
@@ -51,5 +52,6 @@ detail:
   - CreationDate
   - Origin
   - MultiRegion
+  - { key: multi_region_key_type, label: MultiRegionKeyType }
   - EncryptionAlgorithms
   - SigningAlgorithms

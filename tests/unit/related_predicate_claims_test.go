@@ -24,6 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // claimCell is the text the related panel shows for a checker's answer: a
@@ -314,7 +315,7 @@ func TestSSMPlaintextCredentialNamesAreTheSecretScanNames(t *testing.T) {
 	}
 	params = append(params, factsParam("/prod/secure/client_secret_v2", ssmtypes.ParameterTypeSecureString, recent))
 
-	out, err := awsclient.FetchSSMParametersPage(context.Background(), factsSSMFake{params: params}, "")
+	out, err := unit.BindPage("ssm")(awsclient.FetchSSMParametersPage(context.Background(), factsSSMFake{params: params}, ""))
 	if err != nil {
 		t.Fatalf("FetchSSMParametersPage: %v", err)
 	}

@@ -38,6 +38,11 @@ const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
 // AWS adds later is outside the list until it is known to support them.
 var logsFullFeatureClasses = []string{string(cwlogstypes.LogGroupClassStandard)} //nolint:gochecknoglobals // static AWS value set
 
+// logsAWSRetentionClasses are the log classes whose retention AWS sets and the
+// customer cannot change ("Log classes": the Delivery class retention "is fixed
+// and cannot be changed"); DescribeLogGroups reports no retention for them.
+var logsAWSRetentionClasses = []string{string(cwlogstypes.LogGroupClassDelivery)} //nolint:gochecknoglobals // static AWS value set
+
 // logsKind is the group's log class. DescribeLogGroups reports no class on a
 // group created before classes existed, and such a group is Standard.
 func logsKind(r domain.Resource) string {
@@ -63,6 +68,7 @@ func logsOffersEvents(r domain.Resource) bool {
 // neither word — or a word from no vocabulary — is reported on for neither.
 const (
 	logsRetentionNeverExpires = "never expire"
+	logsRetentionFixedByAWS   = "fixed by AWS"
 
 	logsEncryptionKMS  = "kms"
 	logsEncryptionNone = "none"
@@ -126,8 +132,11 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 		}
 
 		retention := logsRetentionNeverExpires
-		if lg.RetentionInDays != nil {
+		switch {
+		case lg.RetentionInDays != nil:
 			retention = fmt.Sprintf("%d days", *lg.RetentionInDays)
+		case slices.Contains(logsAWSRetentionClasses, logsKind(domain.Resource{RawStruct: lg})):
+			retention = logsRetentionFixedByAWS
 		}
 		encryption := logsEncryptionNone
 		if kmsKeyID != "" {
@@ -150,7 +159,7 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			RawStruct: lg,
 		}
 
-		emitWave1("logs", &r, logsGroupFindings(retention, storedBytes, creationTime, encryption)...)
+		r = withWave1(r, logsGroupFindings(retention, storedBytes, creationTime, encryption)...)
 		if encryption == logsEncryptionNone {
 			addWave1Rows(&r, CodeLogsNoKMS, domain.DetailRow{
 				Label: "KMS key", Value: "none", Tier: "~",

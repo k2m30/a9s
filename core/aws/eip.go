@@ -86,7 +86,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 		}
 
 		if unassociated {
-			emitWave1("eip", &r, wave1Finding(CodeEIPUnassociated))
+			r = withWave1(r, wave1Finding(CodeEIPUnassociated))
 		}
 
 		resources = append(resources, r)

@@ -91,7 +91,7 @@ func FetchECSServicesPage(
 
 				findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
 
-				r := withWave1("ecs-svc", resource.Resource{
+				r := withWave1(resource.Resource{
 					ID:   ecsSvcID(clusterName, serviceName),
 					Name: serviceName,
 					Fields: map[string]string{
@@ -121,7 +121,7 @@ func FetchECSServicesPage(
 			idOf := func(arn string) string { return ecsSvcID(clusterName, nameOf(arn)) }
 			rows, batchFailures := keepListed("DescribeServices", serviceArns, idOf, ans, err, func(arn string, err error) resource.Resource {
 				serviceName := nameOf(arn)
-				r := DegradedDetails("ecs-svc", idOf(arn), err)
+				r := degradedRow(idOf(arn), err)
 				r.Name = serviceName
 				r.Fields["service_name"], r.Fields["cluster"], r.Fields["arn"] = serviceName, clusterName, arn
 				return r

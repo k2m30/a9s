@@ -6,6 +6,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -162,8 +163,8 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	ctrl := newBlessedController(t, core)
 
 	finding := domain.Finding{
-		Code:     "s3-public-read",
-		Phrase:   "publicly readable",
+		Code:     "s3.public",
+		Phrase:   catalog.Phrase("s3.public"),
 		Severity: domain.SevBroken,
 		Source:   "wave2:s3",
 	}
@@ -182,8 +183,8 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	if len(tf.Rows) != 1 {
 		t.Fatalf("persisted s3 TypeFile.Rows has %d entries, want 1", len(tf.Rows))
 	}
-	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3-public-read" {
-		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — C6: per-row findings must survive the production save wiring, not just a manually-constructed cache.Row", tf.Rows[0].Findings, "s3-public-read")
+	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3.public" {
+		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — C6: per-row findings must survive the production save wiring, not just a manually-constructed cache.Row", tf.Rows[0].Findings, "s3.public")
 	}
 
 	s2 := session.New()
@@ -413,7 +414,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
 
-	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}
+	finding := domain.Finding{Code: "s3.public", Phrase: catalog.Phrase("s3.public"), Severity: domain.SevBroken, Source: "wave2:s3"}
 	sweepResources := []resource.Resource{
 		{ID: "bucket-sweepenrich-1", Name: "sweepenrich-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
 	}
@@ -465,8 +466,8 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	for _, r := range tf.Rows {
 		if r.ID == "bucket-sweepenrich-1" {
 			found = true
-			if len(r.Findings) != 1 || r.Findings[0].Code != "s3-public-read" {
-				t.Errorf("persisted sweep-only row Findings = %+v, want 1 finding with Code=%q", r.Findings, "s3-public-read")
+			if len(r.Findings) != 1 || r.Findings[0].Code != "s3.public" {
+				t.Errorf("persisted sweep-only row Findings = %+v, want 1 finding with Code=%q", r.Findings, "s3.public")
 			}
 		}
 	}
@@ -486,8 +487,8 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	ctrl := newBlessedController(t, core)
 
 	finding := domain.Finding{
-		Code:     "s3-public-read",
-		Phrase:   "publicly readable",
+		Code:     "s3.public",
+		Phrase:   catalog.Phrase("s3.public"),
 		Severity: domain.SevBroken,
 		Source:   "wave2:s3",
 	}
@@ -528,8 +529,8 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	if len(tf.Rows) != 1 {
 		t.Fatalf("persisted s3 TypeFile.Rows has %d entries, want 1", len(tf.Rows))
 	}
-	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3-public-read" {
-		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — C6: Wave-2 findings applied to an OPEN live list via the real EnrichmentChecked seam must reach ls.Rows/resourceCache so the list-open save path persists them, not just the session-side stores applyEnrichment writes to", tf.Rows[0].Findings, "s3-public-read")
+	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3.public" {
+		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — C6: Wave-2 findings applied to an OPEN live list via the real EnrichmentChecked seam must reach ls.Rows/resourceCache so the list-open save path persists them, not just the session-side stores applyEnrichment writes to", tf.Rows[0].Findings, "s3.public")
 	}
 
 	s2 := session.New()

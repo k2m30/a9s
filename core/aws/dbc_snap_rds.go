@@ -109,7 +109,7 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 			storageEncrypted = strconv.FormatBool(*snapshot.StorageEncrypted)
 		}
 
-		r := withWave1("dbc-snap", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   snapshotID,
 			Name: snapshotID,
 			Fields: map[string]string{

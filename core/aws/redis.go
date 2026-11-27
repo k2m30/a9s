@@ -98,7 +98,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 
 		findings, attentionDetails := computeRedisFindings(status, multiAZ, autoFailover, rg)
 
-		r := withWave1("redis", resource.Resource{
+		r := withWave1(resource.Resource{
 			ID:   rgID,
 			Name: rgID,
 			Fields: map[string]string{

@@ -35,12 +35,12 @@ func wipfixTwoPageFetcher(t *testing.T, shortName string) {
 	resource.SetPaginatedForTest(shortName, func(_ context.Context, _ any, token string) (resource.FetchResult, error) {
 		if token == "" {
 			return resource.FetchResult{
-				Resources:  []resource.Resource{{ID: "row-page-1", Name: "row-page-1", Fields: map[string]string{}}},
+				Resources:  []resource.Resource{{ID: "row-page-1", Name: "row-page-1", Type: shortName, Fields: map[string]string{}}},
 				Pagination: &domain.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
 			}, nil
 		}
 		return resource.FetchResult{
-			Resources:  []resource.Resource{{ID: "row-page-2", Name: "row-page-2", Fields: map[string]string{}}},
+			Resources:  []resource.Resource{{ID: "row-page-2", Name: "row-page-2", Type: shortName, Fields: map[string]string{}}},
 			Pagination: &domain.PaginationMeta{IsTruncated: false},
 		}, nil
 	})

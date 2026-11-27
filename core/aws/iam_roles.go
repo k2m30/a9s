@@ -117,75 +117,12 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		return resource.FetchResult{}, fmt.Errorf("fetching IAM roles: %w", err)
 	}
 
-	listPoliciesAPI, _ := api.(IAMListRolePoliciesAPI)
-	getPolicyAPI, _ := api.(IAMGetRolePolicyAPI)
-
 	var resources []resource.Resource
 	var failures []Failure
 	for _, role := range output.Roles {
-		roleName := ""
-		if role.RoleName != nil {
-			roleName = *role.RoleName
-		}
-
-		roleID := ""
-		if role.RoleId != nil {
-			roleID = *role.RoleId
-		}
-
-		roleARN := ""
-		if role.Arn != nil {
-			roleARN = *role.Arn
-		}
-
-		path := ""
-		if role.Path != nil {
-			path = *role.Path
-		}
-
-		createDate := ""
-		if role.CreateDate != nil {
-			createDate = role.CreateDate.Format("2006-01-02 15:04")
-		}
-
-		description := ""
-		if role.Description != nil {
-			description = *role.Description
-		}
-
-		assumeRolePolicyDoc := ""
-		if role.AssumeRolePolicyDocument != nil {
-			assumeRolePolicyDoc = iampolicy.Decode(*role.AssumeRolePolicyDocument)
-		}
-
-		trust := analyseRoleTrust(assumeRolePolicyDoc)
-		findings, details := trust.findings, trust.details
-
-		if listPoliciesAPI != nil && getPolicyAPI != nil && roleName != "" {
-			inline := scanRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
-			findings, details = addInlinePrivEsc(findings, details, inline)
-			failures = append(failures, inline.failures...)
-		}
-
-		r := withWave1("role", resource.Resource{
-			ID:   roleName,
-			Name: roleName,
-			Type: "role",
-			Fields: map[string]string{
-				"role_name":                   roleName,
-				"role_id":                     roleID,
-				"arn":                         roleARN,
-				"path":                        path,
-				"create_date":                 createDate,
-				"description":                 description,
-				"assume_role_policy_document": assumeRolePolicyDoc,
-				"trust_summary":               trust.summary,
-			},
-			AttentionDetails: details,
-			RawStruct:        role,
-		}, findings...)
-
+		r, roleFailures := roleToResource(ctx, api, role)
 		resources = append(resources, r)
+		failures = append(failures, roleFailures...)
 	}
 
 	nextToken := ""
@@ -317,10 +254,9 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 		failures = inline.failures
 	}
 
-	return withWave1("role", resource.Resource{
+	return withWave1(resource.Resource{
 		ID:   roleName,
 		Name: roleName,
-		Type: "role",
 		Fields: map[string]string{
 			"role_name":                   roleName,
 			"role_id":                     roleID,

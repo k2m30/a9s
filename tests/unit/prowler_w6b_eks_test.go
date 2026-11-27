@@ -153,8 +153,8 @@ func w6bEKSSupportedVersions() map[string]w6bEKSVersionInfo {
 
 func w6bFetchEKS(t *testing.T, fake *w6bEKSFake) []resource.Resource {
 	t.Helper()
-	out, err := awsclient.FetchEKSClustersPage(context.Background(),
-		&awsclient.ServiceClients{EKS: fake}, "")
+	out, err := BindPage("eks")(awsclient.FetchEKSClustersPage(context.Background(),
+		&awsclient.ServiceClients{EKS: fake}, ""))
 	if err != nil {
 		t.Fatalf("FetchEKSClustersPage: %v", err)
 	}

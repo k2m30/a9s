@@ -77,8 +77,10 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 				return nil, errNotInList
 			}
 			return &r, nil
-		}, func(err error) resource.Resource {
-			r := DegradedDetails("kms", listedID, err)
+		}, func(error) resource.Resource {
+			// DescribeKey's denial is answered above with the key's own row, so
+			// a describe that failed here was never refused.
+			r := degradedRow(listedID, nil)
 			r.Fields["key_id"] = listedID
 			r.Fields["arn"] = aws.ToString(key.KeyArn)
 			return r
@@ -197,35 +199,14 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			continue
 		}
 		meta := out.KeyMetadata
-		keyID := ""
-		if meta.KeyId != nil {
-			keyID = *meta.KeyId
-		}
-		description := ""
-		if meta.Description != nil {
-			description = *meta.Description
-		}
-		status := string(meta.KeyState)
+		keyID := aws.ToString(meta.KeyId)
 		known := aliasMap[keyID]
 		if requested, isAlias := kmsAliasName(id); isAlias && !slices.Contains(known, requested) {
 			// DescribeKey answered for this alias, so it is one of the key's,
 			// even when ListAliases does not report it yet.
 			known = append(slices.Clone(known), requested)
 		}
-		alias, aliases := kmsAliasFields(known)
-		resources = append(resources, withWave1("kms", resource.Resource{
-			ID:   keyID,
-			Name: alias,
-			Fields: map[string]string{
-				"key_id":      keyID,
-				"arn":         aws.ToString(meta.Arn),
-				"alias":       alias,
-				"aliases":     aliases,
-				"status":      status,
-				"description": description,
-			},
-			RawStruct: meta,
-		}, withState("kms", status, nil)...))
+		resources = append(resources, kmsKeyResource(meta, map[string][]string{keyID: known}))
 	}
 
 	return resources, errors.Join(
@@ -297,16 +278,21 @@ func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) re
 	keyID := aws.ToString(meta.KeyId)
 	status := string(meta.KeyState)
 	alias, aliases := kmsAliasFields(aliasMap[keyID])
-	return withWave1("kms", resource.Resource{
+	keyType := ""
+	if meta.MultiRegionConfiguration != nil {
+		keyType = string(meta.MultiRegionConfiguration.MultiRegionKeyType)
+	}
+	return withWave1(resource.Resource{
 		ID:   keyID,
 		Name: alias,
 		Fields: map[string]string{
-			"key_id":      keyID,
-			"arn":         aws.ToString(meta.Arn),
-			"alias":       alias,
-			"aliases":     aliases,
-			"status":      status,
-			"description": aws.ToString(meta.Description),
+			"key_id":                keyID,
+			"arn":                   aws.ToString(meta.Arn),
+			"alias":                 alias,
+			"aliases":               aliases,
+			"status":                status,
+			"description":           aws.ToString(meta.Description),
+			"multi_region_key_type": keyType,
 		},
 		RawStruct: meta,
 	}, withState("kms", status, nil)...)
@@ -317,7 +303,7 @@ func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) re
 // (from ListKeys) is not in question, so it stays visible with a finding
 // distinguishing it from a key whose state was read.
 func kmsAccessDeniedResource(keyID, keyARN string) resource.Resource {
-	return withWave1("kms", resource.Resource{
+	return withWave1(resource.Resource{
 		ID: keyID,
 		Fields: map[string]string{
 			"key_id": keyID,

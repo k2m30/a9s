@@ -236,7 +236,7 @@ func t6DevLoadApp(t *testing.T) []*packages.Package {
 func t6DevEachFunc(pkgs []*packages.Package, fn func(pkg *packages.Package, file, name string, body *ast.BlockStmt)) {
 	for _, pkg := range pkgs {
 		for _, f := range pkg.Syntax {
-			file := pkg.Fset.Position(f.Pos()).Filename
+			file := filepath.ToSlash(pkg.Fset.Position(f.Pos()).Filename)
 			if strings.HasSuffix(file, "_test.go") {
 				continue
 			}
