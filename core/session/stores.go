@@ -41,6 +41,11 @@ var clientStores = []struct {
 		reset:      func(s *Session) { s.RegionLists = awsclient.NewRegionListStore() },
 		wire:       func(s *Session, c *awsclient.ServiceClients) { c.SetRegionLists(s.RegionLists) },
 	},
+	{
+		refreshedBy: []string{"s3", "trail", "ebs-snap", "ec2", "lt"},
+		reset:       func(s *Session) { s.ExposureSettings = awsclient.NewExposureSettingsStore() },
+		wire:        func(s *Session, c *awsclient.ServiceClients) { c.SetExposureSettings(s.ExposureSettings) },
+	},
 }
 
 func (s *Session) resetClientStores() {

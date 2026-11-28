@@ -848,7 +848,7 @@ func (f *rvS3PostureFake) GetObjectLockConfiguration(context.Context, *s3.GetObj
 func TestS3Public_ACLRouteNeedsTheBlockItWasJudgedAgainst(t *testing.T) {
 	const bucket = "acme-legacy-downloads"
 	refused, _ := awsclient.EnrichS3Posture(context.Background(), //nolint:errcheck // judged by its findings and marks
-		&awsclient.ServiceClients{S3: &rvS3PostureFake{pabErr: bkOpErr("S3", "GetPublicAccessBlock", "AccessDenied")}}, rvRows("s3", bucket), nil)
+		t4WithAccount(&awsclient.ServiceClients{S3: &rvS3PostureFake{pabErr: bkOpErr("S3", "GetPublicAccessBlock", "AccessDenied")}}), rvRows("s3", bucket), nil)
 	if bkHasCode(refused.Findings[bucket], "s3.public") {
 		t.Error("GetPublicAccessBlock was refused, yet the ACL grant was judged as if IgnorePublicAcls were off and s3.public raised")
 	}
@@ -857,7 +857,7 @@ func TestS3Public_ACLRouteNeedsTheBlockItWasJudgedAgainst(t *testing.T) {
 	}
 
 	read, _ := awsclient.EnrichS3Posture(context.Background(), //nolint:errcheck // judged by its findings
-		&awsclient.ServiceClients{S3: &rvS3PostureFake{}}, rvRows("s3", bucket), nil)
+		t4WithAccount(&awsclient.ServiceClients{S3: &rvS3PostureFake{}}), rvRows("s3", bucket), nil)
 	if !bkHasCode(read.Findings[bucket], "s3.public") {
 		t.Errorf("the block reads IgnorePublicAcls=false and the ACL grants AllUsers, want s3.public; carries %v", bkCodes(read.Findings[bucket]))
 	}

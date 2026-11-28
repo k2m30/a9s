@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -66,6 +67,20 @@ func enrichTrailStatus(ctx context.Context, clients *ServiceClients, resources [
 	return errors.Join(loopErr, AggregateFailures("GetTrailStatus", failures, len(resources)))
 }
 
+// trailBucketOwned reports whether the session's account owns bucket, read
+// off the loaded s3 list: ListBuckets "Returns a list of all buckets owned by
+// the authenticated sender of the request", so a bucket on it is the
+// account's, and one absent from a complete list belongs to another account.
+// known is false when the list is not loaded in full. The account-level
+// public access block applies only to the account's own buckets.
+func trailBucketOwned(cache resource.ResourceCache, bucket string) (owned, known bool) {
+	rows, truncated, loaded := cachedRelatedList(cache, "s3")
+	if slices.ContainsFunc(rows, func(r resource.Resource) bool { return r.ID == bucket }) {
+		return true, true
+	}
+	return false, loaded && !truncated
+}
+
 // trailLogBucketAPI is the read-only S3 calls the log-bucket rows need: the
 // public verdict's reads and the access-logging read. Asserted off the
 // bucket's own S3 client rather than folded into the aggregate, so a client
@@ -86,7 +101,7 @@ type trailLogBucketAPI interface {
 //
 // Up to four calls per trail, capped by EnrichmentCap. A bucket that cannot be
 // read marks its trail truncated rather than reporting it clean.
-func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]string),
@@ -112,7 +127,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 			return
 		}
 
-		pub := s3PublicVerdict(ctx, api, bucket)
+		pub := s3PublicVerdict(ctx, clients, api, bucket)
 		logging, loggingErr := api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 
 		mu.Lock()
@@ -127,7 +142,19 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 				MarkSkipped(&result, r.ID, &failures, err)
 			}
 		}
-		if pub.rows != nil {
+		// The verdict that holds only if the session's account owns the
+		// bucket needs that fact; one both readings agree on does not.
+		ownDecided, public := pub.public(false)
+		if foreignDecided, foreignPublic := pub.public(true); foreignDecided != ownDecided || foreignPublic != public {
+			switch owned, known := trailBucketOwned(cache, bucket); {
+			case !known:
+				public = false
+				markUninspected(&result, r.ID, checkListIncomplete("s3"))
+			case !owned:
+				public = foreignPublic
+			}
+		}
+		if public {
 			setWave2Finding(&result, r.ID, CodeTrailLogBucketPublic, []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: tierOf(CodeTrailLogBucketPublic)}})
 		}
 

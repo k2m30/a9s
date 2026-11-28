@@ -174,13 +174,18 @@ type lockScopeAPIGWFake struct {
 func (f *lockScopeAPIGWFake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
 	return &apigatewayv2.GetStagesOutput{Items: []apigwv2types.Stage{{
 		StageName:         aws.String("prod"),
+		DeploymentId:      aws.String("dpl9c3"),
 		AccessLogSettings: &apigwv2types.AccessLogSettings{DestinationArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/apigw/prod")},
 	}}}, nil
 }
 
 func (f *lockScopeAPIGWFake) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
-	f.barrier.arrive()
 	return &apigatewayv2.GetAuthorizersOutput{}, nil
+}
+
+func (f *lockScopeAPIGWFake) GetRoutes(_ context.Context, _ *apigatewayv2.GetRoutesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	f.barrier.arrive()
+	return &apigatewayv2.GetRoutesOutput{Items: w6aHTTPRoutes(apigwv2types.AuthorizationTypeNone, "")}, nil
 }
 
 func TestEnrichAPIGatewayStage_AuthorizerReadsOverlap(t *testing.T) {
@@ -202,7 +207,7 @@ func TestEnrichAPIGatewayStage_AuthorizerReadsOverlap(t *testing.T) {
 		t.Fatalf("EnrichAPIGatewayStage: %v", err)
 	}
 
-	barrier.assertMet(t, "GetAuthorizers")
+	barrier.assertMet(t, "GetRoutes")
 	for _, id := range []string{apiA, apiB} {
 		w2AssertFindingRaisedOnce(t, res, id, "apigw.no-authorizer")
 		if got := res.FieldUpdates[id]["stages_count"]; got != "1" {

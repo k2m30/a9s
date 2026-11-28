@@ -43,6 +43,7 @@ import (
 	redshift "github.com/aws/aws-sdk-go-v2/service/redshift"
 	route53 "github.com/aws/aws-sdk-go-v2/service/route53"
 	s3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3control "github.com/aws/aws-sdk-go-v2/service/s3control"
 	secretsmanager "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	ses "github.com/aws/aws-sdk-go-v2/service/ses"
 	sesv2 "github.com/aws/aws-sdk-go-v2/service/sesv2"
@@ -293,6 +294,28 @@ func (w t576EC2) DescribeVolumes(ctx context.Context, in *ec2.DescribeVolumesInp
 	return res, err
 }
 
+func (w t576EC2) DescribeVpcBlockPublicAccessExclusions(ctx context.Context, in *ec2.DescribeVpcBlockPublicAccessExclusionsInput, o ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessExclusionsOutput, error) {
+	if err := w.inj.before("EC2", "DescribeVpcBlockPublicAccessExclusions", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		DescribeVpcBlockPublicAccessExclusions(context.Context, *ec2.DescribeVpcBlockPublicAccessExclusionsInput, ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessExclusionsOutput, error)
+	}).DescribeVpcBlockPublicAccessExclusions(ctx, in, o...)
+	w.inj.after("EC2", "DescribeVpcBlockPublicAccessExclusions", in, res)
+	return res, err
+}
+
+func (w t576EC2) DescribeVpcBlockPublicAccessOptions(ctx context.Context, in *ec2.DescribeVpcBlockPublicAccessOptionsInput, o ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessOptionsOutput, error) {
+	if err := w.inj.before("EC2", "DescribeVpcBlockPublicAccessOptions", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		DescribeVpcBlockPublicAccessOptions(context.Context, *ec2.DescribeVpcBlockPublicAccessOptionsInput, ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessOptionsOutput, error)
+	}).DescribeVpcBlockPublicAccessOptions(ctx, in, o...)
+	w.inj.after("EC2", "DescribeVpcBlockPublicAccessOptions", in, res)
+	return res, err
+}
+
 func (w t576EC2) DescribeVpcEndpoints(ctx context.Context, in *ec2.DescribeVpcEndpointsInput, o ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error) {
 	if err := w.inj.before("EC2", "DescribeVpcEndpoints", in); err != nil {
 		return nil, err
@@ -345,6 +368,17 @@ func (w t576EC2) GetInstanceMetadataDefaults(ctx context.Context, in *ec2.GetIns
 		GetInstanceMetadataDefaults(context.Context, *ec2.GetInstanceMetadataDefaultsInput, ...func(*ec2.Options)) (*ec2.GetInstanceMetadataDefaultsOutput, error)
 	}).GetInstanceMetadataDefaults(ctx, in, o...)
 	w.inj.after("EC2", "GetInstanceMetadataDefaults", in, res)
+	return res, err
+}
+
+func (w t576EC2) GetSnapshotBlockPublicAccessState(ctx context.Context, in *ec2.GetSnapshotBlockPublicAccessStateInput, o ...func(*ec2.Options)) (*ec2.GetSnapshotBlockPublicAccessStateOutput, error) {
+	if err := w.inj.before("EC2", "GetSnapshotBlockPublicAccessState", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetSnapshotBlockPublicAccessState(context.Context, *ec2.GetSnapshotBlockPublicAccessStateInput, ...func(*ec2.Options)) (*ec2.GetSnapshotBlockPublicAccessStateOutput, error)
+	}).GetSnapshotBlockPublicAccessState(ctx, in, o...)
+	w.inj.after("EC2", "GetSnapshotBlockPublicAccessState", in, res)
 	return res, err
 }
 
@@ -527,6 +561,23 @@ func (w t576S3) ListObjectsV2(ctx context.Context, in *s3.ListObjectsV2Input, o 
 		ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 	}).ListObjectsV2(ctx, in, o...)
 	w.inj.after("S3", "ListObjectsV2", in, res)
+	return res, err
+}
+
+type t576S3Control struct {
+	awsclient.S3ControlAPI
+	fake any
+	inj  *t576Injector
+}
+
+func (w t576S3Control) GetPublicAccessBlock(ctx context.Context, in *s3control.GetPublicAccessBlockInput, o ...func(*s3control.Options)) (*s3control.GetPublicAccessBlockOutput, error) {
+	if err := w.inj.before("S3Control", "GetPublicAccessBlock", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetPublicAccessBlock(context.Context, *s3control.GetPublicAccessBlockInput, ...func(*s3control.Options)) (*s3control.GetPublicAccessBlockOutput, error)
+	}).GetPublicAccessBlock(ctx, in, o...)
+	w.inj.after("S3Control", "GetPublicAccessBlock", in, res)
 	return res, err
 }
 
@@ -2180,6 +2231,17 @@ func (w t576APIGatewayV2) GetIntegrations(ctx context.Context, in *apigatewayv2.
 	return res, err
 }
 
+func (w t576APIGatewayV2) GetRoutes(ctx context.Context, in *apigatewayv2.GetRoutesInput, o ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	if err := w.inj.before("APIGatewayV2", "GetRoutes", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetRoutes(context.Context, *apigatewayv2.GetRoutesInput, ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error)
+	}).GetRoutes(ctx, in, o...)
+	w.inj.after("APIGatewayV2", "GetRoutes", in, res)
+	return res, err
+}
+
 func (w t576APIGatewayV2) GetStages(ctx context.Context, in *apigatewayv2.GetStagesInput, o ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
 	if err := w.inj.before("APIGatewayV2", "GetStages", in); err != nil {
 		return nil, err
@@ -3416,6 +3478,7 @@ func (w t576Transfer) ListServers(ctx context.Context, in *transfer.ListServersI
 func t576WrapClients(c *awsclient.ServiceClients, inj *t576Injector) {
 	c.EC2 = t576EC2{EC2API: c.EC2, fake: c.EC2, inj: inj}
 	c.S3 = t576S3{S3API: c.S3, fake: c.S3, inj: inj}
+	c.S3Control = t576S3Control{S3ControlAPI: c.S3Control, fake: c.S3Control, inj: inj}
 	c.RDS = t576RDS{RDSAPI: c.RDS, fake: c.RDS, inj: inj}
 	c.ElastiCache = t576ElastiCache{ElastiCacheAPI: c.ElastiCache, fake: c.ElastiCache, inj: inj}
 	c.DocDB = t576DocDB{DocDBAPI: c.DocDB, fake: c.DocDB, inj: inj}

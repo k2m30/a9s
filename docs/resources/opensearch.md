@@ -116,7 +116,7 @@ One bullet per distinct signal.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
   - **Cost shape**: hybrid.
 
-- **Signal**: no `VPCOptions` AND the access policy allows any principal.
+- **Signal**: no `VPCOptions` AND the access policy allows any principal AND fine-grained access control does not check the caller (`AdvancedSecurityOptions.Enabled` off, or anonymous authentication on). AWS, OpenSearch Service "Operational best practices": "There are some situations, however, where it's acceptable to use an open access policy, such as when you enable fine-grained access control."
   - **Explicit Deny**: a Deny statement that takes the grant from every caller on every granted resource clears the signal, and so do Deny statements that together fence both AWS service principals and every other caller to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. A conditional Deny that spares AWS service principals, or that names only part of the granted resources, does not clear it. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody.
   - **State bucket**: Broken.
   - **API call**: `DescribeDomains` — bounded fan-out (shared).
@@ -186,7 +186,7 @@ One row per signal from §3:
 | `DomainProcessingStatus=="Isolated"` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `isolated: quarantined by AWS` |
 | `ServiceSoftwareOptions.UpdateAvailable==true` AND `AutomatedUpdateDate` past | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `software update forced soon` |
 | `EncryptionAtRestOptions.Enabled==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
-| No `VPCOptions` AND access policy allows any principal | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `reachable outside a VPC` |
+| No `VPCOptions` AND access policy allows any principal AND no fine-grained access control | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `reachable outside a VPC` |
 | `AccessPolicies` does not parse | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `access policy not inspected` |
 | `DomainEndpointOptions.EnforceHTTPS` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `HTTPS not enforced` |
 | `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `node-to-node encryption off` |

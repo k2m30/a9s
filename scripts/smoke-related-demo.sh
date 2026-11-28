@@ -30,10 +30,9 @@ keys 'd'
 wait_for s3_detail.txt "CloudTrail Trails (1)" "s3 detail related shows the trail witness"
 
 # --- Witness 2: zero-count rows are dimmed and the cursor skips them -------
-# a9s-demo-nopab carries several (0) pivots (Lambda/SNS/SQS notifications,
-# Athena, Glue, Backup, EventBridge, Route 53, IAM Roles) between two
-# actionable rows (CloudTrail Trails, CloudFront) and the bare CloudTrail
-# Events pivot — an ideal witness for the cursor-skip walk.
+# a9s-demo-nopab opens on a (0) pivot (CloudTrail Trails) and carries several
+# more (Lambda/SNS/SQS notifications, Glue, Backup, EventBridge, Route 53,
+# IAM Roles) around its actionable rows and the bare CloudTrail Events pivot.
 keys Escape
 sleep 1
 keys Escape
@@ -143,7 +142,7 @@ forbid_re s3_detail.txt 'CloudTrail Events[[:space:]]*\([0-9?]' "CloudTrail Even
 # selection starts on the first row (CloudTrail Trails); walking down, the
 # footer never names a (0) pivot as selected and lands on the next
 # actionable/bare row instead.
-expect s3_nopab_tab1.txt "enter CloudTrail Trails" "tab into the panel selects the first actionable row"
+expect s3_nopab_tab1.txt "enter CloudFront Distributions" "tab into the panel selects the first actionable row"
 expect s3_nopab_walked.txt "enter CloudTrail Events" "cursor walk skips every (0) row and lands on the next actionable pivot"
 forbid_re s3_nopab_zero_stop.txt "$ZERO_ROW_SELECTED" "selection marker never lands on a (0) row"
 

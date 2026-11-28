@@ -29,6 +29,9 @@ type APIGWFixtures struct {
 	// Authorizers maps ApiId -> authorizers, served by GetAuthorizers.
 	// Required for the apigw:role related-panel pivot (checkApigwRole).
 	Authorizers map[string][]apigwtypes.Authorizer
+	// Routes maps ApiId -> routes, served by GetRoutes; each route's
+	// AuthorizationType is what the no-authorizer finding reads.
+	Routes map[string][]apigwtypes.Route
 	// Stages maps ApiId -> deployed stages, served by GetStages. Required for
 	// the apigw.stage-config-issues / apigw.no-deployed-stages Wave 2 findings
 	// (EnrichAPIGatewayStage).
@@ -167,6 +170,24 @@ var sharedAPIGWFixtures = shared(func() *APIGWFixtures {
 				},
 			},
 		},
+		// Every route but the WebSocket API's names an authorizer, so
+		// APIGWHTTPNoAuthorizer is the one v2 API a caller reaches unchecked.
+		Routes: map[string][]apigwtypes.Route{
+			PublicAPIGWID: {
+				apigwV2Route("rte-public-1", "GET /v1/orders", apigwtypes.AuthorizationTypeCustom, "auth-public-api-1"),
+				apigwV2Route("rte-public-2", "POST /v1/orders", apigwtypes.AuthorizationTypeCustom, "auth-public-api-1"),
+			},
+			APIGWHTTPNoAuthorizer: {
+				apigwV2Route("rte-ws-connect", "$connect", apigwtypes.AuthorizationTypeNone, ""),
+				apigwV2Route("rte-ws-default", "$default", apigwtypes.AuthorizationTypeNone, ""),
+			},
+			"klm901nop2": {
+				apigwV2Route("rte-internal-1", "ANY /{proxy+}", apigwtypes.AuthorizationTypeCustom, "auth-internal-api-1"),
+			},
+			HealthyAPIGWID: {
+				apigwV2Route("rte-partner-1", "GET /partners", apigwtypes.AuthorizationTypeCustom, "auth-healthy-api-1"),
+			},
+		},
 		// DomainNames + ApiMappings — required for the apigw:acm pivot
 		// (checkApigwACM: GetDomainNames -> GetApiMappings match on
 		// ApiId -> harvest CertificateArn from DomainNameConfigurations).
@@ -219,8 +240,9 @@ var sharedAPIGWFixtures = shared(func() *APIGWFixtures {
 		Stages: map[string][]apigwtypes.Stage{
 			PublicAPIGWID: {
 				{
-					StageName:   aws.String("$default"),
-					CreatedDate: aws.Time(time.Date(2025, 3, 10, 9, 5, 0, 0, time.UTC)),
+					StageName:    aws.String("$default"),
+					DeploymentId: aws.String("dpl001"),
+					CreatedDate:  aws.Time(time.Date(2025, 3, 10, 9, 5, 0, 0, time.UTC)),
 					DefaultRouteSettings: &apigwtypes.RouteSettings{
 						ThrottlingBurstLimit: aws.Int32(0),
 						ThrottlingRateLimit:  aws.Float64(0),
@@ -228,12 +250,31 @@ var sharedAPIGWFixtures = shared(func() *APIGWFixtures {
 					AccessLogSettings: nil,
 				},
 			},
+			// Deployed, throttled and logged, so the one finding on
+			// APIGWHTTPNoAuthorizer is its unauthorized $connect route: an API
+			// no stage deploys answers no caller.
+			APIGWHTTPNoAuthorizer: {
+				{
+					StageName:    aws.String("production"),
+					DeploymentId: aws.String("dpl003"),
+					CreatedDate:  aws.Time(time.Date(2025, 7, 5, 14, 35, 0, 0, time.UTC)),
+					DefaultRouteSettings: &apigwtypes.RouteSettings{
+						ThrottlingBurstLimit: aws.Int32(200),
+						ThrottlingRateLimit:  aws.Float64(400),
+					},
+					AccessLogSettings: &apigwtypes.AccessLogSettings{
+						DestinationArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/apigateway/acme-websocket-api"),
+						Format:         aws.String(`{"requestId":"$context.requestId","status":"$context.status"}`),
+					},
+				},
+			},
 			// HealthyAPIGWID's "prod" stage has real throttling limits and
 			// access logging configured — no apigw.stage-config-issues finding.
 			HealthyAPIGWID: {
 				{
-					StageName:   aws.String("prod"),
-					CreatedDate: aws.Time(time.Date(2025, 10, 12, 8, 5, 0, 0, time.UTC)),
+					StageName:    aws.String("prod"),
+					DeploymentId: aws.String("dpl002"),
+					CreatedDate:  aws.Time(time.Date(2025, 10, 12, 8, 5, 0, 0, time.UTC)),
 					DefaultRouteSettings: &apigwtypes.RouteSettings{
 						ThrottlingBurstLimit: aws.Int32(500),
 						ThrottlingRateLimit:  aws.Float64(1000),
@@ -248,17 +289,31 @@ var sharedAPIGWFixtures = shared(func() *APIGWFixtures {
 	}
 })
 
+func apigwV2Route(id, key string, authorizationType apigwtypes.AuthorizationType, authorizerID string) apigwtypes.Route {
+	r := apigwtypes.Route{RouteId: aws.String(id), RouteKey: aws.String(key), AuthorizationType: authorizationType}
+	if authorizerID != "" {
+		r.AuthorizerId = aws.String(authorizerID)
+	}
+	return r
+}
+
 func NewAPIGWFixtures() *APIGWFixtures {
 	return sharedAPIGWFixtures()
 }
 
 const (
-	// APIGWRESTNoAuthorizer is the REST API with no authorizer and a
-	// resource policy that is absent or public.
+	// APIGWRESTNoAuthorizer is the REST API whose method authorizes no
+	// caller and whose resource policy is absent. It defines an authorizer
+	// that no method names, which guards nothing.
 	APIGWRESTNoAuthorizer = "rst001noauth"
 
-	// APIGWHTTPNoAuthorizer is the HTTP API with no authorizer.
+	// APIGWHTTPNoAuthorizer is the WebSocket API whose $connect route
+	// authorizes no caller.
 	APIGWHTTPNoAuthorizer = "efg567hij8"
+
+	// APIGWRESTSignedOnly is the REST API with no authorizer whose every
+	// method requires a signed request (AWS_IAM), so every caller is checked.
+	APIGWRESTSignedOnly = APIGWRESTTracingOff
 
 	// APIGWRESTNoAccessLogs is the REST API whose stage records no access logs.
 	APIGWRESTNoAccessLogs = "rst002nologs"
@@ -351,8 +406,8 @@ var sharedAPIGWV1Fixtures = shared(func() *APIGWV1Fixtures { //nolint:gochecknog
 			apigwV1RestAPI(APIGWRESTStageSecret, "acme-leaky-rest", "PRIVATE"),
 		},
 		Authorizers: map[string][]apigwv1types.Authorizer{
+			APIGWRESTNoAuthorizer: authorizer,
 			APIGWRESTNoAccessLogs: authorizer,
-			APIGWRESTTracingOff:   authorizer,
 			APIGWRESTStageSecret:  authorizer,
 		},
 		Stages: map[string][]apigwv1types.Stage{
@@ -364,6 +419,15 @@ var sharedAPIGWV1Fixtures = shared(func() *APIGWV1Fixtures { //nolint:gochecknog
 		// acme-orders-rest's POST /orders proxies to the orders Lambda: the
 		// REST API's Lambda row reads it from GetResources.
 		Resources: map[string][]apigwv1types.Resource{
+			APIGWRESTSignedOnly: {{
+				Id:       aws.String("ord003"),
+				ParentId: aws.String(APIGWRESTSignedOnly + "-root"),
+				Path:     aws.String("/orders"),
+				PathPart: aws.String("orders"),
+				ResourceMethods: map[string]apigwv1types.Method{
+					"GET": {HttpMethod: aws.String("GET"), AuthorizationType: aws.String("AWS_IAM")},
+				},
+			}},
 			APIGWRESTNoAuthorizer: {{
 				Id:       aws.String("ord001"),
 				ParentId: aws.String(APIGWRESTNoAuthorizer + "-root"),

@@ -287,6 +287,19 @@ func (f *EC2Fake) GetEbsEncryptionByDefault(_ context.Context, _ *ec2.GetEbsEncr
 	return &ec2.GetEbsEncryptionByDefaultOutput{EbsEncryptionByDefault: aws.Bool(false)}, nil
 }
 
+func (f *EC2Fake) GetSnapshotBlockPublicAccessState(_ context.Context, _ *ec2.GetSnapshotBlockPublicAccessStateInput, _ ...func(*ec2.Options)) (*ec2.GetSnapshotBlockPublicAccessStateOutput, error) {
+	return &ec2.GetSnapshotBlockPublicAccessStateOutput{State: fixtures.EBSSnapshotBlockState, ManagedBy: ec2types.ManagedByAccount}, nil
+}
+
+func (f *EC2Fake) DescribeVpcBlockPublicAccessOptions(_ context.Context, _ *ec2.DescribeVpcBlockPublicAccessOptionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessOptionsOutput, error) {
+	opts := fixtures.VPCBlockPublicAccess
+	return &ec2.DescribeVpcBlockPublicAccessOptionsOutput{VpcBlockPublicAccessOptions: &opts}, nil
+}
+
+func (f *EC2Fake) DescribeVpcBlockPublicAccessExclusions(_ context.Context, _ *ec2.DescribeVpcBlockPublicAccessExclusionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessExclusionsOutput, error) {
+	return &ec2.DescribeVpcBlockPublicAccessExclusionsOutput{VpcBlockPublicAccessExclusions: slices.Clone(fixtures.VPCBlockPublicAccessExclusions)}, nil
+}
+
 // GetInstanceMetadataDefaults answers that the demo account states no
 // account-level instance metadata defaults, so launch settings and AMIs
 // decide.

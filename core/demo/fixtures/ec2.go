@@ -138,6 +138,19 @@ const (
 	// EC2InstanceIPv6EgressOnly is the same shape in prod-private, whose ::/0
 	// route goes to an egress-only gateway: nothing reaches it inbound.
 	EC2InstanceIPv6EgressOnly = "i-0a1b2c3d4e5f60040"
+	// EC2InstanceVPCBlockClosed has the IPv6-exposed instance's shape in
+	// prod-public-b: an IPv6 address, public-ssh-bad, a ::/0 route to the
+	// internet gateway. The Region's VPC block public access blocks ingress
+	// and excludes prod-public-a only (EC2VPCBlockExcludedSubnet), so nothing
+	// reaches this one and it carries no exposure finding, while every exposed
+	// instance in prod-public-a keeps its own.
+	EC2InstanceVPCBlockClosed = "i-0bbb222222222222b"
+	// EC2VPCBlockExcludedSubnet is the subnet the demo's VPC block public
+	// access excludes in allow-bidirectional mode.
+	EC2VPCBlockExcludedSubnet = fixtProdPublicSubnetA
+	// EBSSnapshotBlockState is the demo Region's block public access state
+	// for snapshots: new public shares are refused, existing ones stay public.
+	EBSSnapshotBlockState = ec2types.SnapshotBlockPublicAccessStateBlockNewSharing
 	// EC2InstanceHostileTag is the only demo instance whose Name tag was
 	// written by someone who wanted the terminal, not the operator, to read
 	// it: the value opens an SGR sequence that recolours the rest of the
@@ -733,7 +746,24 @@ func makeInstance(
 var instanceIPv6 = map[string]string{
 	EC2InstanceIPv6Exposed:    "2001:db8:a9:1a00::10",
 	EC2InstanceIPv6EgressOnly: "2001:db8:a9:3a00::10",
+	EC2InstanceVPCBlockClosed: "2001:db8:a9:1b00::11",
 }
+
+var VPCBlockPublicAccess = ec2types.VpcBlockPublicAccessOptions{
+	AwsAccountId:             aws.String("123456789012"),
+	AwsRegion:                aws.String("us-east-1"),
+	InternetGatewayBlockMode: ec2types.InternetGatewayBlockModeBlockIngress,
+	ExclusionsAllowed:        ec2types.VpcBlockPublicAccessExclusionsAllowedAllowed,
+	State:                    ec2types.VpcBlockPublicAccessStateUpdateComplete,
+	ManagedBy:                ec2types.ManagedByAccount,
+}
+
+var VPCBlockPublicAccessExclusions = []ec2types.VpcBlockPublicAccessExclusion{{
+	ExclusionId:                  aws.String("exclusion-0aaa111111111111a"),
+	ResourceArn:                  aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + EC2VPCBlockExcludedSubnet),
+	InternetGatewayExclusionMode: ec2types.InternetGatewayExclusionModeAllowBidirectional,
+	State:                        ec2types.VpcBlockPublicAccessExclusionStateCreateComplete,
+}}
 
 // httpTokensFor keeps EC2InstanceIMDSv1 the single demo instance that still
 // answers IMDSv1; every other instance requires a session token.

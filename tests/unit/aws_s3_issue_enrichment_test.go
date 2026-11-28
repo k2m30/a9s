@@ -90,9 +90,8 @@ func pabResource(name string) resource.Resource {
 	}
 }
 
-// s3 PAB findings are always "~" (SevWarn): account-level PAB may still
-// override, so a missing or partial bucket-level block is never certain
-// public exposure.
+// s3 PAB findings are always "~" (SevWarn): an incomplete block is a gap,
+// and s3.public is the finding that reports a bucket anyone can reach.
 func assertFindingShape(t *testing.T, findings map[string][]domain.Finding, key string) domain.Finding {
 	t.Helper()
 	fs, ok := findings[key]
@@ -131,7 +130,7 @@ func TestS3_Enrich_HealthyBucket_NoFinding(t *testing.T) {
 			},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource("healthy-bucket")}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -153,7 +152,7 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 			"a9s-demo-nopab": nil, // explicit nil → NoSuchPublicAccessBlockConfiguration
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource("a9s-demo-nopab")}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -171,9 +170,7 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 	if rows["Status"] != "no public access block configuration" {
 		t.Errorf("Rows[Status] = %q, want %q", rows["Status"], "no public access block configuration")
 	}
-	if rows["Account-level PAB"] != "may still apply" {
-		t.Errorf("Rows[Account-level PAB] = %q, want %q", rows["Account-level PAB"], "may still apply")
-	}
+	t4RequireNoHedge(t, result.AttentionDetails["a9s-demo-nopab"][finding.Code].Rows)
 
 	updates, ok := result.FieldUpdates["a9s-demo-nopab"]
 	if !ok {
@@ -200,7 +197,7 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 			},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource("a9s-demo-partial-pab")}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -223,9 +220,7 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",
 			rows["Block public access control lists"], "off (BlockPublicAcls)")
 	}
-	if rows["Account-level PAB"] != "may still apply" {
-		t.Errorf("Rows[Account-level PAB] = %q, want %q", rows["Account-level PAB"], "may still apply")
-	}
+	t4RequireNoHedge(t, result.AttentionDetails["a9s-demo-partial-pab"][finding.Code].Rows)
 
 	updates, ok := result.FieldUpdates["a9s-demo-partial-pab"]
 	if !ok {
@@ -249,7 +244,7 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 			},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource("a9s-demo-multifail-pab")}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -290,7 +285,7 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 			},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource("a9s-demo-nilcfg")}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -321,7 +316,7 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 		configs:      map[string]*s3.GetPublicAccessBlockOutput{},
 		errorBuckets: map[string]bool{"error-bucket": true},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource("error-bucket")}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -393,7 +388,7 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 			},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{
 		pabResource("a9s-demo-healthy"),
 		pabResource("a9s-demo-nopab"),
@@ -432,9 +427,8 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 	}
 }
 
-// docs/attention-signals.md: a missing or partial bucket-level PAB block is
-// a risk, not a certainty (account-level PAB may still apply), so it never
-// paints a row red.
+// docs/attention-signals.md: a missing or partial public access block is a
+// risk, not a certainty, so it never paints a row red.
 func TestS3_Enrich_NeverEmitsBrokenSeverity(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -450,7 +444,7 @@ func TestS3_Enrich_NeverEmitsBrokenSeverity(t *testing.T) {
 			"a9s-demo-nilcfg": {PublicAccessBlockConfiguration: nil},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{
 		pabResource("a9s-demo-nopab"),
 		pabResource("a9s-demo-allflagsfalse"),
@@ -495,7 +489,7 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 			},
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{
 		pabResource("a9s-demo-nopab"),
 		pabResource("a9s-demo-partial-pab"),
@@ -531,7 +525,7 @@ func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
 	fake := &s3PABFake{
 		codedErrors: map[string]string{deletedBucket: "NoSuchBucket"},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource(deletedBucket)}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -560,7 +554,7 @@ func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
 	fake := &s3PABFake{
 		codedErrors: map[string]string{deletedBucket: "NotFound"},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{pabResource(deletedBucket)}
 
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)
@@ -605,7 +599,7 @@ func TestS3_Enrich_NonNotFoundErrors_StillAggregate(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			clients := &awsclient.ServiceClients{S3: c.fake(c.bucket)}
+			clients := t4WithAccount(&awsclient.ServiceClients{S3: c.fake(c.bucket)})
 			resources := []resource.Resource{pabResource(c.bucket)}
 
 			result, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)

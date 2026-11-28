@@ -186,9 +186,11 @@ func TestT11aDev_CaptureS3_AsksTheListedBucketRegion(t *testing.T) {
 	cfg.APIOptions = append(cfg.APIOptions, func(st *middleware.Stack) error {
 		return st.Initialize.Add(middleware.InitializeMiddlewareFunc("t11aRegion",
 			func(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (middleware.InitializeOutput, middleware.Metadata, error) {
-				mu.Lock()
-				regions[awsmiddleware.GetOperationName(ctx)] = awsmiddleware.GetRegion(ctx)
-				mu.Unlock()
+				if awsmiddleware.GetServiceID(ctx) == "S3" {
+					mu.Lock()
+					regions[awsmiddleware.GetOperationName(ctx)] = awsmiddleware.GetRegion(ctx)
+					mu.Unlock()
+				}
 				return next.HandleInitialize(ctx, in)
 			}), middleware.Before)
 	})

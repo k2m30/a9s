@@ -55,7 +55,11 @@ func accountIDFromClients(ctx context.Context, c *ServiceClients, store identity
 	}
 	id := liveAccountID(ctx, c)
 	if id == "" {
-		store.Set("", errAccountUnresolved)
+		// A read the context cut off says nothing about the account, and
+		// keeping it would leave every later caller in the session without one.
+		if ctx.Err() == nil {
+			store.Set("", errAccountUnresolved)
+		}
 		return ""
 	}
 	store.Set(id, nil)

@@ -420,6 +420,10 @@ type Session struct {
 	// other than the session's, read once per session.
 	RegionLists *awsclient.RegionListStore
 
+	// ExposureSettings holds the account and Region settings the exposure
+	// checks read, each read once per session.
+	ExposureSettings *awsclient.ExposureSettingsStore
+
 	// ProbeStatus is the per-type most-recent-scan-outcome record,
 	// keyed by resource short name. Guarded by probeStatusMu — unlike
 	// AvailChecked/EnrichChecked and the rest of the Wave-1/Wave-2

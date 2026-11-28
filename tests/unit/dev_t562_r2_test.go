@@ -249,7 +249,7 @@ func TestDevT562_RestrictPublicBucketsClosesAPublicPolicy(t *testing.T) {
 // A policy status read against an unread block is unknown on both passes.
 func TestDevT562_PolicyVerdictNeedsTheBlock(t *testing.T) {
 	fake := devR2PABDenied{&t562S3Fake{policyPublic: true}}
-	clients := &awsclient.ServiceClients{S3: fake, Region: "us-east-1"}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake, Region: "us-east-1"})
 	trails, err := awsclient.FetchCloudTrailTrails(context.Background(), t562TrailListFake{})
 	if err != nil {
 		t.Fatal(err)

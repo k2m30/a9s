@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -53,7 +52,7 @@ func EnrichLTDeprecatedAMI(ctx context.Context, clients *ServiceClients, resourc
 		imagesAPI = clients.EC2
 	}
 	imdsErr := ltIMDSv1Findings(ctx, imagesAPI, resources, &result)
-	ebsErr := ltUnencryptedFindings(ctx, imagesAPI, resources, &result)
+	ebsErr := ltUnencryptedFindings(ctx, clients, resources, &result)
 
 	// The default version is already in hand from Wave 1 — no API call — so
 	// the user-data scan runs whether or not the ami cache is loaded.
@@ -121,14 +120,11 @@ func EnrichLTDeprecatedAMI(ctx context.Context, clients *ServiceClients, resourc
 // ltUnencryptedFindings raises ltCodeUnencrypted on every template whose
 // "$Default" version maps a block device with Encrypted=false explicitly. A
 // nil Encrypted is the account default, not off, and is never flagged. The
-// explicit false loses to the Region's EBS encryption by default: "If you
-// enable it for a Region, you cannot disable it for individual volumes or
-// snapshots in that Region" (Amazon EBS User Guide, "Enable Amazon EBS
-// encryption by default"). That setting is one GetEbsEncryptionByDefault
-// read, made only when a template sets Encrypted=false; a failed read leaves
-// those templates not inspected. With no EC2 client they are not inspected;
-// a client without the call reads the AWS default, off.
-func ltUnencryptedFindings(ctx context.Context, api EC2DescribeImagesAPI, resources []resource.Resource, result *IssueEnricherResult) error {
+// explicit false loses to the Region's EBS encryption by default
+// (ebsEncryptionByDefault), read only when a template sets Encrypted=false; a
+// failed read leaves those templates not inspected. With no EC2 client they
+// are not inspected.
+func ltUnencryptedFindings(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	var offIDs []string
 	for _, res := range resources {
 		raw, ok := assertStruct[LTRaw](res.RawStruct)
@@ -144,23 +140,19 @@ func ltUnencryptedFindings(ctx context.Context, api EC2DescribeImagesAPI, resour
 	if len(offIDs) == 0 {
 		return nil
 	}
-	if api == nil {
+	if clients == nil || clients.EC2 == nil {
 		for _, id := range offIDs {
 			markUninspected(result, id, imdsCheckNoClient)
 		}
 		return nil
 	}
-	forced := false
-	if defaultAPI, ok := api.(EC2GetEbsEncryptionByDefaultAPI); ok {
-		out, err := defaultAPI.GetEbsEncryptionByDefault(ctx, &ec2.GetEbsEncryptionByDefaultInput{})
-		if err != nil {
-			var failures []Failure
-			for _, id := range offIDs {
-				MarkSkipped(result, id, &failures, err)
-			}
-			return AggregateFailures("GetEbsEncryptionByDefault", failures, len(offIDs))
+	forced, err := ebsEncryptionByDefault(ctx, clients)
+	if err != nil {
+		var failures []Failure
+		for _, id := range offIDs {
+			MarkSkipped(result, id, &failures, err)
 		}
-		forced = aws.ToBool(out.EbsEncryptionByDefault)
+		return AggregateFailures("GetEbsEncryptionByDefault", failures, len(offIDs))
 	}
 	if forced {
 		return nil

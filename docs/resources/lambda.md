@@ -221,7 +221,10 @@ read failed, is not inspected: its Status cell stays empty, never `Active`.
   - **State bucket**: Broken.
   - **API call**: `GetFunction` response fields `Configuration.LastUpdateStatus` + `LastUpdateStatusReason` + `LastUpdateStatusReasonCode`.
   - **Cost shape**: per-resource.
-- **Signal**: the function's resource policy allows a wildcard principal, so any AWS caller can call the actions it grants.
+Who may invoke the function is one join of the resource policy (`GetPolicy`) and its URL configs (`ListFunctionUrlConfigs`), and that join raises both exposure signals below, so one fact is one finding. `lambda:InvokeFunctionUrl` authorizes calls to the function URL alone, and "If you delete your function URL with auth type NONE, Lambda doesn't automatically delete the associated resource-based policy": a public grant of that action reaches something only while a URL exists. Since October 2025 the policy AWS writes for a `NONE` URL also grants `lambda:InvokeFunction` to everyone under `Bool lambda:InvokedViaFunctionUrl=true`; that statement reaches the function through its URL alone, so it is part of the URL grant, not a grant of its own. A resource policy is per qualifier, and `ListFunctionUrlConfigs` returns the URLs of every alias: each URL is judged by the policy of its own qualifier (`GetPolicy` with the alias the URL's `FunctionArn` names, one read per alias with a URL), and the `Alias` row names an alias URL. A refused `GetPolicy` decides neither signal; a refused `ListFunctionUrlConfigs` leaves the policy's grants of other actions standing.
+
+- **Signal**: the function's resource policy allows a wildcard principal an action other than `lambda:InvokeFunctionUrl`, or grants that action on a URL whose `AuthType` is `AWS_IAM`, which any AWS account can sign, so any AWS caller can call the actions it grants.
+  - A public `lambda:InvokeFunctionUrl` grant on a function without a URL raises nothing.
   - A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **API call**: `GetPolicy` — one call per function.
@@ -231,9 +234,9 @@ read failed, is not inspected: its Status cell stays empty, never `Active`.
   - **State bucket**: Warning.
   - **API call**: `GetPolicy` — the same read as the wildcard-principal signal.
   - **Cost shape**: per-resource.
-- **Signal**: the function has a URL that requires no authentication (`AuthType == NONE`).
+- **Signal**: the function has a URL that requires no authentication (`AuthType == NONE`) and its resource policy grants `lambda:InvokeFunctionUrl` to everyone. Without that grant the URL answers no caller, so there is no finding.
   - **State bucket**: Broken.
-  - **API call**: `ListFunctionUrlConfigs` — one call per function.
+  - **API call**: `ListFunctionUrlConfigs` — one call per function, joined with the `GetPolicy` read.
   - **Cost shape**: per-resource.
 
 - **Signal**: `State == Deactivating` (GetFunction).
@@ -282,9 +285,9 @@ One row per signal from §3:
 | `Runtime` deprecated | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `runtime is end-of-life` |
 | `DeadLetterConfig==nil` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no dead-letter queue configured` |
 | credential in `Environment.Variables` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
-| resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
+| resource policy allows a wildcard principal an action other than `lambda:InvokeFunctionUrl`, or that action on an `AWS_IAM` URL (`GetPolicy` + `ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
 | resource policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it (`GetPolicy`) | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
-| function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `function endpoint open without authentication` |
+| function URL with `AuthType == NONE` and a public `lambda:InvokeFunctionUrl` grant (`ListFunctionUrlConfigs` + `GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `function endpoint open without authentication` |
 | `State == Deactivating` (GetFunction) | 2 | Warning | `~` | S2, S3, S4, S5 | `deactivating` |
 | `State == Deactivated` (GetFunction) | 2 | Dim | n/a | S2, S4 | `deactivated` |
 | `State == ActiveNonInvocable` (GetFunction) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `active but not invocable` |

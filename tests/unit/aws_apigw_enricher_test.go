@@ -79,6 +79,12 @@ func (f *apigwGetStagesFake) GetStages(
 	return &apigatewayv2.GetStagesOutput{Items: stages}, nil
 }
 
+// GetRoutes puts every route behind the authorizer, keeping the
+// no-authorizer finding out of the stage-config tests.
+func (f *apigwGetStagesFake) GetRoutes(_ context.Context, _ *apigatewayv2.GetRoutesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	return &apigatewayv2.GetRoutesOutput{Items: w6aHTTPRoutes(apigwtypes.AuthorizationTypeJwt, "auth-default")}, nil
+}
+
 var _ awsclient.APIGatewayV2API = (*apigwGetStagesFake)(nil)
 
 // apigwResources returns a slice of API Gateway Resource stubs with the given API IDs.
@@ -102,7 +108,8 @@ func apigwResources(ids ...string) []resource.Resource {
 // apigwStageWithThrottlingAndLogs builds a Stage with throttling and access log settings configured.
 func apigwStageWithThrottlingAndLogs(name string) apigwtypes.Stage {
 	return apigwtypes.Stage{
-		StageName: aws.String(name),
+		StageName:    aws.String(name),
+		DeploymentId: aws.String("dpl4a1"),
 		DefaultRouteSettings: &apigwtypes.RouteSettings{
 			ThrottlingBurstLimit: aws.Int32(500),
 			ThrottlingRateLimit:  aws.Float64(1000),
@@ -149,7 +156,8 @@ func TestEnrichAPIGatewayStage_ThrottledWithLogsProducesNoFindings(t *testing.T)
 // containing "throttling" is produced for api-1 only.
 func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T) {
 	stageNoThrottling := apigwtypes.Stage{
-		StageName: aws.String("$default"),
+		StageName:    aws.String("$default"),
+		DeploymentId: aws.String("dpl4a1"),
 		DefaultRouteSettings: &apigwtypes.RouteSettings{
 			ThrottlingBurstLimit: aws.Int32(0),
 		},
@@ -195,7 +203,8 @@ func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T)
 // containing "access logs" is produced for api-1 only.
 func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T) {
 	stageNoLogs := apigwtypes.Stage{
-		StageName: aws.String("$default"),
+		StageName:    aws.String("$default"),
+		DeploymentId: aws.String("dpl4a1"),
 		DefaultRouteSettings: &apigwtypes.RouteSettings{
 			ThrottlingBurstLimit: aws.Int32(500),
 			ThrottlingRateLimit:  aws.Float64(1000),

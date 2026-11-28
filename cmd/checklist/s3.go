@@ -17,16 +17,23 @@ type s3GroupGrant struct {
 	URI string `json:"uri"`
 }
 
+type s3PAB struct {
+	s3Read
+	BlockPublicAcls       bool `json:"block_public_acls"`
+	IgnorePublicAcls      bool `json:"ignore_public_acls"`
+	BlockPublicPolicy     bool `json:"block_public_policy"`
+	RestrictPublicBuckets bool `json:"restrict_public_buckets"`
+}
+
+func (p s3PAB) complete() bool {
+	return p.BlockPublicAcls && p.IgnorePublicAcls && p.BlockPublicPolicy && p.RestrictPublicBuckets
+}
+
 type s3Data struct {
-	Buckets []struct {
-		Name string `json:"name"`
-		PAB  struct {
-			s3Read
-			BlockPublicAcls       bool `json:"block_public_acls"`
-			IgnorePublicAcls      bool `json:"ignore_public_acls"`
-			BlockPublicPolicy     bool `json:"block_public_policy"`
-			RestrictPublicBuckets bool `json:"restrict_public_buckets"`
-		} `json:"pab"`
+	AccountPAB *s3PAB `json:"account_pab"`
+	Buckets    []struct {
+		Name         string `json:"name"`
+		PAB          s3PAB  `json:"pab"`
 		PolicyStatus struct {
 			s3Read
 			IsPublic bool `json:"is_public"`
@@ -93,7 +100,11 @@ var s3PublicGroups = []string{
 //     that the snapshot does not record, leaves its own findings unjudged and
 //     the bucket not inspected. The public access block is read when it was
 //     returned or AWS stated there is none; the public finding is judged only
-//     against a block that was read.
+//     against a block that was read. The block judged is the effective one:
+//     each flag the bucket's or the account's sets, the account's read when
+//     the bucket's own leaves a flag off or was not read. An unread account
+//     block leaves such a bucket's block unread; an account block setting
+//     all four closes a bucket whose own block was not read.
 //   - a flagged row carries the glyph of its most severe finding and the
 //     Status phrase of the first such finding, with " (+N)" for the others.
 //   - the issue badge counts the rows with a "!" finding; it is a lower bound
@@ -123,9 +134,23 @@ func checklistS3(section json.RawMessage) (Checklist, error) {
 		answered := func(r s3Read) bool { return r.Outcome == "ok" || r.Outcome == "none" }
 
 		var found []s3Finding
-		pabRead := b.PAB.Outcome == "configured" || b.PAB.Outcome == "none"
+		bucketRead := b.PAB.Outcome == "configured" || b.PAB.Outcome == "none"
+		pabRead := bucketRead
 		pab := b.PAB
-		if pabRead && (pab.Outcome == "none" || !pab.BlockPublicAcls || !pab.IgnorePublicAcls || !pab.BlockPublicPolicy || !pab.RestrictPublicBuckets) {
+		accountUnread := false
+		if !bucketRead || !pab.complete() {
+			account := d.AccountPAB
+			accountRead := account != nil && (account.Outcome == "configured" || account.Outcome == "none")
+			if accountRead && account.Outcome == "configured" {
+				pab.BlockPublicAcls = pab.BlockPublicAcls || account.BlockPublicAcls
+				pab.IgnorePublicAcls = pab.IgnorePublicAcls || account.IgnorePublicAcls
+				pab.BlockPublicPolicy = pab.BlockPublicPolicy || account.BlockPublicPolicy
+				pab.RestrictPublicBuckets = pab.RestrictPublicBuckets || account.RestrictPublicBuckets
+			}
+			accountUnread = !accountRead
+			pabRead = accountRead && (bucketRead || pab.complete())
+		}
+		if pabRead && !pab.complete() {
 			found = append(found, s3FindingPAB)
 		}
 		publicPolicy := b.PolicyStatus.Outcome == "ok" && b.PolicyStatus.IsPublic && !pab.RestrictPublicBuckets
@@ -156,7 +181,7 @@ func checklistS3(section json.RawMessage) (Checklist, error) {
 		public := slices.Contains(found, s3FindingPublic)
 		if public {
 			issues++
-		} else if slices.ContainsFunc(reads, func(r s3Read) bool { return !answered(r) && r.Outcome != "configured" }) {
+		} else if accountUnread || slices.ContainsFunc(reads, func(r s3Read) bool { return !answered(r) && r.Outcome != "configured" }) {
 			uncounted++
 		}
 		if len(found) == 0 {

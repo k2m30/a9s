@@ -258,10 +258,14 @@ func (f *apigwCappedStagesFake) GetAuthorizers(
 	return &apigatewayv2.GetAuthorizersOutput{}, nil
 }
 
+func (f *apigwCappedStagesFake) GetRoutes(_ context.Context, _ *apigatewayv2.GetRoutesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	return &apigatewayv2.GetRoutesOutput{Items: w6aHTTPRoutes(apigwv2types.AuthorizationTypeNone, "")}, nil
+}
+
 // TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding: the stage count
 // cap is informational and reported
-// by the "+" on stages_count; the no-authorizer verdict came from
-// GetAuthorizers and must reach the row.
+// by the "+" on stages_count; the no-authorizer verdict comes from the
+// routes and must reach the row.
 func TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding(t *testing.T) {
 	const apiID = "acme-http-api"
 	fake := &apigwCappedStagesFake{stageOutput: []apigwv2types.Stage{{StageName: aws.String("prod")}}}
@@ -281,11 +285,8 @@ func TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding(t *testing.T) {
 		t.Fatalf("GetStages called %d times, want %d (the walk must still be capped)",
 			fake.stageCalls, awsclient.PerParentPageCap)
 	}
-	if fake.authzCalls != 1 {
-		t.Errorf("GetAuthorizers called %d times, want 1", fake.authzCalls)
-	}
-	if len(result.Findings[apiID]) == 0 {
-		t.Errorf("no findings for %q — an API with zero authorizers is unauthenticated whatever its stage count", apiID)
+	if !hasCode(result.Findings[apiID], "apigw.no-authorizer") {
+		t.Errorf("findings for %q = %v, want apigw.no-authorizer — routes with no authorization are unauthenticated whatever the stage count", apiID, findingCodes(result.Findings[apiID]))
 	}
 	if _, marked := result.TruncatedIDs[apiID]; marked {
 		t.Errorf("TruncatedIDs[%q] = true — an informational stage-count cap must not mark the row uninspected: FoldWave2Rows would drop the authorizer finding above", apiID)

@@ -205,7 +205,7 @@ func w6aTrailRes(name, bucket string) resource.Resource {
 
 func w6aEnrichTrail(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource) awsclient.IssueEnricherResult {
 	t.Helper()
-	res, err := w2Enricher(t, "trail")(context.Background(), &awsclient.ServiceClients{S3: fake}, rs, nil)
+	res, err := w2Enricher(t, "trail")(context.Background(), t4WithAccount(&awsclient.ServiceClients{S3: fake}), rs, nil)
 	w2AssertEnricherInvariants(t, res, err)
 	return res
 }
@@ -215,7 +215,7 @@ func w6aEnrichTrail(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource)
 // the invariants is checked and the error is returned.
 func w6aEnrichTrailErr(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
-	res, err := w2Enricher(t, "trail")(context.Background(), &awsclient.ServiceClients{S3: fake}, rs, nil)
+	res, err := w2Enricher(t, "trail")(context.Background(), t4WithAccount(&awsclient.ServiceClients{S3: fake}), rs, nil)
 	w2AssertEnricherShape(t, res)
 	return res, err
 }

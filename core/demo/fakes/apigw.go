@@ -79,6 +79,13 @@ func (f *APIGWFake) GetAuthorizers(_ context.Context, input *apigatewayv2.GetAut
 	return &apigatewayv2.GetAuthorizersOutput{Items: f.fix.Authorizers[*input.ApiId]}, nil
 }
 
+func (f *APIGWFake) GetRoutes(_ context.Context, input *apigatewayv2.GetRoutesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	if input == nil || input.ApiId == nil {
+		return &apigatewayv2.GetRoutesOutput{}, nil
+	}
+	return &apigatewayv2.GetRoutesOutput{Items: f.fix.Routes[*input.ApiId]}, nil
+}
+
 // hasAPI reports whether the fixtures register this API id. An API with no
 // stages still answers empty; an API that does not exist does not.
 func (f *APIGWFake) hasAPI(id string) bool {

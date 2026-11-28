@@ -82,7 +82,7 @@ func TestEnrichS3Posture_CrossRegionDoesNotSpamErrorLog(t *testing.T) {
 			xRegionBucket: "eu-central-2",
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{
 		{ID: xRegionBucket, Name: xRegionBucket},
 		{ID: "same-region-bucket", Name: "same-region-bucket"},
@@ -106,7 +106,7 @@ func TestEnrichS3Posture_CrossRegionDoesNotSpamErrorLog(t *testing.T) {
 func TestEnrichS3Posture_IllegalLocationConstraintNotSpammed(t *testing.T) {
 	const xRegionBucket = "example-dags-destination-euc2"
 	fake := &fakeS3IllegalLocation{bucket: xRegionBucket}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{{ID: xRegionBucket, Name: xRegionBucket}}
 
 	_, err := awsclient.EnrichS3Posture(context.Background(), clients, resources, nil)

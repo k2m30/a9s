@@ -144,6 +144,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An exposure finding now combines every layer AWS combines, so a resource a
+  second layer already closes is no longer reported open:
+  - S3: the account-level public access block is read (S3 Control, once per
+    account, only when a bucket's own block leaves a setting off) and
+    combined with the bucket's setting by setting. A bucket whose access
+    control list grants the public is not "publicly accessible" when the
+    account ignores public ACLs, nor one with a public policy when the
+    account restricts public buckets, and "public access block incomplete"
+    and the Status cell no longer show for a bucket the account's block
+    completes. The detail row names what the account sets instead of "may
+    still apply". A trail's log bucket is judged the same way, and a log
+    bucket in another account by its own block only. A refused
+    account read leaves the buckets it decides "not inspected".
+  - Lambda: a function URL with no authentication is one finding, raised
+    only when the resource policy lets everyone call it, and a leftover URL
+    grant on a function with no URL raises nothing. An open URL no longer
+    counts twice in the issue badge, including with the two-statement
+    policy AWS writes for new URLs. A URL on an alias is judged by the
+    alias's own policy.
+  - API Gateway: "no authorizer" is read from each method's or route's
+    authorization type. An API that defines an authorizer no method uses is
+    reported; one whose every method requires signed requests is not. A
+    WebSocket API is judged by its `$connect` route, and the detail counts
+    the open methods or routes. "No deployed stages" reads whether any stage
+    has a deployment, for REST APIs too, and an undeployed API is not also
+    reported open. Method reads stay inside the account's `GetResources`
+    quota.
+  - OpenSearch: a public domain with fine-grained access control on (and
+    anonymous access off) is no longer "reachable outside a VPC".
+  - EBS snapshots: a snapshot shared with all accounts is not reported
+    public while the Region blocks all public sharing of snapshots.
+  - EC2: an instance is not "reachable from the internet" while the
+    Region's VPC block public access blocks ingress to its subnet; an
+    exclusion that allows inbound traffic keeps the finding.
+  Each Region setting is read once per Region and session, only when a row
+  needs it; a refused read leaves those rows "not inspected".
 - An IAM role's "Last Used" column shows when the role was last used. The
   list call never returns that date, so the column was always blank; it is
   now read with the role's other checks, for service-linked roles too.

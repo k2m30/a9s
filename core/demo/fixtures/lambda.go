@@ -56,8 +56,11 @@ const (
 	// grants a role in the partner account 210987654321.
 	LambdaCrossAccountPolicy = "acme-partner-callback"
 	// LambdaFunctionURLPublic is the only function with a function URL whose
-	// AuthType is NONE.
+	// AuthType is NONE, beside the policy statement Lambda adds with it.
 	LambdaFunctionURLPublic = "cloudwatch-slack-notifier"
+	// LambdaStaleURLGrant keeps the statement Lambda added for a function URL
+	// with AuthType NONE, and no URL: the grant reaches nothing.
+	LambdaStaleURLGrant = "legacy-data-sync"
 	// LambdaJSONLogFormat is the only function writing the JSON log format;
 	// its invocations are platform.report records (cwlogs.go).
 	LambdaJSONLogFormat = "data-pipeline-transform"
@@ -93,6 +96,8 @@ var sharedLambdaFixtures = shared(func() *LambdaFixtures {
 			// principal, which the enricher reads as not public.
 			lambdaProcessOrders:      `{"Version":"2012-10-17","Statement":[{"Sid":"AllowSQS","Effect":"Allow","Principal":{"Service":"sqs.amazonaws.com"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:process-orders"}]}`,
 			LambdaCrossAccountPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPartnerInvoke","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:role/acme-partner-caller"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:` + LambdaCrossAccountPolicy + `"}]}`,
+			LambdaFunctionURLPublic:  lambdaFunctionURLGrant(LambdaFunctionURLPublic),
+			LambdaStaleURLGrant:      lambdaFunctionURLGrant(LambdaStaleURLGrant),
 		},
 		FunctionURLConfigs: map[string][]lambdatypes.FunctionUrlConfig{
 			// Raises lambda.function-url-public: AuthType NONE with a
@@ -114,6 +119,16 @@ var sharedLambdaFixtures = shared(func() *LambdaFixtures {
 		},
 	}
 })
+
+// lambdaFunctionURLGrant is the policy Lambda writes for a function URL with
+// AuthType NONE: lambda:InvokeFunctionUrl, and lambda:InvokeFunction limited
+// to calls through the URL.
+func lambdaFunctionURLGrant(name string) string {
+	arn := "arn:aws:lambda:us-east-1:123456789012:function:" + name
+	return `{"Version":"2012-10-17","Statement":[` +
+		`{"Sid":"FunctionURLAllowPublicAccess","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl","Resource":"` + arn + `","Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}},` +
+		`{"Sid":"FunctionURLInvokeAllowPublicAccess","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"` + arn + `","Condition":{"Bool":{"lambda:InvokedViaFunctionUrl":"true"}}}]}`
+}
 
 func NewLambdaFixtures() *LambdaFixtures {
 	return sharedLambdaFixtures()

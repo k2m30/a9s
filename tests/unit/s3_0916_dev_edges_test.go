@@ -237,7 +237,7 @@ func TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged(t *testing.T) {
 	fake := &row1DeniedBlockFake{row1S3Fake{
 		grants: []s3types.Grant{row1GroupGrant(row1AllUsers, s3types.PermissionRead)},
 	}}
-	clients := &awsclient.ServiceClients{S3: fake, Region: "us-east-1"}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake, Region: "us-east-1"})
 	res := []resource.Resource{{ID: row1Bucket, Name: row1Bucket, Fields: map[string]string{"name": row1Bucket}}}
 
 	got, _ := awsclient.EnrichS3Posture(context.Background(), clients, res, nil)

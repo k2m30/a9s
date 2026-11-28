@@ -129,14 +129,11 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     await command(page, "s3");
     const statusCol = await statusColIndex(page);
 
-    // The two flagged buckets differ. a9s-demo-nopab is also the witness for
-    // the access-control-list route into s3.public (spec row s3-0916/1), so it
-    // carries a broken-tier finding beside its incomplete public access block:
-    // the broken phrase takes the Status cell, "(+1)" stands for the other,
-    // and the row takes the broken color. a9s-demo-partial-pab carries the
-    // warn-tier block finding alone.
+    // The demo account's public access block sets IgnorePublicAcls, so AWS
+    // ignores public ACL grants and neither bucket is public by ACL; both
+    // carry the warn-tier incomplete public access block finding alone.
     const flagged = [
-      { bucket: "a9s-demo-nopab", status: "publicly accessible (+1)", rowClass: /row-broken/ },
+      { bucket: "a9s-demo-nopab", status: "public access block incomplete", rowClass: /row-warning/ },
       { bucket: "a9s-demo-partial-pab", status: "public access block incomplete", rowClass: /row-warning/ },
     ];
     for (const { bucket, status, rowClass } of flagged) {

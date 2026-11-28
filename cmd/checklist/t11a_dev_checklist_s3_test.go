@@ -10,6 +10,7 @@ func TestT11aDev_ChecklistS3_JudgesEveryFindingFromTheRecordedAnswers(t *testing
 	cases := []struct {
 		name          string
 		bucket        string
+		account       string
 		want          []FlaggedRow
 		issues        int
 		issuesAtLeast bool
@@ -53,10 +54,37 @@ func TestT11aDev_ChecklistS3_JudgesEveryFindingFromTheRecordedAnswers(t *testing
 			"pab":{"outcome":"configured","block_public_acls":true,"block_public_policy":true,"restrict_public_buckets":true}}`,
 			want:          []FlaggedRow{{Name: "acme-pab-only", Decorator: "~", Status: "public access block incomplete"}},
 			issuesAtLeast: true},
+		{name: "the account's IgnorePublicAcls closes the grant", bucket: `{"name":"acme-ignored",
+			"pab":{"outcome":"configured","block_public_acls":true,"block_public_policy":true,"restrict_public_buckets":true},
+			"policy_status":{"outcome":"none"},"acl":{"outcome":"ok","group_grants":[{"uri":"http://acs.amazonaws.com/groups/global/AllUsers","permission":"READ"}]},
+			"versioning":{"outcome":"ok","status":"Enabled","mfa_delete":"Enabled"},
+			"logging":{"outcome":"ok","enabled":true},"lifecycle":{"outcome":"ok","enabled_rules":1},
+			"object_lock":{"outcome":"ok","enabled":true}}`,
+			account: `{"outcome":"configured","ignore_public_acls":true}`},
+		{name: "an unread account block leaves a bucket it decides unjudged", bucket: `{"name":"acme-open",
+			"pab":{"outcome":"none"},
+			"policy_status":{"outcome":"ok","is_public":true},"acl":{"outcome":"ok"},
+			"versioning":{"outcome":"ok","status":"Enabled","mfa_delete":"Enabled"},
+			"logging":{"outcome":"ok","enabled":true},"lifecycle":{"outcome":"ok","enabled_rules":1},
+			"object_lock":{"outcome":"ok","enabled":true}}`,
+			account:       `{"outcome":"error","error_code":"AccessDenied"}`,
+			issuesAtLeast: true},
+		{name: "a full account block closes a bucket whose own block was not read", bucket: `{"name":"acme-closed",
+			"pab":{"outcome":"error","error_code":"AccessDenied"},
+			"policy_status":{"outcome":"ok","is_public":true},"acl":{"outcome":"ok"},
+			"versioning":{"outcome":"ok","status":"Enabled","mfa_delete":"Enabled"},
+			"logging":{"outcome":"ok","enabled":true},"lifecycle":{"outcome":"ok","enabled_rules":1},
+			"object_lock":{"outcome":"ok","enabled":true}}`,
+			account:       `{"outcome":"configured","block_public_acls":true,"ignore_public_acls":true,"block_public_policy":true,"restrict_public_buckets":true}`,
+			issuesAtLeast: true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := checklistS3(json.RawMessage(`{"buckets":[` + c.bucket + `]}`))
+			account := c.account
+			if account == "" {
+				account = `{"outcome":"none"}`
+			}
+			got, err := checklistS3(json.RawMessage(`{"account_pab":` + account + `,"buckets":[` + c.bucket + `]}`))
 			if err != nil {
 				t.Fatal(err)
 			}

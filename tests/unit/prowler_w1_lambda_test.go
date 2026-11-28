@@ -211,7 +211,7 @@ func TestLambda_PublicPolicy_ConditionedGrantIsHealthy(t *testing.T) {
 // both shapes and the IAM console emits the object form.
 func TestLambda_PublicPolicy_SingleStatementObject(t *testing.T) {
 	const name = "acme-object-stmt"
-	doc := `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl","Resource":"*"}}`
+	doc := `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"*"}}`
 	fake := &pw1LambdaPostureFake{policies: map[string]string{name: doc}}
 	res := pw1EnrichLambda(t, fake, name)
 	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
@@ -330,7 +330,7 @@ func pw1Digits(n int) string {
 // function URL with AuthType NONE is an unauthenticated HTTPS endpoint.
 func TestLambda_FunctionURLPublic_AuthTypeNone(t *testing.T) {
 	const name = "acme-url-open"
-	fake := &pw1LambdaPostureFake{urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
+	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}, urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
 		name: {{
 			FunctionUrl: aws.String("https://abc123.lambda-url.us-east-1.on.aws/"),
 			AuthType:    lambdatypes.FunctionUrlAuthTypeNone,
@@ -347,7 +347,7 @@ func TestLambda_FunctionURLPublic_AuthTypeNone(t *testing.T) {
 // endpoint that also allows any origin is callable from any page.
 func TestLambda_FunctionURLPublic_WildcardCORSIsCited(t *testing.T) {
 	const name = "acme-url-cors"
-	fake := &pw1LambdaPostureFake{urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
+	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}, urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
 		name: {{
 			FunctionUrl: aws.String("https://def456.lambda-url.us-east-1.on.aws/"),
 			AuthType:    lambdatypes.FunctionUrlAuthTypeNone,
@@ -362,7 +362,7 @@ func TestLambda_FunctionURLPublic_WildcardCORSIsCited(t *testing.T) {
 // list does not produce the CORS row.
 func TestLambda_FunctionURLPublic_ScopedCORSIsNotCited(t *testing.T) {
 	const name = "acme-url-scoped-cors"
-	fake := &pw1LambdaPostureFake{urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
+	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}, urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
 		name: {{
 			FunctionUrl: aws.String("https://ghi789.lambda-url.us-east-1.on.aws/"),
 			AuthType:    lambdatypes.FunctionUrlAuthTypeNone,
@@ -404,8 +404,12 @@ func TestLambda_FunctionURLPublic_NoURLConfigIsHealthy(t *testing.T) {
 // findings, each with its own code and its own rows.
 func TestLambda_PolicyAndURLAreTwoFindings(t *testing.T) {
 	const name = "acme-open"
+	both := `{"Version":"2012-10-17","Statement":[` +
+		`{"Sid":"AllowPublicInvoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:acme-open"},` +
+		`{"Sid":"FunctionURLAllowPublicAccess","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl","Resource":"arn:aws:lambda:us-east-1:123456789012:function:acme-open",` +
+		`"Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}}]}`
 	fake := &pw1LambdaPostureFake{
-		policies: map[string]string{name: pw1PublicInvokePolicy},
+		policies: map[string]string{name: both},
 		urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{
 			name: {{
 				FunctionUrl: aws.String("https://mno345.lambda-url.us-east-1.on.aws/"),

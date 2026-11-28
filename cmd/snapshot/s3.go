@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3control"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // s3Data is the normalized, raw view of S3 buckets the checklist generator reads. It records
@@ -15,6 +17,9 @@ import (
 // docs/resources/s3.md rules to derive expected colors/glyphs/status.
 type s3Data struct {
 	Buckets []s3Bucket `json:"buckets"`
+	// AccountPAB is the account-level block (S3 Control GetPublicAccessBlock),
+	// read when a bucket's own block leaves a flag off, as the app reads it.
+	AccountPAB *s3PAB `json:"account_pab,omitempty"`
 }
 
 type s3Bucket struct {
@@ -118,13 +123,48 @@ func captureS3(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 		return clients[region]
 	}
+	data := s3Data{Buckets: buckets}
 	for i := range buckets {
 		b := &buckets[i]
 		b.Location = captureS3Location(ctx, in(cmp.Or(b.Region, cfg.Region)), b.Name)
 		captureS3Posture(ctx, in(cmp.Or(b.Location.Region, b.Region, cfg.Region)), b)
+		if data.AccountPAB == nil && !b.PAB.closesAll() {
+			account := captureS3AccountPAB(ctx, cfg)
+			data.AccountPAB = &account
+		}
 	}
 
-	return s3Data{Buckets: buckets}, nil
+	return data, nil
+}
+
+// closesAll reports whether the bucket's own block was read and sets all four
+// flags; otherwise the account's block decides part of the bucket's.
+func (p s3PAB) closesAll() bool {
+	return p.Outcome == "configured" && p.BlockPublicAcls && p.IgnorePublicAcls && p.BlockPublicPolicy && p.RestrictPublicBuckets
+}
+
+func captureS3AccountPAB(ctx context.Context, cfg aws.Config) s3PAB {
+	id, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		o, code := outcomeOf(err)
+		return s3PAB{Outcome: o, ErrorCode: code}
+	}
+	out, err := s3control.NewFromConfig(cfg).GetPublicAccessBlock(ctx, &s3control.GetPublicAccessBlockInput{AccountId: id.Account})
+	if err != nil {
+		o, code := outcomeOf(err)
+		return s3PAB{Outcome: o, ErrorCode: code}
+	}
+	c := out.PublicAccessBlockConfiguration
+	if c == nil {
+		return s3PAB{Outcome: outcomeNone}
+	}
+	return s3PAB{
+		Outcome:               "configured",
+		BlockPublicAcls:       aws.ToBool(c.BlockPublicAcls),
+		IgnorePublicAcls:      aws.ToBool(c.IgnorePublicAcls),
+		BlockPublicPolicy:     aws.ToBool(c.BlockPublicPolicy),
+		RestrictPublicBuckets: aws.ToBool(c.RestrictPublicBuckets),
+	}
 }
 
 func captureS3Location(ctx context.Context, client *s3.Client, bucket string) s3Location {

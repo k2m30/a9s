@@ -81,11 +81,7 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 	})
 
 	t.Run("issues", func(t *testing.T) {
-		scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3ACLPublicStatus)
-		// colorS3 resolves color via colorFromAnyFinding (catalog_databases.go);
-		// this bucket's s3.public finding (granted through its access-control
-		// list) is Severity: SevBroken, so the row renders Broken row color and
-		// carries no glyph.
+		scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3NoPABStatus)
 		scenario.ExpectRowNoGlyphPrefix(s3NoPABBucketID)
 	})
 

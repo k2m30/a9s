@@ -47,6 +47,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3control"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
@@ -65,7 +66,7 @@ import (
 // ServiceClients holds AWS service clients for all supported services.
 //
 // Per-Session capability stores (IAMPolicies, IdentityStore, RuleSets,
-// RegionLists) are stored as unexported fields guarded by sync.RWMutex and
+// RegionLists, ExposureSettings) are stored as unexported fields guarded by sync.RWMutex and
 // accessed via thread-safe getter/setter methods. Direct field access would race under
 // `-race` because:
 //
@@ -84,6 +85,7 @@ type ServiceClients struct {
 	identityStore identityStore
 	ruleSets      ruleSetStore
 	regionLists   *RegionListStore
+	exposure      *ExposureSettingsStore
 
 	// cfg is the session config CreateServiceClients was called with, kept so
 	// a client for another Region can be built from it on demand. Zero value
@@ -102,6 +104,10 @@ type ServiceClients struct {
 	bucketRegionMu sync.Mutex
 	bucketRegions  map[string]string
 
+	// apigwResources paces this Region's REST GetResources calls
+	// (apigwRESTResources).
+	apigwResources callWindow
+
 	// Region is the region resolved from the session's AWS config at
 	// construction time (profile config, AWS_REGION/AWS_DEFAULT_REGION env,
 	// or the SDK default). Immutable after CreateServiceClients returns — safe
@@ -112,6 +118,7 @@ type ServiceClients struct {
 
 	EC2              EC2API
 	S3               S3API
+	S3Control        S3ControlAPI
 	RDS              RDSAPI
 	ElastiCache      ElastiCacheAPI
 	DocDB            DocDBAPI
@@ -198,6 +205,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		// calls with no active operation, and any call under a later
 		// operation, always re-execute.
 		S3:               NewCoalescingS3(s3.NewFromConfig(cfg)),
+		S3Control:        s3control.NewFromConfig(cfg),
 		RDS:              rds.NewFromConfig(cfg),
 		ElastiCache:      elasticache.NewFromConfig(cfg),
 		DocDB:            docdb.NewFromConfig(cfg),
@@ -432,6 +440,31 @@ func (c *ServiceClients) SetRegionLists(s *RegionListStore) {
 	o.storesMu.Lock()
 	defer o.storesMu.Unlock()
 	o.regionLists = s
+}
+
+// ExposureSettings returns the session-scoped store of account and Region
+// exposure settings. A set no session has wired keeps one of its own.
+// Concurrency-safe.
+func (c *ServiceClients) ExposureSettings() *ExposureSettingsStore {
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	if o.exposure == nil {
+		o.exposure = NewExposureSettingsStore()
+	}
+	return o.exposure
+}
+
+// SetExposureSettings replaces the session-scoped exposure settings store; a
+// read in flight keeps writing to the store it captured.
+func (c *ServiceClients) SetExposureSettings(s *ExposureSettingsStore) {
+	if c == nil {
+		return
+	}
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	o.exposure = s
 }
 
 // errClientMissing is domain.ErrClientMissing, the one signal that a read's

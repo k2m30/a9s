@@ -5,6 +5,9 @@ package unit
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 )
@@ -389,12 +392,15 @@ func pw1FunctionURLPolicy(name, authType string) string {
 		`"Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"` + authType + `"}}}]}`
 }
 
-func TestLambda_PublicPolicy_FunctionURLAuthTypeNoneIsPublic(t *testing.T) {
+func TestLambda_FunctionURLAuthTypeNoneGrantIsTheURLFinding(t *testing.T) {
 	const name = "acme-url-policy-none"
-	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "NONE")}}
+	fake := &pw1LambdaPostureFake{
+		policies:   map[string]string{name: pw1FunctionURLPolicy(name, "NONE")},
+		urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{name: t4OpenURL("pqr678")},
+	}
 	res := pw1EnrichLambda(t, fake, name)
-	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"resource policy open to anyone", domain.SevBroken, "wave2")
+	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodeURLPublic,
+		"function endpoint open without authentication", domain.SevBroken, "wave2")
 }
 
 // With AWS_IAM a caller in another account needs "permissions granted to them
@@ -403,8 +409,15 @@ func TestLambda_PublicPolicy_FunctionURLAuthTypeNoneIsPublic(t *testing.T) {
 // AWS account.
 func TestLambda_PublicPolicy_FunctionURLAuthTypeIAMIsPublic(t *testing.T) {
 	const name = "acme-url-policy-iam"
-	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "AWS_IAM")}}
+	fake := &pw1LambdaPostureFake{
+		policies: map[string]string{name: pw1FunctionURLPolicy(name, "AWS_IAM")},
+		urlConfigs: map[string][]lambdatypes.FunctionUrlConfig{name: {{
+			FunctionUrl: aws.String("https://stu901.lambda-url.us-east-1.on.aws/"),
+			AuthType:    lambdatypes.FunctionUrlAuthTypeAwsIam,
+		}}},
+	}
 	res := pw1EnrichLambda(t, fake, name)
-	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
-		"resource policy open to anyone", domain.SevBroken, "wave2")
+	if got := t4LambdaExposures(res, name); len(got) != 1 || got[0].Severity != domain.SevBroken {
+		t.Errorf("exposure findings = %+v, want one Broken finding: every AWS account may call the URL", got)
+	}
 }

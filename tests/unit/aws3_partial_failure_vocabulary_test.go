@@ -48,7 +48,7 @@ func (f *s3TwoDenialsFake) GetObjectLockConfiguration(_ context.Context, _ *s3.G
 // Reporting only the first denial would send the operator to grant one
 // permission, after which the bucket fails again on the second.
 func TestS3BucketDeniedTwoChecksNamesBoth(t *testing.T) {
-	clients := &awsclient.ServiceClients{S3: &s3TwoDenialsFake{}}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: &s3TwoDenialsFake{}})
 	rows := []resource.Resource{{ID: "acme-logs", Name: "acme-logs", Fields: map[string]string{"name": "acme-logs"}}}
 
 	_, err := awsclient.EnrichS3Posture(context.Background(), clients, rows, nil)

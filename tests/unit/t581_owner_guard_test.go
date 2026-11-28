@@ -33,7 +33,6 @@ var t581FactOwners = []struct {
 	{"ELB security policy judged by name", regexp.MustCompile(`"ELBSecurityPolicy-`), nil, false},
 	{"ECR registry scanning rules", regexp.MustCompile(`\.GetRegistryScanningConfiguration\(`), []string{"ecr_issue_enrichment.go"}, false},
 	{"standard logging (v2) deliveries", regexp.MustCompile(`\.DescribeDeliver(ies|ySources)\(`), []string{"cf_issue_enrichment.go"}, false},
-	{"account EBS encryption by default", regexp.MustCompile(`\.GetEbsEncryptionByDefault\(`), []string{"lt_issue_enrichment.go"}, false},
 	{"Transfer security policy algorithms", regexp.MustCompile(`\.DescribeSecurityPolicy\(`), []string{"transfer_issue_enrichment.go"}, false},
 	{"Transfer security policy judged by name", regexp.MustCompile(`"TransferSecurityPolicy-`), nil, false},
 	{"OpenSearch encryption at rest", regexp.MustCompile(`EncryptionAtRestOptions\.Enabled\b`), []string{"opensearch.go"}, true},

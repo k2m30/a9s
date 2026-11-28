@@ -101,7 +101,7 @@ var t3bTypes = []t3bType{ //nolint:gochecknoglobals // test-only table
 		actions: []string{"codeartifact:ReadFromRepository", "codeartifact:PublishPackageVersion"}, run: t3bRunCodeArtifact},
 	{short: "apigw", public: "apigw.no-authorizer-public",
 		actions: []string{"execute-api:Invoke"}, run: t3bRunAPIGW,
-		fixedRows: []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: "!"}, {Label: "Endpoint", Value: "regional", Tier: "!"}}},
+		fixedRows: []domain.DetailRow{{Label: "Open methods", Value: "3", Tier: "!"}, {Label: "Endpoint", Value: "regional", Tier: "!"}}},
 	{short: "opensearch", public: "opensearch.public",
 		actions: []string{"es:ESHttpGet", "es:ESHttpPost"}, run: t3bRunOpenSearch,
 		fixedRows: []domain.DetailRow{{Label: "Endpoint", Value: "public", Tier: "!"}, {Label: "Access policy", Value: "open", Tier: "!"}}},

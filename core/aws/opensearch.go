@@ -67,10 +67,15 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 		findings = append(findings, wave1Finding(opensearchCodeEncryptionOff))
 	}
 	// Reachable outside a VPC only counts when the access policy also lets
-	// anyone in: a public endpoint fronted by a scoped policy is a deliberate,
-	// defended design.
+	// anyone in and fine-grained access control does not stand behind it: a
+	// public endpoint fronted by a scoped policy is a deliberate, defended
+	// design, and "it's acceptable to use an open access policy, such as when
+	// you enable fine-grained access control" (OpenSearch Service, Operational
+	// best practices). Anonymous authentication lets an unsigned caller past
+	// fine-grained access control, so it guards nothing then.
 	policy := readPolicy("opensearch", aws.ToString(d.AccessPolicies), "", "")
-	if d.VPCOptions == nil && policy.public() {
+	fgac := d.AdvancedSecurityOptions != nil && aws.ToBool(d.AdvancedSecurityOptions.Enabled) && !aws.ToBool(d.AdvancedSecurityOptions.AnonymousAuthEnabled)
+	if d.VPCOptions == nil && policy.public() && !fgac {
 		findings = append(findings, wave1Finding(opensearchCodePublic))
 	}
 	findings = policy.withUnread(findings)

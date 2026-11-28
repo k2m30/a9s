@@ -41,9 +41,9 @@ const noChecklistFact = "cmd/checklist compares no fact this operation answers"
 // notCaptured lists the operations the app sends for a type and the collector
 // does not, keyed "<type> <Service>.<Operation>", each with the reason.
 var notCaptured = map[string]string{
-	"apigw API Gateway.GetAuthorizers":                             noChecklistFact,
+	"apigw API Gateway.GetResources":                               noChecklistFact,
 	"apigw API Gateway.GetStages":                                  noChecklistFact,
-	"apigw ApiGatewayV2.GetAuthorizers":                            noChecklistFact,
+	"apigw ApiGatewayV2.GetRoutes":                                 noChecklistFact,
 	"asg Auto Scaling.DescribeLaunchConfigurations":                noChecklistFact,
 	"cf CloudWatch Logs.DescribeDeliveries":                        noChecklistFact,
 	"cf CloudWatch Logs.DescribeDeliverySources":                   noChecklistFact,
@@ -58,6 +58,7 @@ var notCaptured = map[string]string{
 	"ddb DynamoDB.ListTagsOfResource":                              noChecklistFact,
 	"eb Elastic Beanstalk.DescribeConfigurationSettings":           noChecklistFact,
 	"ec2 EC2.DescribeInstanceAttribute":                            noChecklistFact,
+	"ebs-snap EC2.GetSnapshotBlockPublicAccessState":               noChecklistFact,
 	"ecr ECR.GetLifecyclePolicy":                                   noChecklistFact,
 	"ecr ECR.GetRegistryScanningConfiguration":                     noChecklistFact,
 	"ecr ECR.GetRepositoryPolicy":                                  noChecklistFact,
@@ -86,6 +87,7 @@ var notCaptured = map[string]string{
 	"trail S3.GetBucketLogging":                                    noChecklistFact,
 	"trail S3.GetBucketPolicyStatus":                               noChecklistFact,
 	"trail S3.GetPublicAccessBlock":                                noChecklistFact,
+	"trail S3 Control.GetPublicAccessBlock":                        noChecklistFact,
 	"transfer Transfer.DescribeSecurityPolicy":                     noChecklistFact,
 	"waf CloudFront.ListDistributionsByWebACLId":                   noChecklistFact,
 	"waf WAFV2.GetLoggingConfiguration":                            noChecklistFact,

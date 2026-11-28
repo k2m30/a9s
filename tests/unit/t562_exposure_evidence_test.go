@@ -531,7 +531,7 @@ func t562Verdicts(t *testing.T, fake *t562S3Fake) (trailPublic, s3Public bool) {
 	if len(trails) != 1 || trails[0].Fields["s3_bucket"] != t562TrailBucket {
 		t.Fatalf("trail rows = %+v, want one delivering to %s", trails, t562TrailBucket)
 	}
-	clients := &awsclient.ServiceClients{S3: fake, Region: "us-east-1"}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake, Region: "us-east-1"})
 	tr, err := awsclient.EnrichTrailLogBucket(context.Background(), clients, trails, nil)
 	if err != nil {
 		t.Fatalf("EnrichTrailLogBucket: %v", err)

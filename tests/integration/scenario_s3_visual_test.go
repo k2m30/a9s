@@ -26,32 +26,27 @@ const (
 	s3NilCfgPABID    = "a9s-demo-nilcfg"
 	// The badge counts rows whose Wave-1-only colour IsIssue, plus
 	// Healthy rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so
-	// only the second clause can fire. Two of the 42 bucket fixtures carry a
-	// `!`, one for each route into s3.public:
-	// acme-public-datasets, whose bucket policy status is public, and
-	// a9s-demo-nopab, whose access control list grants AllUsers read with no
-	// public access block to disregard it.
-	// Every other s3 finding — the three remaining PAB fixtures and the
+	// only the second clause can fire. One of the 42 bucket fixtures carries a
+	// `!`: acme-public-datasets, whose bucket policy status is public. The demo
+	// account's public access block sets IgnorePublicAcls, so AWS ignores every
+	// public ACL grant and no demo bucket is public by ACL.
+	// Every other s3 finding — the PAB fixtures and the
 	// versioning, MFA-delete, access-logging, lifecycle and object-lock
 	// fixtures — is Wave-2 `~` and never bumps the badge.
-	s3ExpectedIssueBkt = 2
+	s3ExpectedIssueBkt = 1
 
 	// Wave-2 Rows row labels/values emitted by EnrichS3Posture.
 	s3Row_BlockPublicAcls    = "BlockPublicAcls"
 	s3Row_BlockPublicPolicy  = "BlockPublicPolicy"
 	s3Row_AccountLevelLabel  = "Account-level PAB"
-	s3Row_AccountLevelValue  = "may still apply"
+	s3Row_AccountLevelValue  = "off for these settings too"
 	s3Row_NoPABStatusValue   = "no public access block configuration"
 	s3S4Phrase               = "public access block incomplete"
 	s3DetailPhraseCapitalize = "Public access block incomplete"
 
-	// s3ACLPublicStatus is the no-PAB bucket's Status cell. That bucket's
-	// access control list also routes it into s3.public, so it carries two
-	// findings: the broken-tier
-	// phrase takes the cell and "(+1)" stands for the warn-tier public
-	// access block finding beside it. The other three PAB fixtures carry
-	// one finding each and still render s3S4Phrase alone.
-	s3ACLPublicStatus = "publicly accessible (+1)"
+	// s3NoPABStatus is the no-PAB bucket's Status cell: the demo account block
+	// does not cover its missing settings, so it carries the one PAB finding.
+	s3NoPABStatus = "public access block incomplete"
 )
 
 func TestScenario_S3Visual(t *testing.T) {
@@ -74,9 +69,7 @@ func TestScenario_S3Visual(t *testing.T) {
 
 	scenario.ExpectRowStatusBlank(demofixtures.HealthyBucketName)
 
-	// The no-PAB bucket leads with its broken-tier finding and counts the PAB
-	// one in its suffix.
-	scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3ACLPublicStatus)
+	scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3NoPABStatus)
 	scenario.ExpectRowStatusEquals(s3PartialPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3MultiFailPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3NilCfgPABID, s3S4Phrase)

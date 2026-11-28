@@ -90,14 +90,14 @@ func TestT562_DemoDistributionNamesTheBehaviourAllowingHTTP(t *testing.T) {
 }
 
 // A trail's log bucket is public exactly when the bucket list calls it public,
-// and the demo holds one public by ACL grant alone.
+// and the demo holds one public by bucket policy.
 func TestT562_DemoTrailLogBucketVerdictMatchesTheBucketList(t *testing.T) {
 	bench := t562Bench(t)
 	buckets := map[string]resource.Resource{}
 	for _, b := range bench["s3"] {
 		buckets[b.ID] = b
 	}
-	compared, aclOnly := 0, 0
+	compared, byPolicyCount := 0, 0
 	for _, tr := range bench["trail"] {
 		b, ok := buckets[tr.Fields["s3_bucket"]]
 		if !ok {
@@ -111,20 +111,18 @@ func TestT562_DemoTrailLogBucketVerdictMatchesTheBucketList(t *testing.T) {
 		if !bucketPublic {
 			continue
 		}
-		var byACL, byPolicy bool
 		for _, row := range b.AttentionDetails["s3.public"].Rows {
-			byACL = byACL || row.Label == "Access control list"
-			byPolicy = byPolicy || row.Label == "Policy status"
-		}
-		if byACL && !byPolicy {
-			aclOnly++
+			if row.Label == "Policy status" {
+				byPolicyCount++
+				break
+			}
 		}
 	}
 	if compared == 0 {
 		t.Fatal("no demo trail delivers to a bucket on the demo bucket list")
 	}
-	if aclOnly == 0 {
-		t.Error("no demo trail delivers to a bucket public by ACL grant alone")
+	if byPolicyCount == 0 {
+		t.Error("no demo trail delivers to a bucket public by bucket policy")
 	}
 }
 

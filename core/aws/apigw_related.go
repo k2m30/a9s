@@ -161,13 +161,7 @@ func apigwRESTIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 	if !ok {
 		return nil, false, errClientMissing
 	}
-	resources, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwv1types.Resource, *string, error) {
-		out, err := api.GetResources(ctx, &apigateway.GetResourcesInput{RestApiId: aws.String(apiID), Embed: []string{"methods"}, Position: token})
-		if err != nil {
-			return nil, nil, err
-		}
-		return out.Items, out.Position, nil
-	})
+	resources, complete, err := apigwRESTResources(ctx, c, api, apiID)
 	var items []apigwIntegration
 	links := false
 	for _, r := range resources {

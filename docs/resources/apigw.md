@@ -95,21 +95,23 @@ No Wave 1 signals — the list API does not return fields usable for attention.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `apigatewayv2:GetStages` per HTTP/WebSocket API returns zero deployed stages (no stage with a `DeploymentId`).
+- **Signal**: no stage of the API carries a `DeploymentId` (no stage at all, or only stages never deployed), read in the same `GetStages` pass the stage checks use.
   - **State bucket**: Warning.
-  - **API call**: `apigatewayv2:GetStages` — one per v2 resource.
+  - **API call**: `apigatewayv2:GetStages` per HTTP/WebSocket API, `apigateway:GetStages` per REST API.
   - **Cost shape**: per-resource.
 
 - **Signal**: a deployed stage carries a configuration gap with no code of its own.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: internet-facing REST API with no authorizer and no scoped resource policy.
+Whether a caller is checked is read off each method's (REST, `GetResources` with the `methods` embed) or route's (HTTP and WebSocket, `GetRoutes`) `AuthorizationType`: an authorizer guards only the methods that name it, so how many authorizers the API defines is not evidence. A method or route is open when its `AuthorizationType` is `NONE`; an `OPTIONS` method answers the CORS preflight and is not counted. A WebSocket API authorizes on its `$connect` route alone, and one without a `$connect` route accepts every connection. A refused or capped method or route read with no open method found leaves the row not inspected. The finding's row counts the open methods or routes (`Open methods` / `Open routes`). An API no stage deploys answers no caller, so it carries the no-deployed-stage signal and never the no-authorization one. REST `GetResources` asks for the largest page (500) and every call the SDK client sends, from the issue check or the related panel, stays inside the account quota AWS states as "5 requests every 2 seconds per account", which cannot be increased.
+
+- **Signal**: internet-facing REST API with a method that authorizes no caller and no scoped resource policy.
   - **Scoped resource policy**: a policy in which no wildcard grant survives unscoped. That covers a policy that grants only named principals, one with Deny statements only, one whose wildcard grant an unconditional Deny removes, one whose wildcard grant sits under a restrictive condition, and one fenced by a Deny to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. For a method with no IAM authorization, API Gateway admits an anonymous caller only when the policy grants it and no Deny matches. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the API itself (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`), scopes nobody. API Gateway returns the policy JSON-escaped; it is read unescaped. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: private REST API, or HTTP API, with no authorizer.
+- **Signal**: private REST API, or HTTP or WebSocket API, with a method or route that authorizes no caller.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -142,10 +144,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| No deployed stage (v2) | 2 | Warning | `~` | S2, S3, S4, S5 | `no deployed stages` |
+| No stage carries a `DeploymentId` | 2 | Warning | `~` | S2, S3, S4, S5 | `no deployed stages` |
 | a deployed stage carries a configuration gap with no code of its own | 2 | Warning | `~` | S2, S3, S4, S5 | `stage configuration issues` |
-| internet-facing REST API with no authorizer and no scoped resource policy | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `internet-facing with no authorizer` |
-| private REST API, or HTTP API, with no authorizer | 2 | Warning | `~` | S2, S3, S4, S5 | `no authorizer` |
+| internet-facing REST API with a method whose `AuthorizationType` is `NONE` and no scoped resource policy | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `internet-facing with no authorizer` |
+| private REST API, or HTTP or WebSocket API, with a method or route whose `AuthorizationType` is `NONE` | 2 | Warning | `~` | S2, S3, S4, S5 | `no authorizer` |
 | a stage with no access log settings | 2 | Warning | `~` | S2, S3, S4, S5 | `no access logs` |
 | a REST stage with `TracingEnabled == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `X-Ray tracing off` |
 | a REST stage variable whose value scans as a credential | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in stage variables` |

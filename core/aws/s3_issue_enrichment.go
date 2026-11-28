@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	s3controltypes "github.com/aws/aws-sdk-go-v2/service/s3control/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -33,7 +34,9 @@ const (
 // with a small set of read-only per-bucket calls and emits one independently
 // evaluated Finding per condition:
 //
-//   - GetPublicAccessBlock     → s3.public-access-block-incomplete
+//   - GetPublicAccessBlock     → s3.public-access-block-incomplete (with the
+//     account's block, S3 Control GetPublicAccessBlock, when the bucket's
+//     own leaves a flag off)
 //   - GetBucketPolicyStatus    → s3.public
 //   - GetBucketVersioning      → s3.versioning-off / s3.mfa-delete-off
 //   - GetBucketLogging         → s3.access-logging-off
@@ -41,9 +44,10 @@ const (
 //   - GetObjectLockConfig...   → s3.no-object-lock
 //
 // Contract (public access block Finding):
-//   - Severity is always "~" (a missing/partial bucket-level PAB is a risk,
-//     not a certainty — account-level PAB may still apply — so this signal
-//     never paints a row Broken).
+//   - It reads the effective block, the bucket's and the account's flag by
+//     flag, and fires when that leaves a flag off.
+//   - Severity is always "~" (a flag off is a risk, not an exposure, so this
+//     signal never paints a row Broken).
 //   - Rows carry the per-case detail (never duplicated in Summary).
 //
 // On PermanentRedirect (301) / IllegalLocationConstraintException (400):
@@ -90,7 +94,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		if bucketName == "" {
 			return
 		}
-		p := scanS3BucketPosture(ctx, clients.s3For(ctx, bucketName), bucketName)
+		p := scanS3BucketPosture(ctx, clients, clients.s3For(ctx, bucketName), bucketName)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -166,39 +170,48 @@ type s3PublicRead struct {
 	// rows names each way in from the internet; nil when the bucket is not
 	// public.
 	rows []domain.DetailRow
-	// pab is the bucket's public access block when pabRead; nil there means
-	// the bucket has none.
-	pab         *s3.GetPublicAccessBlockOutput
-	pabRead     bool
-	failures    []error
-	unreachable error
+	// pabRead is true when the bucket's effective public access block is
+	// known: the bucket's own and the account's were read, or one of them
+	// alone sets all four flags. bucketPAB is nil for a bucket with none or
+	// not read, accountPAB nil for an account with none or not read.
+	pabRead    bool
+	bucketPAB  *s3types.PublicAccessBlockConfiguration
+	accountPAB *s3controltypes.PublicAccessBlockConfiguration
+	// foreignRows and foreignPABRead are the same verdict for a bucket
+	// another account owns, judged on the bucket's own block alone: the
+	// account-level block that applies to a bucket is its owner's.
+	foreignRows    []domain.DetailRow
+	foreignPABRead bool
+	failures       []error
+	unreachable    error
+}
+
+func (v s3PublicRead) public(foreign bool) (decided, public bool) {
+	if foreign {
+		return v.foreignPABRead, v.foreignPABRead && v.foreignRows != nil
+	}
+	return v.pabRead, v.pabRead && v.rows != nil
 }
 
 // s3PublicVerdict is the one answer to "is this bucket public", for the
 // bucket's own posture and for every resource that delivers into it. A bucket
-// is public when AWS evaluates its policy as public and its own
+// is public when AWS evaluates its policy as public and its effective
 // RestrictPublicBuckets setting is off, or when its ACL grants a public group
-// access and its own IgnorePublicAcls setting is off. Each half is judged only
-// against a block that was read: an unread block may be the one closing it.
-// The first call decides reachability: a cross-region or already-deleted
-// bucket short-circuits the rest.
-func s3PublicVerdict(ctx context.Context, api s3PublicAPI, bucket string) s3PublicRead {
+// access and its effective IgnorePublicAcls setting is off. The effective
+// block is the bucket's and the account's, flag by flag (s3AccountBlock); the
+// account's is read only when the bucket's own leaves a flag off or could not
+// be read. Each half is judged only against a block that was read: an unread
+// block may be the one closing it. The first call decides reachability: a
+// cross-region or already-deleted bucket short-circuits the rest.
+func s3PublicVerdict(ctx context.Context, clients *ServiceClients, api s3PublicAPI, bucket string) s3PublicRead {
 	var v s3PublicRead
-	// Whether the bucket's own block makes S3 disregard the public grants its
-	// ACL already carries, and serve a public policy only to AWS service
-	// principals and the owner's own account.
-	ignorePublicACLs, restrictPublicBuckets := false, false
 
 	pabOut, err := api.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil || isS3APIErrCode(err, "NoSuchPublicAccessBlockConfiguration"):
 		v.pabRead = true
-		if err == nil {
-			v.pab = pabOut
-		}
-		if v.pab != nil && v.pab.PublicAccessBlockConfiguration != nil {
-			ignorePublicACLs = aws.ToBool(v.pab.PublicAccessBlockConfiguration.IgnorePublicAcls)
-			restrictPublicBuckets = aws.ToBool(v.pab.PublicAccessBlockConfiguration.RestrictPublicBuckets)
+		if err == nil && pabOut != nil {
+			v.bucketPAB = pabOut.PublicAccessBlockConfiguration
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		v.unreachable = err
@@ -206,13 +219,23 @@ func s3PublicVerdict(ctx context.Context, api s3PublicAPI, bucket string) s3Publ
 	default:
 		v.failures = append(v.failures, err)
 	}
+	v.foreignPABRead = v.pabRead
+	if bucketRead := v.pabRead; !bucketRead || !s3EffectiveBlock(v.bucketPAB, nil).complete() {
+		account, accountErr := s3AccountBlock(ctx, clients)
+		if accountErr != nil {
+			v.failures = append(v.failures, accountErr)
+		}
+		v.accountPAB = account
+		// An account block that sets all four flags closes the bucket
+		// whatever its own block says.
+		v.pabRead = accountErr == nil && (bucketRead || s3EffectiveBlock(nil, account).complete())
+	}
 
 	statusOut, err := api.GetBucketPolicyStatus(ctx, &s3.GetBucketPolicyStatusInput{Bucket: aws.String(bucket)})
+	policyPublic := false
 	switch {
 	case err == nil:
-		if v.pabRead && !restrictPublicBuckets && statusOut.PolicyStatus != nil && aws.ToBool(statusOut.PolicyStatus.IsPublic) {
-			v.rows = append(v.rows, domain.DetailRow{Label: "Policy status", Value: "public", Tier: "!"})
-		}
+		policyPublic = statusOut.PolicyStatus != nil && aws.ToBool(statusOut.PolicyStatus.IsPublic)
 	// A bucket with no policy at all cannot be public by policy.
 	case isS3APIErrCode(err, "NoSuchBucketPolicy"):
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
@@ -225,39 +248,72 @@ func s3PublicVerdict(ctx context.Context, api s3PublicAPI, bucket string) s3Publ
 	aclOut, err := api.GetBucketAcl(ctx, &s3.GetBucketAclInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil:
-		// One bucket reachable from the internet is one condition, however
-		// many ways in it has. A grant is judged only against a block that was
-		// read: an unread block may be the one ignoring it.
-		if rows := s3ACLPublicRows(aclOut, ignorePublicACLs); v.pabRead && rows != nil {
-			v.rows = append(v.rows, rows...)
-		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		v.unreachable = err
 		return v
 	default:
+		aclOut = nil
 		v.failures = append(v.failures, err)
 	}
+
+	// One bucket reachable from the internet is one condition, however many
+	// ways in it has. Each half is judged only against a block that was read:
+	// an unread block may be the one closing it.
+	judge := func(eff s3Block, read bool) []domain.DetailRow {
+		if !read {
+			return nil
+		}
+		var rows []domain.DetailRow
+		if policyPublic && !eff.restrictPublicBuckets {
+			rows = append(rows, domain.DetailRow{Label: "Policy status", Value: "public", Tier: "!"})
+		}
+		return append(rows, s3ACLPublicRows(aclOut, eff.ignorePublicAcls)...)
+	}
+	v.rows = judge(s3EffectiveBlock(v.bucketPAB, v.accountPAB), v.pabRead)
+	v.foreignRows = judge(s3EffectiveBlock(v.bucketPAB, nil), v.foreignPABRead)
 	return v
+}
+
+type s3Block struct {
+	blockPublicAcls, ignorePublicAcls, blockPublicPolicy, restrictPublicBuckets bool
+}
+
+func (b s3Block) complete() bool {
+	return b.blockPublicAcls && b.ignorePublicAcls && b.blockPublicPolicy && b.restrictPublicBuckets
+}
+
+func s3EffectiveBlock(bucket *s3types.PublicAccessBlockConfiguration, account *s3controltypes.PublicAccessBlockConfiguration) s3Block {
+	var b s3Block
+	if bucket != nil {
+		b = s3Block{aws.ToBool(bucket.BlockPublicAcls), aws.ToBool(bucket.IgnorePublicAcls), aws.ToBool(bucket.BlockPublicPolicy), aws.ToBool(bucket.RestrictPublicBuckets)}
+	}
+	if account != nil {
+		b.blockPublicAcls = b.blockPublicAcls || aws.ToBool(account.BlockPublicAcls)
+		b.ignorePublicAcls = b.ignorePublicAcls || aws.ToBool(account.IgnorePublicAcls)
+		b.blockPublicPolicy = b.blockPublicPolicy || aws.ToBool(account.BlockPublicPolicy)
+		b.restrictPublicBuckets = b.restrictPublicBuckets || aws.ToBool(account.RestrictPublicBuckets)
+	}
+	return b
 }
 
 // scanS3BucketPosture runs the per-bucket posture calls in order and collects
 // what fired. The first call decides reachability: a cross-region or
 // already-deleted bucket short-circuits the rest, since every remaining call
 // would fail the same way.
-func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s3BucketPosture {
+func scanS3BucketPosture(ctx context.Context, clients *ServiceClients, api s3PostureAPI, bucket string) s3BucketPosture {
 	var p s3BucketPosture
 	add := func(code domain.FindingCode, rows []domain.DetailRow) {
 		p.findings = append(p.findings, s3PostureFinding{code: code, rows: rows})
 	}
 
-	pub := s3PublicVerdict(ctx, api, bucket)
+	pub := s3PublicVerdict(ctx, clients, api, bucket)
 	p.failures = pub.failures
 	if pub.unreachable != nil {
 		p.unreachable = pub.unreachable
 		return p
 	}
 	if pub.pabRead {
-		if rows := s3PABRows(pub.pab); rows != nil {
+		if rows := s3PABRows(pub.bucketPAB, pub.accountPAB); rows != nil {
 			p.pabIncomplete = true
 			add(s3CodePublicAccessBlockIncomplete, rows)
 		}
@@ -340,40 +396,40 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	return p
 }
 
-// s3PABRows returns the AttentionDetail rows for an incomplete bucket-level
-// public access block, or nil when the block is complete. A nil out is a
-// bucket with no block at all.
-func s3PABRows(out *s3.GetPublicAccessBlockOutput) []domain.DetailRow {
-	if out == nil || out.PublicAccessBlockConfiguration == nil {
-		return []domain.DetailRow{
-			{Label: "Status", Value: "no public access block configuration"},
-			{Label: "Account-level PAB", Value: "may still apply"},
-		}
+// s3PABRows returns the AttentionDetail rows for a bucket whose effective
+// public access block leaves a flag off, one row per flag off on both layers,
+// or nil when the effective block is complete. A nil bucket is a bucket with
+// no block of its own, a nil account an account with none.
+func s3PABRows(bucket *s3types.PublicAccessBlockConfiguration, account *s3controltypes.PublicAccessBlockConfiguration) []domain.DetailRow {
+	eff := s3EffectiveBlock(bucket, account)
+	if eff.complete() {
+		return nil
 	}
-	cfg := out.PublicAccessBlockConfiguration
+	var rows []domain.DetailRow
+	if bucket == nil {
+		rows = append(rows, domain.DetailRow{Label: "Status", Value: "no public access block configuration"})
+	}
 	// The label is what the console calls the setting; the SDK flag name
 	// rides in the value, which the style gate exempts because a value
 	// legitimately is an identifier.
-	flags := []struct {
-		label string
-		flag  string
-		value *bool
+	for _, fc := range []struct {
+		label, flag string
+		on          bool
 	}{
-		{"Block public access control lists", "BlockPublicAcls", cfg.BlockPublicAcls},
-		{"Ignore public access control lists", "IgnorePublicAcls", cfg.IgnorePublicAcls},
-		{"Block public bucket policy", "BlockPublicPolicy", cfg.BlockPublicPolicy},
-		{"Restrict public buckets", "RestrictPublicBuckets", cfg.RestrictPublicBuckets},
-	}
-	var rows []domain.DetailRow
-	for _, fc := range flags {
-		if !aws.ToBool(fc.value) {
+		{"Block public access control lists", "BlockPublicAcls", eff.blockPublicAcls},
+		{"Ignore public access control lists", "IgnorePublicAcls", eff.ignorePublicAcls},
+		{"Block public bucket policy", "BlockPublicPolicy", eff.blockPublicPolicy},
+		{"Restrict public buckets", "RestrictPublicBuckets", eff.restrictPublicBuckets},
+	} {
+		if !fc.on {
 			rows = append(rows, domain.DetailRow{Label: fc.label, Value: "off (" + fc.flag + ")"})
 		}
 	}
-	if len(rows) == 0 {
-		return nil
+	accountValue := "off for these settings too"
+	if account == nil {
+		accountValue = "not configured"
 	}
-	return append(rows, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
+	return append(rows, domain.DetailRow{Label: "Account-level PAB", Value: accountValue})
 }
 
 // Canonical group URIs S3 grants an ACL permission to. Both reach the whole

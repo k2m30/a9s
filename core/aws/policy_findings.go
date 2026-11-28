@@ -288,6 +288,80 @@ func (p policyReading) absent() bool { return !p.present }
 
 func (p policyReading) public() bool { return p.ex.Public }
 
+// functionURLGrants splits a function policy's public grants into the ones
+// that reach the function through its URL and the ones that reach it any
+// other way, each part evaluated beside the document's Deny statements. A URL
+// call is authorized by lambda:InvokeFunctionUrl and, for URLs made since
+// October 2025, by the lambda:InvokeFunction grant AWS writes beside it under
+// Bool lambda:InvokedViaFunctionUrl=true, which no other call satisfies
+// (Lambda Developer Guide, "Default resource-based policy for NONE auth
+// type"). A grant that names neither in that form, a NotAction grant
+// included, reaches the function directly, and through its URL too when it
+// covers lambda:InvokeFunctionUrl.
+func (p policyReading) functionURLGrants() (urlGrant, otherGrant bool) {
+	if !p.public() {
+		return false, false
+	}
+	var viaURL, direct, denies []iampolicy.Statement
+	for _, st := range p.doc.Statement {
+		switch {
+		case st.Effect == "Deny":
+			denies = append(denies, st)
+		case functionURLStatement(st):
+			viaURL = append(viaURL, st)
+		default:
+			direct = append(direct, st)
+		}
+	}
+	evaluate := func(allows []iampolicy.Statement) iampolicy.Exposure {
+		if len(allows) == 0 {
+			return iampolicy.Exposure{}
+		}
+		return iampolicy.Evaluate(iampolicy.Document{Statement: slices.Concat(allows, denies)}, p.own)
+	}
+	ex := evaluate(direct)
+	if ex.Public {
+		otherGrant = len(ex.PublicActions) == 0
+		urlGrant = otherGrant
+		for _, a := range ex.PublicActions {
+			urlGrant = urlGrant || iampolicy.Match(a, lambdaInvokeURLAction)
+			otherGrant = otherGrant || !strings.EqualFold(a, lambdaInvokeURLAction)
+		}
+	}
+	return urlGrant || evaluate(viaURL).Public, otherGrant
+}
+
+// functionURLStatement reports whether every action an Allow names reaches
+// the function only through its URL.
+func functionURLStatement(st iampolicy.Statement) bool {
+	if len(st.Action) == 0 || len(st.NotAction) > 0 {
+		return false
+	}
+	viaURL := false
+	for op, keys := range st.Condition {
+		if !strings.EqualFold(op, "Bool") {
+			continue
+		}
+		for key, values := range keys {
+			viaURL = viaURL || (strings.EqualFold(key, "lambda:InvokedViaFunctionUrl") && len(values) == 1 && strings.EqualFold(values[0], "true"))
+		}
+	}
+	for _, a := range st.Action {
+		if !strings.EqualFold(a, lambdaInvokeURLAction) && (!viaURL || !strings.EqualFold(a, "lambda:InvokeFunction")) {
+			return false
+		}
+	}
+	return true
+}
+
+// publicOnlyIf is p, read as public only while public holds: a type whose
+// other read decides that a public grant reaches nothing withdraws the
+// verdict here, and the rest of the reading stands.
+func (p policyReading) publicOnlyIf(public bool) policyReading {
+	p.ex.Public = p.ex.Public && public
+	return p
+}
+
 // word is the Wave 1 verdict a row shows for its policy: unknown when the
 // document could not be read, so a row never reads private or scoped on a
 // policy nobody could read.

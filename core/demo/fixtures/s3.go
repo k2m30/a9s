@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	s3controltypes "github.com/aws/aws-sdk-go-v2/service/s3control/types"
 )
 
 // Exported constants — referenced by sibling fixture files and tests.
@@ -56,11 +57,16 @@ const (
 
 	// S3BucketPublic is the bucket AWS reports as public by policy.
 	S3BucketPublic = "acme-public-datasets"
-	// S3BucketPublicByACL is the bucket that is public the other way: no
-	// policy at all, a legacy ACL grant to AllUsers, and no public access
-	// block to disregard it. It doubles as the no-PAB bucket, which is what
-	// leaves the grant live.
+	// S3BucketPublicByACL is the bucket whose access control list grants
+	// AllUsers read, with no policy and no public access block of its own.
+	// The account's block ignores public ACLs (S3AccountBlock), so the grant
+	// reaches nobody and the bucket is not public; it doubles as the no-PAB
+	// bucket, whose effective block still leaves the two policy settings off.
 	S3BucketPublicByACL = "a9s-demo-nopab"
+	// S3BucketAccountCompletesBlock is the bucket whose own block leaves
+	// IgnorePublicAcls off, which the account's block sets, so its effective
+	// block is complete and it carries no finding.
+	S3BucketAccountCompletesBlock = "acme-config-backup"
 	// S3BucketVersioningOff is the bucket that has never had versioning enabled.
 	S3BucketVersioningOff = "acme-versioning-off"
 	// S3BucketMFADeleteOff has versioning enabled but MFA delete disabled.
@@ -72,6 +78,17 @@ const (
 	// S3BucketNoObjectLock is the bucket with object lock not enabled.
 	S3BucketNoObjectLock = "acme-no-object-lock"
 )
+
+// S3AccountBlock is the demo account's S3 public access block, served by
+// S3 Control GetPublicAccessBlock: public ACLs ignored and nothing else, so
+// a public bucket policy stays public and a bucket's own missing
+// BlockPublicAcls stays missing.
+var S3AccountBlock = s3controltypes.PublicAccessBlockConfiguration{
+	BlockPublicAcls:       aws.Bool(false),
+	IgnorePublicAcls:      aws.Bool(true),
+	BlockPublicPolicy:     aws.Bool(false),
+	RestrictPublicBuckets: aws.Bool(false),
+}
 
 // S3Fixtures holds all S3 domain objects served by the fake.
 type S3Fixtures struct {
@@ -189,7 +206,7 @@ func buildS3Buckets() []s3types.Bucket {
 		{HealthyBucketName, HealthyBucketARN, "us-east-1", "2025-01-10T10:00:00+00:00"},
 		// Logs target: plain access-log destination bucket (no issues).
 		{LogsBucketName, "arn:aws:s3:::" + LogsBucketName, "us-east-1", "2025-01-10T10:05:00+00:00"},
-		// Warning: no bucket-level PAB configured (account-level policy may apply).
+		// Warning: no bucket-level PAB configured; the account's leaves the policy settings off.
 		{S3BucketPublicByACL, "arn:aws:s3:::" + S3BucketPublicByACL, "us-east-1", "2025-02-01T12:00:00+00:00"},
 		// Warning: PAB partial — BlockPublicAcls=false, others true.
 		{"a9s-demo-partial-pab", "arn:aws:s3:::a9s-demo-partial-pab", "us-east-1", "2025-03-15T09:00:00+00:00"},
@@ -326,6 +343,15 @@ func buildS3PublicAccessBlockConfigs() map[string]*s3.GetPublicAccessBlockOutput
 				BlockPublicAcls:       aws.Bool(false),
 				IgnorePublicAcls:      aws.Bool(true),
 				BlockPublicPolicy:     aws.Bool(false),
+				RestrictPublicBuckets: aws.Bool(true),
+			},
+		},
+		// The one flag this bucket leaves off is the one the account's block sets.
+		S3BucketAccountCompletesBlock: {
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       aws.Bool(true),
+				IgnorePublicAcls:      aws.Bool(false),
+				BlockPublicPolicy:     aws.Bool(true),
 				RestrictPublicBuckets: aws.Bool(true),
 			},
 		},

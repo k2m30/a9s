@@ -152,14 +152,16 @@ func TestPartialLambda_OneFailedCheckKeepsTheOtherOne(t *testing.T) {
 		partialAssertUninspected(t, res, partialLambdaFn)
 	})
 
-	t.Run("policy read denied, open function url still reported", func(t *testing.T) {
+	// A URL with AuthType NONE is callable by anyone only when the resource
+	// policy grants lambda:InvokeFunctionUrl to everyone, so an unread policy
+	// leaves the URL undecided.
+	t.Run("policy read denied, open function url undecided", func(t *testing.T) {
 		res := partialEnrichLambda(t, &partialLambdaFake{
 			policyErr: partialAccessDenied(),
 			hasURL:    true,
 			urlAuth:   lambdatypes.FunctionUrlAuthTypeNone,
 		})
-		w4AssertFinding(t, res.Findings[partialLambdaFn], "lambda.function-url-public",
-			"function endpoint open without authentication", domain.SevBroken, "wave2")
+		w4AssertNoCode(t, res.Findings[partialLambdaFn], "lambda.function-url-public")
 		partialAssertUninspected(t, res, partialLambdaFn)
 	})
 

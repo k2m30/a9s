@@ -22,6 +22,7 @@ func NewServiceClients() *awsclient.ServiceClients {
 	clients := awsclient.CreateServiceClients(NewDemoAWSConfig())
 	clients.EC2 = fakes.NewEC2()
 	clients.S3 = fakes.NewS3()
+	clients.S3Control = fakes.NewS3Control()
 	clients.RDS = fakes.NewRDS()
 	clients.ElastiCache = fakes.NewElastiCache()
 	clients.DocDB = fakes.NewDocDB()

@@ -250,7 +250,7 @@ func TestT6_S3StatusClearsWhenPublicAccessBlockCompletes(t *testing.T) {
 	rows := t6DemoRows(t, "s3")[:2]
 	target, healthy := rows[0], rows[1]
 	posture := &t6S3Posture{partial: map[string]bool{target.Name: true}}
-	a := t6NewApp(t, "s3", &awsclient.ServiceClients{S3: posture}, rows, nil, true)
+	a := t6NewApp(t, "s3", t4WithAccount(&awsclient.ServiceClients{S3: posture}), rows, nil, true)
 
 	a.wave2(t)
 	if got := a.statusCell(t, target.ID); got != "public access block incomplete" {

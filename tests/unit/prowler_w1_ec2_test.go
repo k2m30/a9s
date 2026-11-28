@@ -134,6 +134,19 @@ func (f *pw1EC2EnrichFake) DescribeInstanceStatus(_ context.Context, _ *ec2.Desc
 	return &ec2.DescribeInstanceStatusOutput{}, nil
 }
 
+// DescribeVpcBlockPublicAccessOptions answers the Region as AWS ships it:
+// VPC block public access off.
+func (f *pw1EC2EnrichFake) DescribeVpcBlockPublicAccessOptions(_ context.Context, _ *ec2.DescribeVpcBlockPublicAccessOptionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessOptionsOutput, error) {
+	return &ec2.DescribeVpcBlockPublicAccessOptionsOutput{VpcBlockPublicAccessOptions: &ec2types.VpcBlockPublicAccessOptions{
+		InternetGatewayBlockMode: ec2types.InternetGatewayBlockModeOff,
+		State:                    ec2types.VpcBlockPublicAccessStateDefaultState,
+	}}, nil
+}
+
+func (f *pw1EC2EnrichFake) DescribeVpcBlockPublicAccessExclusions(_ context.Context, _ *ec2.DescribeVpcBlockPublicAccessExclusionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcBlockPublicAccessExclusionsOutput, error) {
+	return &ec2.DescribeVpcBlockPublicAccessExclusionsOutput{}, nil
+}
+
 func (f *pw1EC2EnrichFake) DescribeInstanceAttribute(_ context.Context, in *ec2.DescribeInstanceAttributeInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceAttributeOutput, error) {
 	id := aws.ToString(in.InstanceId)
 	f.mu.Lock()

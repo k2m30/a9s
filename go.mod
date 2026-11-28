@@ -48,6 +48,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/redshift v1.72.2
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.73.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.2
+	github.com/aws/aws-sdk-go-v2/service/s3control v1.81.3
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.51.2
 	github.com/aws/aws-sdk-go-v2/service/ses v1.43.2
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.80.2

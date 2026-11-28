@@ -50,15 +50,14 @@ type APIGatewayV2GetAuthorizersAPI interface {
 	GetAuthorizers(ctx context.Context, params *apigatewayv2.GetAuthorizersInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error)
 }
 
-// The two Wave 2 interfaces below are deliberately NOT folded into
+// The Wave 2 interfaces below are deliberately NOT folded into
 // APIGatewayV1API. The enricher type-asserts for them off clients.APIGatewayV1
 // the way EnrichCodeArtifactRepository does for CodeArtifactListPackagesAPI,
 // so a client or fake that implements only the aggregate keeps satisfying it
 // instead of failing to compile.
 
 // APIGatewayV1GetAuthorizersAPI lists the authorizers configured for a REST
-// API. Used by Wave 2 enrichment to tell an unauthenticated API from one
-// behind an authorizer.
+// API. Used to resolve apigw→role via AuthorizerCredentials.
 type APIGatewayV1GetAuthorizersAPI interface {
 	GetAuthorizers(ctx context.Context, params *apigateway.GetAuthorizersInput, optFns ...func(*apigateway.Options)) (*apigateway.GetAuthorizersOutput, error)
 }
@@ -84,6 +83,12 @@ type APIGatewayV1GetVpcLinksAPI interface {
 // mappings, how an edge-optimized domain maps REST APIs.
 type APIGatewayV1GetBasePathMappingsAPI interface {
 	GetBasePathMappings(ctx context.Context, params *apigateway.GetBasePathMappingsInput, optFns ...func(*apigateway.Options)) (*apigateway.GetBasePathMappingsOutput, error)
+}
+
+// APIGatewayV2GetRoutesAPI lists an HTTP or WebSocket API's routes, each with
+// the authorization type a caller must pass.
+type APIGatewayV2GetRoutesAPI interface {
+	GetRoutes(ctx context.Context, params *apigatewayv2.GetRoutesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error)
 }
 
 // APIGatewayV2ListRoutingRulesAPI lists a custom domain's routing rules,

@@ -71,15 +71,12 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 	if clients.EC2 == nil {
 		return result, nil
 	}
-	// Cache-only cross-ref: costs nothing and must survive a
-	// DescribeInstanceStatus outage, so it runs before the API passes.
-	ec2InternetExposure(&result, resources, cache)
+	// The cache cross-ref must survive a DescribeInstanceStatus outage, so it
+	// runs before the status pass.
+	exposureErr := ec2InternetExposure(ctx, clients, &result, resources, cache)
 	userDataErr := ec2UserDataSecrets(ctx, clients, resources, &result)
 	statusResult, statusErr := ec2InstanceStatusFindings(ctx, clients, resources, &result)
-	if statusErr != nil {
-		return statusResult, errors.Join(statusErr, userDataErr)
-	}
-	return statusResult, userDataErr
+	return statusResult, errors.Join(statusErr, exposureErr, userDataErr)
 }
 
 // ec2InstanceStatusFindings is the DescribeInstanceStatus pass: status checks
@@ -207,14 +204,18 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 // address whose interface's security groups open a sensitive port, or every
 // port, to everyone on that address's family, in a subnet whose route table
 // sends that family's default route to an internet gateway, is reachable from
-// the internet. No API call; the exposure rule per address family is owned by
-// sg.go (sgFamilyExposure), and this pass only joins it to each interface.
+// the internet unless the Region's VPC block public access closes the
+// interface's VPC and subnet (vpcIngressAllowed, read only for an interface
+// that would otherwise be exposed). The exposure rule per address family is
+// owned by sg.go (sgFamilyExposure), and this pass only joins it to each
+// interface.
 //
 // A NAT gateway or an egress-only gateway admits nothing inbound, so an
 // address behind one is not exposed. A group or a route table the loaded
 // lists cannot answer for marks the row not inspected — beside the finding
 // when one was found, since the unread part could widen it.
-func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resource, cache resource.ResourceCache) {
+func ec2InternetExposure(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource, cache resource.ResourceCache) error {
+	var failures []Failure
 	sgEntry, sgLoaded := cache["sg"]
 	rtbEntry, rtbLoaded := cache["rtb"]
 	groups := make(map[string]ec2types.SecurityGroup, len(sgEntry.Resources))
@@ -243,6 +244,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 		var all ec2Exposure
 		var addresses, groupIDs []string
 		groupUnread, routeUnread := false, ""
+		var blockErr error
 		for _, ifc := range ifaces {
 			for _, fam := range []struct {
 				ipv6  bool
@@ -275,7 +277,15 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 				if routeUnread == "" || unread == checkInspectionEndpointRoute {
 					routeUnread = unread
 				}
-				if !routed {
+				if !routed || blockErr != nil {
+					continue
+				}
+				allowed, err := vpcIngressAllowed(ctx, clients, aws.ToString(inst.VpcId), ifc.subnet)
+				if err != nil {
+					blockErr = err
+					continue
+				}
+				if !allowed {
 					continue
 				}
 				all.add(e.wideOpen, strings.Join(e.ports, ", "))
@@ -287,6 +297,9 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 			markUninspected(result, r.ID, checkListIncomplete("sg"))
 		case routeUnread != "":
 			markUninspected(result, r.ID, routeUnread)
+		}
+		if blockErr != nil {
+			MarkSkipped(result, r.ID, &failures, blockErr)
 		}
 		if !all.exposed() {
 			continue
@@ -315,6 +328,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 		}
 		setWave2Finding(result, r.ID, ec2CodeInternetExposed, rows, portList)
 	}
+	return AggregateFailures("VPC block public access", failures, len(resources))
 }
 
 // ec2Exposure accumulates sgFamilyExposure verdicts across groups and

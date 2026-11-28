@@ -171,7 +171,7 @@ func w2S3RunErr(t *testing.T, fake *w2S3Posture, buckets ...string) (awsclient.I
 	for _, b := range buckets {
 		rs = append(rs, w2Res(b, nil))
 	}
-	res, err := w2Enricher(t, "s3")(context.Background(), &awsclient.ServiceClients{S3: fake}, rs, nil)
+	res, err := w2Enricher(t, "s3")(context.Background(), t4WithAccount(&awsclient.ServiceClients{S3: fake}), rs, nil)
 	w2AssertEnricherShape(t, res)
 	return res, err
 }

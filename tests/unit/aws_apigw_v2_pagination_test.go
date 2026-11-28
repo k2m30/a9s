@@ -56,6 +56,12 @@ func (f *apigwPaginatedFake) GetAuthorizers(
 	}}}, nil
 }
 
+// GetRoutes puts every route behind the authorizer, keeping the
+// apigw.no-authorizer finding out of these results.
+func (f *apigwPaginatedFake) GetRoutes(_ context.Context, _ *apigatewayv2.GetRoutesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	return &apigatewayv2.GetRoutesOutput{Items: w6aHTTPRoutes(apigwtypes.AuthorizationTypeJwt, "auth-default")}, nil
+}
+
 func newAPiGWPaginatedFake() *apigwPaginatedFake {
 	return &apigwPaginatedFake{
 		pages:      make(map[string][]*apigatewayv2.GetStagesOutput),
@@ -106,7 +112,8 @@ func makeStagesGood(n int) []apigwtypes.Stage {
 	stages := make([]apigwtypes.Stage, n)
 	for i := range stages {
 		stages[i] = apigwtypes.Stage{
-			StageName: aws.String(fmt.Sprintf("stage-%d", i)),
+			StageName:    aws.String(fmt.Sprintf("stage-%d", i)),
+			DeploymentId: aws.String(fmt.Sprintf("dpl%03d", i)),
 			DefaultRouteSettings: &apigwtypes.RouteSettings{
 				ThrottlingBurstLimit: aws.Int32(500),
 				ThrottlingRateLimit:  aws.Float64(1000),

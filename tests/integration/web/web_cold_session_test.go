@@ -58,15 +58,13 @@ const (
 	// coldS3ExpectedIssueCount is the canonical s3 demo-fixture badge count.
 	// The badge counts rows whose Wave-1-only colour IsIssue, plus Healthy
 	// rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so only the
-	// second clause can fire, and two of the 42 bucket fixtures satisfy it,
-	// one for each route into s3.public:
-	// acme-public-datasets, whose bucket policy status is public, and
-	// a9s-demo-nopab, whose access control list grants AllUsers read with no
-	// public access block to disregard it. The three remaining PAB fixtures
-	// and the other five s3 posture fixtures are all Wave-2 `~` and never bump the
-	// badge. Pinned as s3ExpectedIssueBkt=2 in
+	// second clause can fire, and one of the 42 bucket fixtures satisfies it:
+	// acme-public-datasets, whose bucket policy status is public. The demo
+	// account ignores public ACLs, so no bucket is public by ACL. The other
+	// s3 posture fixtures are all Wave-2 `~` and never bump the badge. Pinned
+	// as s3ExpectedIssueBkt=1 in
 	// tests/integration/scenario_s3_visual_test.go.
-	coldS3ExpectedIssueCount = 2
+	coldS3ExpectedIssueCount = 1
 )
 
 // coldSessionCoreTypes are the resource types whose availability counts must

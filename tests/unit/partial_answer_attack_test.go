@@ -55,11 +55,16 @@ func TestPartialAttackLambda_BothReadsFailingIsOneFailedRow(t *testing.T) {
 }
 
 // TestPartialAttackLambda_BothConditionsOnOneFunction pins that the two
-// exposure findings are not exclusive. A function
-// that is both open by policy and open by URL carries both findings.
+// exposure findings are not exclusive.
 func TestPartialAttackLambda_BothConditionsOnOneFunction(t *testing.T) {
+	both := `{"Version":"2012-10-17","Id":"default","Statement":[` +
+		`{"Sid":"AllowPublicInvoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction",` +
+		`"Resource":"arn:aws:lambda:us-east-1:123456789012:function:acme-webhook"},` +
+		`{"Sid":"FunctionURLAllowPublicAccess","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl",` +
+		`"Resource":"arn:aws:lambda:us-east-1:123456789012:function:acme-webhook",` +
+		`"Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}}]}`
 	res := partialEnrichLambda(t, &partialLambdaFake{
-		policy:  partialLambdaPublicPolicy,
+		policy:  both,
 		hasURL:  true,
 		urlAuth: lambdatypes.FunctionUrlAuthTypeNone,
 	})

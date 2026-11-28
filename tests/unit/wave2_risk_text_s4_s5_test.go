@@ -85,7 +85,7 @@ func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 			"bucket-no-pab": nil, // nil value → NoSuchPublicAccessBlockConfiguration
 		},
 	}
-	clients := &awsclient.ServiceClients{S3: fake}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake})
 	resources := []resource.Resource{
 		pabResource("bucket-no-pab"),
 	}
@@ -102,8 +102,8 @@ func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 	if finding.Phrase != "public access block incomplete" {
 		t.Errorf("s3 PAB Phrase (S4) = %q, want %q", finding.Phrase, "public access block incomplete")
 	}
-	if finding.Detail != "This bucket does not set all four public-access settings, so it relies on the account-level block to stop a future policy or ACL from making it public, and that block may not be set either. Turn on all four settings on the bucket itself so it is safe regardless of the account." {
-		t.Errorf("s3 PAB Detail (S5) = %q, want %q", finding.Detail, "This bucket does not set all four public-access settings, so it relies on the account-level block to stop a future policy or ACL from making it public, and that block may not be set either. Turn on all four settings on the bucket itself so it is safe regardless of the account.")
+	if finding.Detail != "This bucket does not set all four public-access settings, and the account-level block does not set the missing ones either, so nothing stops a future policy or ACL from making it public. Turn on all four settings on the bucket itself so it is safe regardless of the account." {
+		t.Errorf("s3 PAB Detail (S5) = %q, want %q", finding.Detail, "This bucket does not set all four public-access settings, and the account-level block does not set the missing ones either, so nothing stops a future policy or ACL from making it public. Turn on all four settings on the bucket itself so it is safe regardless of the account.")
 	}
 }
 

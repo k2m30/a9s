@@ -93,12 +93,11 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 func buildCTTrails() []cloudtrailtypes.Trail {
 	return []cloudtrailtypes.Trail{
 		{
-			// TrailLogBucketPublic: delivers to the bucket public by an ACL
-			// grant alone, so the trail's verdict is visibly the bucket's own
-			// and not a policy-status read.
+			// TrailLogBucketPublic: delivers to the bucket public by policy,
+			// so the trail's verdict is visibly the bucket's own.
 			Name:                       aws.String(TrailLogBucketPublic),
 			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/" + TrailLogBucketPublic),
-			S3BucketName:               aws.String(S3BucketPublicByACL),
+			S3BucketName:               aws.String(S3BucketPublic),
 			HomeRegion:                 aws.String("us-east-1"),
 			IsMultiRegionTrail:         aws.Bool(true),
 			IsOrganizationTrail:        aws.Bool(false),
@@ -1093,9 +1092,8 @@ const (
 	// TrailNoKMS is the trail whose log files carry no KMS key.
 	TrailNoKMS = "acme-unencrypted-trail"
 
-	// TrailLogBucketPublic is the trail delivering to
-	// fixtures.S3BucketPublicByACL, the bucket the s3 enricher reports as
-	// public by an ACL grant.
+	// TrailLogBucketPublic is the trail delivering to fixtures.S3BucketPublic,
+	// the bucket the s3 enricher reports as public by policy.
 	TrailLogBucketPublic = "acme-public-bucket-trail"
 
 	// TrailLogBucketNoLogging is the trail delivering to the bucket the s3

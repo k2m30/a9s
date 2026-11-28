@@ -31,7 +31,7 @@ func t6DevStoredField(t *testing.T, a *t6App, id, key string) (string, bool) {
 func TestT6Dev_ErroredEmptyAnswerKeepsDeclaredFields(t *testing.T) {
 	rows := t6DemoRows(t, "s3")[:2]
 	target := rows[0]
-	a := t6NewApp(t, "s3", &awsclient.ServiceClients{S3: &t6S3Posture{partial: map[string]bool{target.Name: true}}}, rows, nil, true)
+	a := t6NewApp(t, "s3", t4WithAccount(&awsclient.ServiceClients{S3: &t6S3Posture{partial: map[string]bool{target.Name: true}}}), rows, nil, true)
 	a.wave2(t)
 	if v, _ := t6DevStoredField(t, a, target.ID, "status"); v != "public access block incomplete" {
 		t.Fatalf("precondition: status = %q after the first answer", v)
@@ -65,7 +65,7 @@ func TestT6Dev_MarkedRowKeepsDeclaredFields(t *testing.T) {
 	target := rows[0]
 	posture := &t6S3Posture{partial: map[string]bool{target.Name: true}}
 	refused := &t6DevS3Refused{t6S3Posture: posture, refuse: map[string]bool{}}
-	a := t6NewApp(t, "s3", &awsclient.ServiceClients{S3: refused}, rows, nil, true)
+	a := t6NewApp(t, "s3", t4WithAccount(&awsclient.ServiceClients{S3: refused}), rows, nil, true)
 	a.wave2(t)
 
 	posture.partial[target.Name] = false

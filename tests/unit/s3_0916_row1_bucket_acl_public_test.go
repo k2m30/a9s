@@ -151,7 +151,7 @@ func row1OwnerGrant() s3types.Grant {
 
 func row1Run(t *testing.T, fake *row1S3Fake) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
-	clients := &awsclient.ServiceClients{S3: fake, Region: "us-east-1"}
+	clients := t4WithAccount(&awsclient.ServiceClients{S3: fake, Region: "us-east-1"})
 	res := []resource.Resource{{
 		ID:     row1Bucket,
 		Name:   row1Bucket,

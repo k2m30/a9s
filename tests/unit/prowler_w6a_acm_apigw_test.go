@@ -120,6 +120,52 @@ type w6aAPIGWV1Fake struct {
 	stages      []apigwtypes.Stage
 	stagesErr   error
 	restApis    []apigwtypes.RestApi
+	resources   []apigwtypes.Resource
+}
+
+func (f *w6aAPIGWV1Fake) restResources() []apigwtypes.Resource {
+	if f.resources == nil {
+		return w6aRESTMethods("NONE", "")
+	}
+	return f.resources
+}
+
+func (f *w6aAPIGWV1Fake) GetResources(_ context.Context, _ *apigateway.GetResourcesInput, _ ...func(*apigateway.Options)) (*apigateway.GetResourcesOutput, error) {
+	return &apigateway.GetResourcesOutput{Items: f.restResources()}, nil
+}
+
+func (f *w6aAPIGWV1Fake) GetMethod(_ context.Context, in *apigateway.GetMethodInput, _ ...func(*apigateway.Options)) (*apigateway.GetMethodOutput, error) {
+	for _, r := range f.restResources() {
+		if aws.ToString(r.Id) != aws.ToString(in.ResourceId) {
+			continue
+		}
+		if m, ok := r.ResourceMethods[aws.ToString(in.HttpMethod)]; ok {
+			return &apigateway.GetMethodOutput{
+				HttpMethod:        m.HttpMethod,
+				AuthorizationType: m.AuthorizationType,
+				AuthorizerId:      m.AuthorizerId,
+				ApiKeyRequired:    m.ApiKeyRequired,
+			}, nil
+		}
+	}
+	return nil, errNotFoundForTest{}
+}
+
+// w6aRESTMethods is the resource tree in the shape GetResources returns with
+// the "methods" embed, where each resource carries its methods inline.
+func w6aRESTMethods(authType, authorizerID string) []apigwtypes.Resource {
+	method := func(verb string) apigwtypes.Method {
+		m := apigwtypes.Method{HttpMethod: aws.String(verb), AuthorizationType: aws.String(authType), ApiKeyRequired: aws.Bool(false)}
+		if authorizerID != "" {
+			m.AuthorizerId = aws.String(authorizerID)
+		}
+		return m
+	}
+	return []apigwtypes.Resource{
+		{Id: aws.String("r00t01"), Path: aws.String("/"), ResourceMethods: map[string]apigwtypes.Method{"GET": method("GET")}},
+		{Id: aws.String("ord3r5"), ParentId: aws.String("r00t01"), PathPart: aws.String("orders"), Path: aws.String("/orders"),
+			ResourceMethods: map[string]apigwtypes.Method{"GET": method("GET"), "POST": method("POST")}},
+	}
 }
 
 func (f *w6aAPIGWV1Fake) GetRestApis(_ context.Context, _ *apigateway.GetRestApisInput, _ ...func(*apigateway.Options)) (*apigateway.GetRestApisOutput, error) {
@@ -148,6 +194,25 @@ type w6aAPIGWV2Fake struct {
 	// walk that reads past its answer is visible.
 	authPages int
 	authCalls int
+	routes    []apigwv2types.Route
+}
+
+func (f *w6aAPIGWV2Fake) GetRoutes(_ context.Context, _ *apigatewayv2.GetRoutesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error) {
+	if f.routes == nil {
+		return &apigatewayv2.GetRoutesOutput{Items: w6aHTTPRoutes(apigwv2types.AuthorizationTypeNone, "")}, nil
+	}
+	return &apigatewayv2.GetRoutesOutput{Items: f.routes}, nil
+}
+
+func w6aHTTPRoutes(authType apigwv2types.AuthorizationType, authorizerID string) []apigwv2types.Route {
+	route := func(id, key string) apigwv2types.Route {
+		r := apigwv2types.Route{RouteId: aws.String(id), RouteKey: aws.String(key), AuthorizationType: authType, ApiKeyRequired: aws.Bool(false)}
+		if authorizerID != "" {
+			r.AuthorizerId = aws.String(authorizerID)
+		}
+		return r
+	}
+	return []apigwv2types.Route{route("rte0001", "GET /orders"), route("rte0002", "ANY /{proxy+}")}
 }
 
 func (f *w6aAPIGWV2Fake) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
@@ -174,8 +239,9 @@ func (f *w6aAPIGWV2Fake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesI
 // so it trips none of the other v2 findings.
 func w6aV2HealthyStage(name string) apigwv2types.Stage {
 	return apigwv2types.Stage{
-		StageName:  aws.String(name),
-		AutoDeploy: aws.Bool(true),
+		StageName:    aws.String(name),
+		AutoDeploy:   aws.Bool(true),
+		DeploymentId: aws.String("dpl7k2"),
 		AccessLogSettings: &apigwv2types.AccessLogSettings{
 			DestinationArn: aws.String("arn:aws:logs:eu-central-1:123456789012:log-group:/aws/apigw/acme:*"),
 			Format:         aws.String("$context.requestId"),
@@ -258,7 +324,7 @@ func TestW6AAPIGWRESTNoAuthorizerIsBrokenWhenReachable(t *testing.T) {
 	w2AssertFinding(t, res.Findings["rst001noauth"], w6aAPIGWNoAuthPublic,
 		"internet-facing with no authorizer", domain.SevBroken, "wave2")
 	rows := w2Rows(t, res, "rst001noauth", w6aAPIGWNoAuthPublic)
-	w2AssertRow(t, rows, "Authorizers", "0")
+	w2AssertRow(t, rows, "Open methods", "3")
 	w2AssertRow(t, rows, "Endpoint", "edge")
 }
 
@@ -311,7 +377,8 @@ func TestW6AAPIGWRESTNoAuthorizer_AnAuthorizerClosesIt(t *testing.T) {
 				Name: aws.String("acme-jwt"),
 				Type: apigwtypes.AuthorizerTypeRequest,
 			}},
-			stages: []apigwtypes.Stage{w6aV1Stage("prod")},
+			resources: w6aRESTMethods("CUSTOM", "auth01"),
+			stages:    []apigwtypes.Stage{w6aV1Stage("prod")},
 		},
 		&w6aAPIGWV2Fake{},
 		w6aRESTRes("rst008authed", "acme-guarded-rest", "EDGE", ""),
@@ -337,6 +404,7 @@ func TestW6AAPIGWHTTPNoAuthorizer(t *testing.T) {
 				AuthorizerId: aws.String("auth02"),
 				Name:         aws.String("acme-jwt"),
 			}},
+			routes: w6aHTTPRoutes(apigwv2types.AuthorizationTypeJwt, "auth02"),
 			stages: []apigwv2types.Stage{w6aV2HealthyStage("$default")},
 		},
 		w6aHTTPRes("htp002authed", "acme-guarded-http"),
@@ -525,30 +593,28 @@ func w6aAssertNoSecretLeak(t *testing.T, parts ...string) {
 	}
 }
 
-// TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer pins the v2
-// authorizer paging. The check asks whether an API has any authorizer, so one
-// on the first page answers it and every further page is a call nobody
-// needed; an API with none has to be walked to the last page before the
-// finding is honest.
-func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
-	guarded := &w6aAPIGWV2Fake{
+// TestW6AAPIGWHTTPNoAuthorizer_AuthorizerPagesDoNotDecide pins that the
+// verdict is read from each route's AuthorizationType: an authorizer on the
+// first of five pages that no route uses leaves the API open, and an API with
+// no authorizer whose routes all require IAM is closed.
+func TestW6AAPIGWHTTPNoAuthorizer_AuthorizerPagesDoNotDecide(t *testing.T) {
+	unattached := &w6aAPIGWV2Fake{
 		authPages:   5,
 		authorizers: []apigwv2types.Authorizer{{AuthorizerId: aws.String("auth02"), Name: aws.String("acme-jwt")}},
+		routes:      w6aHTTPRoutes(apigwv2types.AuthorizationTypeNone, ""),
 		stages:      []apigwv2types.Stage{w6aV2HealthyStage("$default")},
 	}
-	res := w6aEnrichAPIGW(t, nil, guarded, w6aHTTPRes("htp005authed", "acme-guarded-http"))
-	if guarded.authCalls != 1 {
-		t.Errorf("GetAuthorizers called %d times after the first hit, want 1", guarded.authCalls)
-	}
-	w2AssertNoCode(t, res.Findings["htp005authed"], w6aAPIGWNoAuth)
-
-	open := &w6aAPIGWV2Fake{authPages: 3, stages: []apigwv2types.Stage{w6aV2HealthyStage("$default")}}
-	res = w6aEnrichAPIGW(t, nil, open, w6aHTTPRes("htp006noauth", "acme-open-http"))
-	if open.authCalls != 3 {
-		t.Errorf("GetAuthorizers called %d times over 3 pages, want 3", open.authCalls)
-	}
-	w2AssertFinding(t, res.Findings["htp006noauth"], w6aAPIGWNoAuth,
+	res := w6aEnrichAPIGW(t, nil, unattached, w6aHTTPRes("htp005unused", "acme-unused-authorizer-http"))
+	w2AssertFinding(t, res.Findings["htp005unused"], w6aAPIGWNoAuth,
 		"no authorizer", domain.SevWarn, "wave2")
+
+	signed := &w6aAPIGWV2Fake{
+		authPages: 3,
+		routes:    w6aHTTPRoutes(apigwv2types.AuthorizationTypeAwsIam, ""),
+		stages:    []apigwv2types.Stage{w6aV2HealthyStage("$default")},
+	}
+	res = w6aEnrichAPIGW(t, nil, signed, w6aHTTPRes("htp006iam", "acme-signed-http"))
+	w2AssertNoCode(t, res.Findings["htp006iam"], w6aAPIGWNoAuth)
 }
 
 // TestW6AAPIGWRESTEndpointType pins the endpoint type, one case per branch.

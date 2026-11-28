@@ -54,6 +54,12 @@ func (f *pw1EBSSnapFake) DescribeSnapshots(_ context.Context, in *ec2.DescribeSn
 	return &ec2.DescribeSnapshotsOutput{Snapshots: f.all}, nil
 }
 
+// GetSnapshotBlockPublicAccessState answers the Region as AWS ships it:
+// snapshot block public access unblocked.
+func (f *pw1EBSSnapFake) GetSnapshotBlockPublicAccessState(_ context.Context, _ *ec2.GetSnapshotBlockPublicAccessStateInput, _ ...func(*ec2.Options)) (*ec2.GetSnapshotBlockPublicAccessStateOutput, error) {
+	return &ec2.GetSnapshotBlockPublicAccessStateOutput{State: ec2types.SnapshotBlockPublicAccessStateUnblocked}, nil
+}
+
 // pw1Snapshot builds a completed snapshot of volumeID.
 func pw1Snapshot(id, volumeID string) ec2types.Snapshot {
 	return ec2types.Snapshot{

@@ -107,9 +107,9 @@ One bullet per distinct signal. Each runs on the type's bounded second pass, aft
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.VolumeId` not present in the already-loaded `ebs` list (rule skipped when the `ebs` list was not loaded in this sweep, and for a snapshot made by `CopySnapshot`, whose `VolumeId` is the placeholder `vol-ffffffff`).
 
-- **Signal**: restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`).
+- **Signal**: restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`), while the Region's block public access for snapshots (`GetSnapshotBlockPublicAccessState`) is not `block-all-sharing`. AWS (`AWS::EC2::SnapshotBlockPublicAccess`): under `block-all-sharing` "snapshots that are already publicly shared are treated as private and they are no longer publicly available", while their attributes still name the `all` group; `block-new-sharing` refuses new public shares and leaves existing ones public.
   - **State bucket**: Broken.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type. The Region state is read once per Region and session, only when a listed snapshot is shared with everyone; a refused read leaves those snapshots not inspected.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
@@ -135,7 +135,7 @@ One row per signal from §3:
 | age > 365d AND automated description | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automated, <N>d old` |
 | `Encrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted` |
 | orphan: source volume deleted | 2 | Warning | `~` | S2, S3, S4, S5 | `orphan: source volume deleted` |
-| restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |
+| restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`), Region not `block-all-sharing` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |
 | `State` is a value the SDK enum `SnapshotState` does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)

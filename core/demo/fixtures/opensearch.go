@@ -103,8 +103,12 @@ const WarnOpenSearchDetailsUnavailableID = "warn-os-details-unavailable"
 // enforces HTTPS, encrypts node-to-node traffic, and has no access policy
 // that lets anyone in.
 const (
-	// OpenSearchPublic sits outside a VPC behind an open access policy.
+	// OpenSearchPublic sits outside a VPC behind an open access policy, with
+	// fine-grained access control off.
 	OpenSearchPublic = "acme-public-search"
+	// OpenSearchPublicBehindFGAC sits outside a VPC behind an open access
+	// policy with fine-grained access control on, which checks every caller.
+	OpenSearchPublicBehindFGAC = HealthyBaselineDomain
 	// OpenSearchUnreadablePolicy sits outside a VPC behind an access policy
 	// that does not parse, so whether anyone can reach it is unknown.
 	OpenSearchUnreadablePolicy = "acme-unreadable-search"
@@ -131,6 +135,7 @@ var sharedOpenSearchFixtures = shared(func() *OpenSearchFixtures {
 			osPostureWitness(OpenSearchPublic, func(d *ostypes.DomainStatus) {
 				d.VPCOptions = nil
 				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-east-1:123456789012:domain/` + OpenSearchPublic + `/*"}]}`)
+				d.AdvancedSecurityOptions = &ostypes.AdvancedSecurityOptions{Enabled: aws.Bool(false)}
 			}),
 			osPostureWitness(OpenSearchUnreadablePolicy, func(d *ostypes.DomainStatus) {
 				d.VPCOptions = nil
@@ -223,7 +228,9 @@ func osHealthyBaseline() ostypes.DomainStatus {
 	d.ClusterConfig.InstanceType = ostypes.OpenSearchPartitionInstanceTypeM6gLargeSearch
 	d.ClusterConfig.InstanceCount = aws.Int32(1)
 	d.EBSOptions.VolumeSize = aws.Int32(50)
-	// No VPCOptions — public endpoint.
+	// No VPCOptions — public endpoint. osBaseDomain turns fine-grained access
+	// control on, which is what keeps the open policy below from exposing it.
+	d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-east-1:123456789012:domain/staging-analytics/*"}]}`)
 	return d
 }
 

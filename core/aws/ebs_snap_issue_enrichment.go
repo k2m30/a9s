@@ -54,7 +54,8 @@ func enrichEBSSnapCrossRef(ctx context.Context, clients *ServiceClients, resourc
 // own snapshots are restorable by everyone (RestorableByUserIds=["all"]) —
 // one call for the whole page rather than a
 // DescribeSnapshotAttribute per snapshot. Only snapshots present in the
-// input page get a finding.
+// input page get a finding, and only while the Region's block public access
+// for snapshots leaves a public share public (snapshotsBlockAllSharing).
 func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	if clients.EC2 == nil || len(resources) == 0 {
 		return nil
@@ -85,17 +86,28 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 			}
 			return out.Snapshots, out.NextToken, nil
 		})
+	var shared []string
 	for _, snap := range public {
-		id := aws.ToString(snap.SnapshotId)
-		if !known[id] {
-			continue
+		if id := aws.ToString(snap.SnapshotId); known[id] {
+			shared = append(shared, id)
 		}
-		setWave2Finding(result, id, ebsSnapCodePublic, []domain.DetailRow{{Label: "Public", Value: "yes", Tier: tierOf(ebsSnapCodePublic)}})
 	}
+	var failures []Failure
 	if walkErr != nil {
-		return AggregateFailures(op, []Failure{FailedOnPage(pages, walkErr)}, len(resources))
+		failures = append(failures, FailedOnPage(pages, walkErr))
 	}
-	return nil
+	if len(shared) > 0 {
+		blocked, err := snapshotsBlockAllSharing(ctx, clients)
+		for _, id := range shared {
+			switch {
+			case err != nil:
+				MarkSkipped(result, id, &failures, err)
+			case !blocked:
+				setWave2Finding(result, id, ebsSnapCodePublic, []domain.DetailRow{{Label: "Public", Value: "yes", Tier: tierOf(ebsSnapCodePublic)}})
+			}
+		}
+	}
+	return AggregateFailures(op, failures, len(resources))
 }
 
 // ebsSnapOrphanCrossRef is the SnapshotCrossRef helper instantiated with

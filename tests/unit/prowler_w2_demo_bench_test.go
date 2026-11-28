@@ -69,12 +69,11 @@ var w2BenchWitnesses = []struct {
 }
 
 // w2BenchWitnessCount overrides the default of one carrier for a code a demo
-// row can reach by more than one route. s3.public has two: AWS reporting the
-// bucket policy public, and an access control list granting a public group.
-// The bench shows one bucket for each, so an operator sees both phrasings of
-// the same finding.
+// row can reach by more than one route. s3.public has two routes, but the
+// demo account's public access block sets IgnorePublicAcls, so AWS ignores
+// every public ACL grant and only the policy-public bucket carries it.
 var w2BenchWitnessCount = map[string]int{
-	"s3.public": 2,
+	"s3.public": 1,
 }
 
 func TestW2DemoBenchOneWitnessPerFinding(t *testing.T) {
