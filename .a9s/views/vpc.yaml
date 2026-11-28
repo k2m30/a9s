@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
   Name: 825a9ede861cbc56
-  VPC ID: 51b18126b8707aee
-  CIDR Block: d28de27bfb9a12d3
-  Status: 22256ac216898d4c
-  Default: 3ad26453df878502
+  VPC ID: 8fd38a59c94f4eb1
+  CIDR Block: fc1515cb6b588b24
+  Status: 516e63265dd02620
+  Default: a099c9aa34d3ffe4
   Flow Logs: 7d87f3f0430cdda4
 detail_hashes:
   VpcId: 2f6df9d3ec6df63c
@@ -22,19 +22,15 @@ list:
     key: name
     width: 24
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
   CIDR Block:
-    path: CidrBlock
     key: cidr_block
     width: 18
   Status:
-    path: State
     key: state
     width: 12
   Default:
-    path: IsDefault
     key: is_default
     width: 9
   Flow Logs:

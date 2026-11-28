@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Target Group: c0bc5f5f2aeebe10
-  Port: a9b36f353907abf5
-  Protocol: 307b206951ae1f38
+  Target Group: 604cc991969dcd8f
+  Port: 9117b15e2799a6ac
+  Protocol: a8dab65fb35df868
   Status: 8ccaa20065d484bf
-  VPC ID: 51b18126b8707aee
-  Target Type: 0b80794779a6c76b
-  Health Check: 007f75eb30783a67
+  VPC ID: 8fd38a59c94f4eb1
+  Target Type: 43e0c1bdc3dc2490
+  Health Check: 6fb435cc4aea907b
 detail_hashes:
   TargetGroupName: 15e4a2eeb022c18b
   TargetGroupArn: 85b643c838f4be37
@@ -27,30 +27,24 @@ detail_hashes:
   LoadBalancerArns: a0cf0763d51e4ec5
 list:
   Target Group:
-    path: TargetGroupName
     key: target_group_name
     width: 32
   Port:
-    path: Port
     key: port
     width: 8
   Protocol:
-    path: Protocol
     key: protocol
     width: 10
   Status:
     key: health_summary
     width: 14
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
   Target Type:
-    path: TargetType
     key: target_type
     width: 12
   Health Check:
-    path: HealthCheckPath
     key: health_check_path
     width: 24
 

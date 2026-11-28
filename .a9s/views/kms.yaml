@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
   Alias: 4f22eaf2b38b3f74
-  Key ID: 467cca39304a38f7
-  Status: 89507bb429278bb5
+  Key ID: 2d05243c9a33337d
+  Status: 168e38cf521a9b36
   Rotation: 256ae1e94282646a
-  Description: 0022b6f6290d9419
+  Description: 1786bb31adf580e1
 detail_hashes:
   KeyId: 7af249b76e26e982
   Arn: fb866fb55912dfcd
@@ -25,18 +25,15 @@ list:
     key: alias
     width: 32
   Key ID:
-    path: KeyId
     key: key_id
     width: 38
   Status:
-    path: KeyState
     key: status
     width: 12
   Rotation:
     key: rotation_enabled
     width: 10
   Description:
-    path: Description
     key: description
     width: 36
 

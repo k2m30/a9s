@@ -1,6 +1,6 @@
 generated: 12
 list_hashes:
-  Log Group Name: 02e984f503f52754
+  Log Group Name: b627c6b0437e1ea0
   Status: 516e63265dd02620
   Size: f75a934835a6e211
   Retention: 95d18d059f8241e6
@@ -20,7 +20,6 @@ detail_hashes:
   DataProtectionStatus: e0a66f2660522550
 list:
   Log Group Name:
-    path: LogGroupName
     key: log_group_name
     width: 48
   Status:

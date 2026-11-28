@@ -1,14 +1,14 @@
 generated: 12
 list_hashes:
-  Name: 69b7c3ce9beb801b
-  Image ID: b1ee1e049e438f6d
-  Status: 22256ac216898d4c
+  Name: 61bd1f26e94ffe26
+  Image ID: b3a11e1370d03e67
+  Status: 516e63265dd02620
   Deprecated: 234e173199ef4d54
-  Arch: a669b10d8e38ff13
-  Platform: 23acb72077c8a504
-  Root Device: a3d8aa66e118248a
-  Created: 1c65911b21c57efa
-  Public: 55ef60b129f36fb4
+  Arch: 86131a2dd9e5f750
+  Platform: 5914939870d16b27
+  Root Device: 06ce6c5c2e9614d2
+  Created: 06fa9fce319ddf50
+  Public: f1ed0d50e97268b8
 detail_hashes:
   ImageId: 0cdee1891bcda243
   Name: 1e4a1612672f42b2
@@ -34,38 +34,30 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Name:
-    path: Name
     key: name
     width: 32
   Image ID:
-    path: ImageId
     key: image_id
     width: 22
   Status:
-    path: State
     key: state
     width: 12
   Deprecated:
     key: deprecated
     width: 22
   Arch:
-    path: Architecture
     key: architecture
     width: 10
   Platform:
-    path: PlatformDetails
     key: platform
     width: 16
   Root Device:
-    path: RootDeviceType
     key: root_device_type
     width: 14
   Created:
-    path: CreationDate
     key: creation_date
     width: 22
   Public:
-    path: Public
     key: public
     width: 8
 

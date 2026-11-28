@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"context"
 	"slices"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -28,6 +29,25 @@ func enumValues[T interface {
 func LifecycleClassOf(shortName, status string) catalog.LifecycleClass {
 	class, _ := catalog.LifecycleOf(shortName, status)
 	return class
+}
+
+// rowLive reports whether r, a row of shortName, is in a live lifecycle
+// class: a resource leaving or gone has no configuration left to read.
+func rowLive(shortName string, r resource.Resource) bool {
+	td, ok := catalog.StateTable(shortName)
+	return !ok || catalog.RowLifecycle(td, r).Live()
+}
+
+// liveSource is check for a source row of shortName that is live; a row
+// leaving or gone relates to no target through its configuration, so it
+// answers none found without asking AWS.
+func liveSource(shortName, target string, check resource.RelatedChecker) resource.RelatedChecker {
+	return func(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+		if !rowLive(shortName, res) {
+			return foundNone(target, "source not live")
+		}
+		return check(ctx, clients, res, cache)
+	}
 }
 
 // StateFinding is the one Wave-1 emitter of a state finding. slots default

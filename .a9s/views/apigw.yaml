@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Name: 141f2e161b230f88
+  Name: 49cd2c5c00dfc200
   Status: 516e63265dd02620
   API ID: b68a07664bc25eec
   Protocol: 79986511aef28dc6
   Stages: d9fa7cd5f54b1e79
   Endpoint: 730ee9b980150ed6
-  Description: db8526853ab7a372
+  Description: b9919eabf9baef1f
 detail_hashes:
   "key:api_id": c95416731ca26921
   Name: 1e4a1612672f42b2
@@ -20,7 +20,6 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Name:
-    path: Name
     key: name
     width: 28
   Status:
@@ -39,7 +38,6 @@ list:
     key: endpoint
     width: 50
   Description:
-    path: Description
     key: description
     width: 30
 

@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
-  Logical ID: 4de1aed3538f1b37
-  Physical ID: 1cea9184176bf502
-  Type: 9a995c28b9125a5b
+  Logical ID: 89fd8fe3c5672596
+  Physical ID: a9c8527b96b11c88
+  Type: ac58c21fcb452991
   Status: 46a13ebc90e10d8a
   Drift: debc1d0ea1159ed8
   Updated: 4753a7cd1f2cf305
@@ -17,15 +17,12 @@ detail_hashes:
   ModuleInfo: 3448d075adc46400
 list:
   Logical ID:
-    path: LogicalResourceId
     key: logical_resource_id
     width: 28
   Physical ID:
-    path: PhysicalResourceId
     key: physical_resource_id
     width: 28
   Type:
-    path: ResourceType
     key: resource_type
     width: 28
   Status:

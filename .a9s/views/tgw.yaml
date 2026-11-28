@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
   Name: 49cd2c5c00dfc200
-  TGW ID: 12adcfb1f3c6a24e
-  Status: 22256ac216898d4c
+  TGW ID: da03f8236c64adfc
+  Status: 516e63265dd02620
   Att Issues: 211cb226c5e9d723
-  Owner: 51b5abab26a3cfff
-  Description: db8526853ab7a372
+  Owner: 50f8763b5dd15ac3
+  Description: b9919eabf9baef1f
 detail_hashes:
   TransitGatewayId: bfd61fe8d3788449
   TransitGatewayArn: 74d8d546579dae58
@@ -20,22 +20,18 @@ list:
     key: name
     width: 28
   TGW ID:
-    path: TransitGatewayId
     key: tgw_id
     width: 26
   Status:
-    path: State
     key: state
     width: 12
   Att Issues:
     key: att_status
     width: 10
   Owner:
-    path: OwnerId
     key: owner_id
     width: 14
   Description:
-    path: Description
     key: description
     width: 30
 

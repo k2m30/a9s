@@ -1,14 +1,14 @@
 generated: 12
 list_hashes:
   Name: 825a9ede861cbc56
-  Snapshot ID: 0604c9b851f8aba9
-  Status: 22256ac216898d4c
-  Volume ID: f6fc54dc378434cc
-  Size (GiB): 8ad478195aab230b
-  Encrypted: 956f4cdf07855f30
-  Description: db8526853ab7a372
-  Started: 17c84ae7d832690e
-  Progress: 5439f95a23958510
+  Snapshot ID: 1fd111d67d7cc221
+  Status: 516e63265dd02620
+  Volume ID: 75a53bef9f643ff2
+  Size (GiB): fc309308bf57cc25
+  Encrypted: e73516e547dd83bf
+  Description: b9919eabf9baef1f
+  Started: 8377a0a7b3e82c19
+  Progress: 212dca2dbcc987e0
 detail_hashes:
   SnapshotId: ff260acf28f9e9c0
   State: a60d7692c7b3780c
@@ -26,35 +26,27 @@ list:
     key: name
     width: 24
   Snapshot ID:
-    path: SnapshotId
     key: snapshot_id
     width: 24
   Status:
-    path: State
     key: state
     width: 12
   Volume ID:
-    path: VolumeId
     key: volume_id
     width: 22
   Size (GiB):
-    path: VolumeSize
     key: size
     width: 10
   Encrypted:
-    path: Encrypted
     key: encrypted
     width: 10
   Description:
-    path: Description
     key: description
     width: 30
   Started:
-    path: StartTime
     key: started
     width: 18
   Progress:
-    path: Progress
     key: progress
     width: 10
 

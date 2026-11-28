@@ -290,13 +290,13 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 	if len(resources) == 0 {
 		return resources
 	}
-	columns := c.resolveColumnsLocked(typeName)
+	td, columns := c.listColumnsAndTypeLocked(typeName)
 	if len(columns) == 0 {
 		return resources
 	}
 	out := make([]resource.Resource, len(resources))
 	for i, r := range resources {
-		out[i] = MaterializeListFields(r, columns)
+		out[i] = materializeListFields(r, columns, td)
 	}
 	return out
 }

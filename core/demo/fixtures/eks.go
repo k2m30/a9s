@@ -95,6 +95,9 @@ func buildEKSClusters() []*ekstypes.Cluster {
 			EncryptionConfig: eksSecretsEncryption(),
 			CreatedAt:        aws.Time(mustTime("2025-03-01T10:00:00Z")),
 			PlatformVersion:  aws.String("eks.5"),
+			Identity: &ekstypes.Identity{Oidc: &ekstypes.OIDC{
+				Issuer: aws.String("https://oidc.eks.us-east-1.amazonaws.com/id/ABCDEF0123456789"),
+			}},
 			// aws:cloudformation:stack-name tag — required for eks→cfn
 			// related-panel pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: map[string]string{
@@ -331,6 +334,7 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 				Status:        ekstypes.NodegroupStatusActive,
 				NodeRole:      aws.String(eksNodeRoleARN),
 				AmiType:       ekstypes.AMITypesAl2X8664,
+				CapacityType:  ekstypes.CapacityTypesOnDemand,
 				DiskSize:      aws.Int32(50),
 				InstanceTypes: []string{"m5.xlarge"},
 				Subnets:       []string{eksSubnetA, eksSubnetB, eksSubnetC},
@@ -339,6 +343,8 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					MaxSize:     aws.Int32(8),
 					DesiredSize: aws.Int32(3),
 				},
+				Labels: map[string]string{"workload": "general"},
+				Taints: []ekstypes.Taint{{Key: aws.String("dedicated"), Value: aws.String("general"), Effect: ekstypes.TaintEffectPreferNoSchedule}},
 				// RemoteAccessSecurityGroup — required for ng→sg related-panel pivot.
 				Resources: &ekstypes.NodegroupResources{
 					AutoScalingGroups: []ekstypes.AutoScalingGroup{

@@ -124,6 +124,7 @@ func buildVpcPeerConnections() []ec2types.VpcPeeringConnection {
 		[]string{"10.0.0.0/16"}, []string{"192.168.0.0/16"})
 	root.RequesterVpcInfo.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(true)}
 	root.AccepterVpcInfo.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(false)}
+	root.Tags = []ec2types.Tag{{Key: aws.String("Environment"), Value: aws.String("prod")}}
 
 	pending := peer(WarnPeerPendingID, ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance, "", nil, nil)
 	pending.ExpirationTime = aws.Time(time.Now().UTC().Add(72 * time.Hour))

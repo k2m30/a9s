@@ -928,6 +928,15 @@ func buildVpcs() []ec2types.Vpc {
 					},
 				},
 			},
+			Ipv6CidrBlockAssociationSet: []ec2types.VpcIpv6CidrBlockAssociation{
+				{
+					AssociationId:      aws.String("vpc-cidr-assoc-ipv6-01"),
+					Ipv6CidrBlock:      aws.String("2600:1f18:4a3b:c100::/56"),
+					Ipv6Pool:           aws.String("Amazon"),
+					NetworkBorderGroup: aws.String("us-east-1"),
+					Ipv6CidrBlockState: &ec2types.VpcCidrBlockState{State: ec2types.VpcCidrBlockStateCodeAssociated},
+				},
+			},
 			// aws:cloudformation:stack-name tag — required for vpc→cfn
 			// related-panel pivot. acme-eks-cluster is a real stack fixture
 			// (cfn.go).
@@ -2838,10 +2847,14 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 		},
 		// State=failed → wave1 finding (CodeVPCEStateFailed, SevBroken) → Broken.
 		{
-			VpcEndpointId:     aws.String("vpce-0failed111111111e"),
-			ServiceName:       aws.String("com.amazonaws.us-east-1.sts"),
-			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.State("failed"),
+			VpcEndpointId:   aws.String("vpce-0failed111111111e"),
+			ServiceName:     aws.String("com.amazonaws.us-east-1.sts"),
+			VpcEndpointType: ec2types.VpcEndpointTypeInterface,
+			State:           ec2types.State("failed"),
+			LastError: &ec2types.LastError{
+				Code:    aws.String("InsufficientFreeAddressesInSubnet"),
+				Message: aws.String("The subnet has insufficient free IP addresses to create the endpoint network interface"),
+			},
 			VpcId:             aws.String(fixtStagingVPCID),
 			SubnetIds:         []string{fixtStagingSubnetA},
 			PrivateDnsEnabled: aws.Bool(true),

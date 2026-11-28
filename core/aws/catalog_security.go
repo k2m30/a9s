@@ -6,11 +6,15 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"reflect"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
 
 func colorRole(r domain.Resource) domain.Color {
@@ -36,8 +40,13 @@ func colorWAF(r domain.Resource) domain.Color {
 
 var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:             "IAM Roles",
-		ShortName:        "role",
+		Name:      "IAM Roles",
+		ShortName: "role",
+		RowTypes:  []reflect.Type{reflect.TypeFor[iamtypes.Role]()},
+		// "This operation does not return the following attributes, even
+		// though they are an attribute of the returned object:
+		// PermissionsBoundary, RoleLastUsed, Tags" (IAM ListRoles).
+		ListOmits:        []string{"PermissionsBoundary", "RoleLastUsed", "Tags"},
 		RefToID:          roleRefToID,
 		Aliases:          []string{"role", "roles", "iam-roles", "iam_roles"},
 		Category:         "SECURITY & IAM",
@@ -47,13 +56,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "role_name", Title: "Role Name", Path: "RoleName", Width: 36},
+			{Key: "role_name", Title: "Role Name", Width: 36},
 			{Key: "state", Title: "Status", Width: 12},
-			{Title: "Last Used", Path: "RoleLastUsed.LastUsedDate", Width: 22},
+			{Key: "last_used", Title: "Last Used", Width: 22},
 			{Key: "trust_summary", Title: "Trust", Width: 12},
-			{Key: "path", Title: "Path", Path: "Path", Width: 20},
-			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "path", Title: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Width: 22},
+			{Key: "description", Title: "Description", Width: 30},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "role_policies",
@@ -73,6 +82,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			"role_name", "role_id", "arn", "path", "create_date", "description",
 			"assume_role_policy_document", "trust_summary",
 		},
+		IssueEnricherFieldKeys: []string{"last_used"},
+		DetailEnrich:           enrichRole,
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)
 			if !ok || getRoleAPI == nil {
@@ -102,6 +113,10 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:      "IAM Policies",
 		ShortName: "policy",
+		RowTypes:  []reflect.Type{reflect.TypeFor[iamtypes.Policy]()},
+		// Description "is not included in the response to the ListPolicies
+		// operation" (IAM Policy), and ListPolicies "does not return tags".
+		ListOmits: []string{"Description", "Tags"},
 		RefToID:   policyRefToID,
 		// Document is the version GetPolicyVersion returns and lands on
 		// PolicyEnriched when the detail opens.
@@ -217,8 +232,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 	},
 	{
-		Name:          "IAM Users",
-		ShortName:     "iam-user",
+		Name:      "IAM Users",
+		ShortName: "iam-user",
+		RowTypes:  []reflect.Type{reflect.TypeFor[iamtypes.User]()},
+		// "This operation does not return the following attributes, even
+		// though they are an attribute of the returned object:
+		// PermissionsBoundary, Tags" (IAM ListUsers).
+		ListOmits:     []string{"PermissionsBoundary", "Tags"},
 		RefToID:       iamUserRefToID,
 		LifecycleKey:  "risk",
 		Aliases:       []string{"iam-user", "iam-users", "users", "iam_users"},
@@ -233,13 +253,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/users/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "user_name", Title: "User Name", Path: "UserName", Width: 32},
+			{Key: "user_name", Title: "User Name", Width: 32},
 			{Key: "mfa", Title: "MFA", Width: 5},
 			{Key: "risk", Title: "Status", Width: 14},
-			{Key: "user_id", Title: "User ID", Path: "UserId", Width: 22},
-			{Key: "path", Title: "Path", Path: "Path", Width: 20},
-			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
-			{Key: "password_last_used", Title: "Password Last Used", Path: "PasswordLastUsed", Width: 22},
+			{Key: "user_id", Title: "User ID", Width: 22},
+			{Key: "path", Title: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Width: 22},
+			{Key: "password_last_used", Title: "Password Last Used", Width: 22},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
@@ -249,6 +269,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Wave2:                  IssueEnricher{Fn: EnrichIAMUserMFA, Priority: 100},
 		FieldKeys:              []string{"user_name", "user_id", "path", "create_date", "password_last_used"},
 		IssueEnricherFieldKeys: []string{"mfa", "risk", "has_console_password"},
+		DetailEnrich:           enrichIAMUser,
 		Related: []domain.RelatedDef{
 			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false, Truncated: true, Mirror: true},
@@ -267,6 +288,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:             "IAM Groups",
 		ShortName:        "iam-group",
+		RowTypes:         []reflect.Type{reflect.TypeFor[iamtypes.Group]()},
 		RefToID:          iamGroupRefToID,
 		Aliases:          []string{"iam-group", "iam-groups", "groups", "iam_groups"},
 		Category:         "SECURITY & IAM",
@@ -276,13 +298,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/groups/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "group_name", Title: "Group Name", Path: "GroupName", Width: 32},
+			{Key: "group_name", Title: "Group Name", Width: 32},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "member_count", Title: "Members", Width: 9},
-			{Key: "group_id", Title: "Group ID", Path: "GroupId", Width: 22},
-			{Key: "path", Title: "Path", Path: "Path", Width: 20},
-			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
-			{Key: "arn", Title: "ARN", Path: "Arn", Width: 60},
+			{Key: "group_id", Title: "Group ID", Width: 22},
+			{Key: "path", Title: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Width: 22},
+			{Key: "arn", Title: "ARN", Width: 60},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "iam_group_members",
@@ -311,6 +333,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:             "WAF Web ACLs",
 		ShortName:        "waf",
+		RowTypes:         []reflect.Type{reflect.TypeFor[wafv2types.WebACLSummary]()},
 		RefToID:          wafRefToID,
 		HumanizeFields:   []string{"scope"},
 		Aliases:          []string{"waf", "webacl", "web-acl"},
@@ -329,11 +352,11 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Regional(region, tail+"&region="+region+"&scope=regional")
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 28},
-			{Key: "id", Title: "ID", Path: "Id", Width: 38},
+			{Key: "name", Title: "Name", Width: 28},
+			{Key: "id", Title: "ID", Width: 38},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "rules_summary", Title: "Rules", Width: 18},
-			{Key: "description", Title: "Description", Path: "Description", Width: 36},
+			{Key: "description", Title: "Description", Width: 36},
 		},
 		Color:          colorWAF,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.WAFv2} }),
@@ -366,6 +389,7 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 	{
 		Name:      "Group Members",
 		ShortName: "iam_group_members",
+		RowTypes:  []reflect.Type{reflect.TypeFor[iamtypes.User]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			user := r.Fields["user_name"]
 			if user == "" {
@@ -381,10 +405,12 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMGroupMembers(ctx, c.IAM, parentCtx, continuationToken)
 		}),
+		DetailEnrich: enrichIAMUser,
 	},
 	{
 		Name:      "Role Policies",
 		ShortName: "role_policies",
+		RowTypes:  []reflect.Type{reflect.TypeFor[RolePolicyRow]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			if arn := r.Fields["policy_arn"]; arn != "" {
 				return consolelink.Global(region, "iam/home#/policies/details/"+url.QueryEscape(arn))

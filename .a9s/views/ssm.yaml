@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Name: 0804cc29dc2dba48
-  Type: d345ea75001d91ee
+  Name: b72a0c84b3e2d08e
+  Type: 96cdd389f322fccc
   Status: 65137daedb64f4c8
-  Version: 0569204bf3ea16c4
-  Last Modified: 2a379a97a80bab58
-  Description: db8526853ab7a372
+  Version: 03fc046a5ff10b93
+  Last Modified: f8051c8ba1a2c983
+  Description: b9919eabf9baef1f
 detail_hashes:
   Name: 1e4a1612672f42b2
   Type: 94b276c178bd3a02
@@ -19,26 +19,21 @@ detail_hashes:
   AllowedPattern: a8a36eb3ed22fbaa
 list:
   Name:
-    path: Name
     key: name
     width: 40
   Type:
-    path: Type
     key: type
     width: 14
   Status:
     key: risk
     width: 10
   Version:
-    path: Version
     key: version
     width: 8
   Last Modified:
-    path: LastModifiedDate
     key: last_modified
     width: 22
   Description:
-    path: Description
     key: description
     width: 30
 

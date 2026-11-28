@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Cluster ID: f13937105fefa2f4
-  Version: 0d4effbddeed9778
+  Cluster ID: 0ad8ec61ecfcb494
+  Version: 82273529d2f8ea4b
   Status: de81d4d25f6b3255
-  Instances: 9e7afc6adca2e8e0
-  Endpoint: c88357e86510aac5
+  Instances: 4ae7fa99e7858bea
+  Endpoint: 01b528d66e153482
 detail_hashes:
   DBClusterIdentifier: 2cc43370ef5237b7
   DBClusterArn: 4518eb586dd60f06
@@ -25,11 +25,9 @@ detail_hashes:
   MasterUsername: 6d06a268017f9d6a
 list:
   Cluster ID:
-    path: DBClusterIdentifier
     key: cluster_id
     width: 28
   Version:
-    path: EngineVersion
     key: engine_version
     width: 10
   Status:
@@ -37,11 +35,9 @@ list:
     width: 32
     sort_key: status_raw
   Instances:
-    path: DBClusterMembers
     key: instances
     width: 10
   Endpoint:
-    path: Endpoint
     key: endpoint
     width: 48
 

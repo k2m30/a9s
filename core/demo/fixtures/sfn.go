@@ -150,12 +150,14 @@ var sharedSFNFixtures = shared(func() *SFNFixtures {
 		Executions: map[string][]sfntypes.ExecutionListItem{
 			smARNOrderFulfillment: {
 				{
-					ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0315-a1b2c3d4"),
-					Name:            aws.String("exec-2026-0322-0315-a1b2c3d4"),
-					StartDate:       &start1,
-					StopDate:        &stop1,
-					StateMachineArn: aws.String(smARNOrderFulfillment),
-					Status:          sfntypes.ExecutionStatusSucceeded,
+					ExecutionArn:           aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0315-a1b2c3d4"),
+					Name:                   aws.String("exec-2026-0322-0315-a1b2c3d4"),
+					StartDate:              &start1,
+					StopDate:               &stop1,
+					StateMachineArn:        aws.String(smARNOrderFulfillment),
+					StateMachineAliasArn:   aws.String(smARNOrderFulfillment + ":prod"),
+					StateMachineVersionArn: aws.String(smARNOrderFulfillment + ":7"),
+					Status:                 sfntypes.ExecutionStatusSucceeded,
 				},
 				{
 					ExecutionArn:    aws.String(execArnOrderFulfillmentFailed),
@@ -399,6 +401,67 @@ var sharedSFNFixtures = shared(func() *SFNFixtures {
 		// required for the sfn_execution_history.broken.event_failed
 		// finding (both TaskFailed and ExecutionFailed classify "failed").
 		History: map[string][]sfntypes.HistoryEvent{
+			// The succeeded run: a Lambda step, a distributed Map run and an
+			// asynchronous task, every one finishing.
+			"arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0315-a1b2c3d4": {
+				{Id: 1, Timestamp: &start1, Type: sfntypes.HistoryEventTypeLambdaFunctionScheduled,
+					LambdaFunctionScheduledEventDetails: &sfntypes.LambdaFunctionScheduledEventDetails{Resource: aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders")}},
+				{Id: 2, PreviousEventId: 1, Timestamp: aws.Time(start1.Add(2 * time.Second)), Type: sfntypes.HistoryEventTypeLambdaFunctionSucceeded,
+					LambdaFunctionSucceededEventDetails: &sfntypes.LambdaFunctionSucceededEventDetails{Output: aws.String(`{"reserved":true}`)}},
+				{Id: 3, PreviousEventId: 2, Timestamp: aws.Time(start1.Add(2 * time.Second)), Type: sfntypes.HistoryEventTypeTaskStateExited,
+					StateExitedEventDetails: &sfntypes.StateExitedEventDetails{Name: aws.String("ReserveStock"), Output: aws.String(`{"reserved":true}`)}},
+				{Id: 4, PreviousEventId: 3, Timestamp: aws.Time(start1.Add(3 * time.Second)), Type: sfntypes.HistoryEventTypeMapRunStarted,
+					MapRunStartedEventDetails: &sfntypes.MapRunStartedEventDetails{MapRunArn: aws.String("arn:aws:states:us-east-1:123456789012:mapRun:order-fulfillment-workflow/ShipItems:7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d")}},
+				{Id: 5, PreviousEventId: 4, Timestamp: aws.Time(start1.Add(90 * time.Second)), Type: sfntypes.HistoryEventTypeTaskSubmitted,
+					TaskSubmittedEventDetails: &sfntypes.TaskSubmittedEventDetails{Resource: aws.String("startExecution"), ResourceType: aws.String("states"), Output: aws.String(`{"ExecutionArn":"arn:aws:states:us-east-1:123456789012:execution:user-onboarding-flow:notify-ORD-88210"}`)}},
+				{Id: 6, PreviousEventId: 5, Timestamp: aws.Time(stop1.Add(-time.Second)), Type: sfntypes.HistoryEventTypeTaskSucceeded,
+					TaskSucceededEventDetails: &sfntypes.TaskSucceededEventDetails{Resource: aws.String("startExecution"), ResourceType: aws.String("states"), Output: aws.String(`{"Status":"SUCCEEDED"}`)}},
+				{Id: 7, PreviousEventId: 6, Timestamp: &stop1, Type: sfntypes.HistoryEventTypeExecutionSucceeded,
+					ExecutionSucceededEventDetails: &sfntypes.ExecutionSucceededEventDetails{Output: aws.String(`{"orderId":"ORD-88210","shipped":true}`)}},
+			},
+			// The run that ran out of time: an activity worker that never
+			// answered, a Lambda past its timeout, a task past its own.
+			"arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-2200-d4e5f6a7": {
+				{Id: 1, Timestamp: &start4, Type: sfntypes.HistoryEventTypeActivityScheduled,
+					ActivityScheduledEventDetails: &sfntypes.ActivityScheduledEventDetails{Resource: aws.String("arn:aws:states:us-east-1:123456789012:activity:pick-and-pack"), TimeoutInSeconds: aws.Int64(3600)}},
+				{Id: 2, PreviousEventId: 1, Timestamp: aws.Time(start4.Add(time.Minute)), Type: sfntypes.HistoryEventTypeActivityStarted,
+					ActivityStartedEventDetails: &sfntypes.ActivityStartedEventDetails{WorkerName: aws.String("warehouse-worker-3")}},
+				{Id: 3, PreviousEventId: 2, Timestamp: aws.Time(start4.Add(61 * time.Minute)), Type: sfntypes.HistoryEventTypeActivityTimedOut,
+					ActivityTimedOutEventDetails: &sfntypes.ActivityTimedOutEventDetails{Error: aws.String("States.Timeout")}},
+				{Id: 4, PreviousEventId: 3, Timestamp: aws.Time(start4.Add(62 * time.Minute)), Type: sfntypes.HistoryEventTypeLambdaFunctionTimedOut,
+					LambdaFunctionTimedOutEventDetails: &sfntypes.LambdaFunctionTimedOutEventDetails{Error: aws.String("States.Timeout")}},
+				{Id: 5, PreviousEventId: 4, Timestamp: aws.Time(start4.Add(150 * time.Minute)), Type: sfntypes.HistoryEventTypeTaskTimedOut,
+					TaskTimedOutEventDetails: &sfntypes.TaskTimedOutEventDetails{Resource: aws.String("runTask.sync"), ResourceType: aws.String("ecs"), Error: aws.String("States.Timeout")}},
+				{Id: 6, PreviousEventId: 5, Timestamp: &stop4, Type: sfntypes.HistoryEventTypeExecutionTimedOut,
+					ExecutionTimedOutEventDetails: &sfntypes.ExecutionTimedOutEventDetails{Error: aws.String("States.Timeout")}},
+			},
+			// The run an operator stopped, after an activity succeeded and
+			// the next one could not be scheduled.
+			"arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-1800-e5f6a7b8": {
+				{Id: 1, Timestamp: &start5, Type: sfntypes.HistoryEventTypeActivitySucceeded,
+					ActivitySucceededEventDetails: &sfntypes.ActivitySucceededEventDetails{Output: aws.String(`{"packed":true}`)}},
+				{Id: 2, PreviousEventId: 1, Timestamp: aws.Time(start5.Add(time.Second)), Type: sfntypes.HistoryEventTypeActivityScheduleFailed,
+					ActivityScheduleFailedEventDetails: &sfntypes.ActivityScheduleFailedEventDetails{Error: aws.String("States.ActivityDoesNotExist"), Cause: aws.String("Activity arn:aws:states:us-east-1:123456789012:activity:label-printer does not exist")}},
+				{Id: 3, PreviousEventId: 2, Timestamp: &stop5, Type: sfntypes.HistoryEventTypeExecutionAborted,
+					ExecutionAbortedEventDetails: &sfntypes.ExecutionAbortedEventDetails{Error: aws.String("User.Aborted"), Cause: aws.String("Stopped from the console")}},
+			},
+			// The payment run that failed at every kind of step.
+			"arn:aws:states:us-east-1:123456789012:execution:payment-validation:exec-2026-0322-0400-b1c2d3e4": {
+				{Id: 1, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 0, 0, time.UTC)), Type: sfntypes.HistoryEventTypeLambdaFunctionStartFailed,
+					LambdaFunctionStartFailedEventDetails: &sfntypes.LambdaFunctionStartFailedEventDetails{Error: aws.String("Lambda.ServiceException"), Cause: aws.String("Rate exceeded")}},
+				{Id: 2, PreviousEventId: 1, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 2, 0, time.UTC)), Type: sfntypes.HistoryEventTypeLambdaFunctionFailed,
+					LambdaFunctionFailedEventDetails: &sfntypes.LambdaFunctionFailedEventDetails{Error: aws.String("PaymentDeclined"), Cause: aws.String("card issuer declined the authorization")}},
+				{Id: 3, PreviousEventId: 2, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 3, 0, time.UTC)), Type: sfntypes.HistoryEventTypeActivityFailed,
+					ActivityFailedEventDetails: &sfntypes.ActivityFailedEventDetails{Error: aws.String("FraudCheckFailed"), Cause: aws.String("manual review rejected the payment")}},
+				{Id: 4, PreviousEventId: 3, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 4, 0, time.UTC)), Type: sfntypes.HistoryEventTypeTaskStartFailed,
+					TaskStartFailedEventDetails: &sfntypes.TaskStartFailedEventDetails{Resource: aws.String("putItem"), ResourceType: aws.String("dynamodb"), Error: aws.String("DynamoDB.AmazonDynamoDBException"), Cause: aws.String("Requested resource not found")}},
+				{Id: 5, PreviousEventId: 4, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 5, 0, time.UTC)), Type: sfntypes.HistoryEventTypeTaskSubmitFailed,
+					TaskSubmitFailedEventDetails: &sfntypes.TaskSubmitFailedEventDetails{Resource: aws.String("publish"), ResourceType: aws.String("sns"), Error: aws.String("SNS.AuthorizationErrorException"), Cause: aws.String("not authorized to perform SNS:Publish")}},
+				{Id: 6, PreviousEventId: 5, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 6, 0, time.UTC)), Type: sfntypes.HistoryEventTypeMapRunFailed,
+					MapRunFailedEventDetails: &sfntypes.MapRunFailedEventDetails{Error: aws.String("States.ExceedToleratedFailureThreshold"), Cause: aws.String("The specified tolerated failure threshold was exceeded")}},
+				{Id: 7, PreviousEventId: 6, Timestamp: aws.Time(time.Date(2026, 3, 22, 4, 0, 7, 0, time.UTC)), Type: sfntypes.HistoryEventTypeExecutionFailed,
+					ExecutionFailedEventDetails: &sfntypes.ExecutionFailedEventDetails{Error: aws.String("PaymentDeclined"), Cause: aws.String("card issuer declined the authorization")}},
+			},
 			execArnOrderFulfillmentFailed: {
 				{
 					Id:        1,

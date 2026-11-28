@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Rule Name: c78195761a9d7b27
-  Status: 5da5b3eba930969d
+  Rule Name: 1624d40ae20aaf66
+  Status: 380cdfb2b7580da0
   Targets: 5a24225af75c4206
-  Event Bus: 142c868e63ac210c
-  Schedule: 083aad0130ff92d3
-  Description: db8526853ab7a372
+  Event Bus: c49485f00338950d
+  Schedule: 151a435e5f67aa33
+  Description: b9919eabf9baef1f
 detail_hashes:
   Name: 1e4a1612672f42b2
   Arn: fb866fb55912dfcd
@@ -18,26 +18,21 @@ detail_hashes:
   RoleArn: 53f87cbcf258bdaa
 list:
   Rule Name:
-    path: Name
     key: name
     width: 28
   Status:
-    path: State
     key: state
     width: 10
   Targets:
     key: target_count
     width: 8
   Event Bus:
-    path: EventBusName
     key: event_bus
     width: 18
   Schedule:
-    path: ScheduleExpression
     key: schedule
     width: 24
   Description:
-    path: Description
     key: description
     width: 30
 

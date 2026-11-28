@@ -516,9 +516,12 @@ var sharedCWLogsFixtures = shared(func() *CWLogsFixtures {
 		"/aws/lambda/api-gateway-authorizer": {
 			{
 				LogStreamName:       aws.String("2026/03/22/[$LATEST]abc123"),
+				Arn:                 aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api-gateway-authorizer:log-stream:2026/03/22/[$LATEST]abc123"),
 				CreationTime:        aws.Int64(1774253700000),
 				FirstEventTimestamp: aws.Int64(1774253700000),
 				LastEventTimestamp:  aws.Int64(1774253800000),
+				LastIngestionTime:   aws.Int64(1774253802000),
+				UploadSequenceToken: aws.String("49612345678901234567890123456789012345678901234567890"),
 				StoredBytes:         aws.Int64(1024),
 			},
 			{

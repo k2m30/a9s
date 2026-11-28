@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  ASG Name: 9da979ac4f7d4c23
-  Min: 17dbaf942dfd095f
-  Max: 1f946ee13f8c907f
-  Desired: 8e90c1bdec4d5ff4
-  Instances: 26c7e289b105a36c
-  Status: 2bb69a4a55078c29
+  ASG Name: 5e079390ca7c7f05
+  Min: 322b2d2c1095f2f2
+  Max: 7dfa04089426dfae
+  Desired: 26d58963119b3c44
+  Instances: 4ae7fa99e7858bea
+  Status: 168e38cf521a9b36
 detail_hashes:
   AutoScalingGroupName: e70d6e0e5f105ae6
   AutoScalingGroupARN: 9ad6b647f7ac540a
@@ -25,27 +25,21 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   ASG Name:
-    path: AutoScalingGroupName
     key: asg_name
     width: 36
   Min:
-    path: MinSize
     key: min_size
     width: 6
   Max:
-    path: MaxSize
     key: max_size
     width: 6
   Desired:
-    path: DesiredCapacity
     key: desired
     width: 8
   Instances:
-    path: Instances
     key: instances
     width: 10
   Status:
-    path: Status
     key: status
     width: 12
 

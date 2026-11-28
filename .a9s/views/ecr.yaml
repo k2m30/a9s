@@ -1,14 +1,14 @@
 generated: 12
 list_hashes:
-  Repository: 956da080e958f39c
+  Repository: 4106da9e0002c04b
   Status: 516e63265dd02620
-  URI: 8b6688ea3b14f1ce
-  Tag Mutability: 943bffad19ff3680
+  URI: 68e12b6efcb59fe6
+  Tag Mutability: 51edd2f5be03d1bc
   Scan: 220f9bc00c8c4dd2
   Critical: 6f63806909c8e9e1
   High: 96e1a09d61195739
   Scanned: 06a4ec476d779f4f
-  Created: 7db3e78a48e36bcf
+  Created: 1454e9b1e5431ef2
 detail_hashes:
   RepositoryName: cae5f19ca92ab093
   RepositoryUri: 87fe5ff31a72707e
@@ -20,18 +20,15 @@ detail_hashes:
   CreatedAt: ac4f44b9064dcc14
 list:
   Repository:
-    path: RepositoryName
     key: repository_name
     width: 36
   Status:
     key: state
     width: 12
   URI:
-    path: RepositoryUri
     key: uri
     width: 60
   Tag Mutability:
-    path: ImageTagMutability
     key: tag_mutability
     width: 16
   Scan:
@@ -47,7 +44,6 @@ list:
     key: images_scanned
     width: 8
   Created:
-    path: CreatedAt
     key: created_at
     width: 22
 

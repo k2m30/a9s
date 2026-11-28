@@ -1,38 +1,33 @@
 generated: 12
 list_hashes:
-  Plan Name: 2389c8ec548f8b61
+  Plan Name: b3ebddd8dd92e34d
   Status: 1ba84f451d344b6b
-  Plan ID: aa9515625a4866fe
-  Created: 1c65911b21c57efa
-  Last Execution: c88e270cb7a58f5e
+  Plan ID: 8ada20b7254b3580
+  Created: 06fa9fce319ddf50
+  Last Execution: d239963c7a76fe58
 detail_hashes:
   BackupPlanName: cc237aef180a196f
   BackupPlanId: 78db908fba95126e
   BackupPlanArn: 324558e99e348289
   CreationDate: 9de39562d22bb856
   LastExecutionDate: 4f6dbc12ccb8c91b
-  DeletionDate: afa50f49c4cbab1a
   VersionId: f377b59e2fdaf2bd
   CreatorRequestId: 6b42e53c27788055
   AdvancedBackupSettings: 1200508ce68673da
 list:
   Plan Name:
-    path: BackupPlanName
     key: plan_name
     width: 32
   Status:
     key: status
     width: 40
   Plan ID:
-    path: BackupPlanId
     key: plan_id
     width: 38
   Created:
-    path: CreationDate
     key: creation_date
     width: 22
   Last Execution:
-    path: LastExecutionDate
     key: last_execution
     width: 22
 
@@ -42,7 +37,6 @@ detail:
   - BackupPlanArn
   - CreationDate
   - LastExecutionDate
-  - DeletionDate
   - VersionId
   - CreatorRequestId
   - AdvancedBackupSettings

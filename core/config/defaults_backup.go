@@ -7,7 +7,7 @@ func backupDefaultViews() map[string]ViewDef {
 		"backup": {
 			Detail: []DetailField{
 				{Path: "BackupPlanName"}, {Path: "BackupPlanId"}, {Path: "BackupPlanArn"},
-				{Path: "CreationDate"}, {Path: "LastExecutionDate"}, {Path: "DeletionDate"},
+				{Path: "CreationDate"}, {Path: "LastExecutionDate"},
 				{Path: "VersionId"}, {Path: "CreatorRequestId"}, {Path: "AdvancedBackupSettings"},
 			},
 		},

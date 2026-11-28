@@ -1,7 +1,7 @@
 generated: 12
 list_hashes:
-  Target ID: da92e6295dbc69aa
-  Target ARN: ab3706c5be2cc96b
+  Target ID: 70b8c33a1040ec3c
+  Target ARN: 438897eab8455e23
   Resource: 3dadf65605d1fd9c
   Input: 89a479aa0588804c
 detail_hashes:
@@ -23,11 +23,9 @@ detail_hashes:
   AppSyncParameters: 3b2d390b3b638146
 list:
   Target ID:
-    path: Id
     key: target_id
     width: 20
   Target ARN:
-    path: Arn
     key: target_arn
     width: 48
   Resource:

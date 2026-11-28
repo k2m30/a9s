@@ -15,6 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // DetailField references a single line in the detail view. Exactly one of
@@ -395,33 +396,29 @@ func loadReport(cfg *ViewsConfig, unresolved, collisions []string) error {
 }
 
 // ColumnFilled reports whether anything puts a value in this column's cell on
-// td: a RawStruct path it reads the value from, or a key some producer writes
-// — the type's Wave 1 fields, its Wave 2 enricher's, a key the type's own
-// columns name, or its status key, which the findings fill and the save lane
-// stores.
+// td: a key some producer writes — the type's Wave 1 fields, its Wave 2
+// enricher's, a key the type's own columns name, or its status key, which the
+// findings fill and the save lane stores — or a path a cell can read from a
+// struct the type's rows carry (ResourceTypeDef.CellPath).
 //
-// A Path is a producer: the cascade
-// reads the struct live, and MaterializeListFields writes that same value
-// under the column's key for the row a restart replays.
+// A path the rows' structs lack is no producer: the cascade reads the struct
+// live and finds nothing, on every row.
 //
 // The load's report and the producers gate ask here, so a column the gate
 // accepts is never one the operator is told is broken.
 func ColumnFilled(td catalog.ResourceTypeDef, col ListColumn) bool {
-	if col.Path != "" || col.Key == "" {
-		return true
-	}
-	if col.Key == "@id" || col.Key == td.StatusKey() {
-		return true
-	}
-	if slices.Contains(td.FieldKeys, col.Key) || slices.Contains(td.IssueEnricherFieldKeys, col.Key) {
-		return true
-	}
-	for _, c := range td.Columns {
-		if c.Key == col.Key {
+	if col.Key != "" {
+		if col.Key == "@id" || col.Key == td.StatusKey() || td.Produces(col.Key) {
+			return true
+		}
+		if slices.ContainsFunc(td.Columns, func(c domain.Column) bool { return c.Key == col.Key }) {
 			return true
 		}
 	}
-	return false
+	if col.Path != "" {
+		return td.CellPath(col.Path)
+	}
+	return col.Key == ""
 }
 
 // unfillableColumnKeys reports every list column nothing can fill. Such a cell
@@ -442,11 +439,15 @@ func unfillableColumnKeys(cfg *ViewsConfig) []string {
 			continue
 		}
 		for _, col := range cfg.Views[name].List {
-			if ColumnFilled(*td, col) {
-				continue
+			switch {
+			case ColumnFilled(*td, col):
+			case col.Path != "":
+				reports = append(reports, fmt.Sprintf("%s.yaml: column %q reads path %q, which names no value of the row %s stores",
+					name, col.Title, col.Path, name))
+			default:
+				reports = append(reports, fmt.Sprintf("%s.yaml: column %q reads key %q, which nothing on %s writes",
+					name, col.Title, col.Key, name))
 			}
-			reports = append(reports, fmt.Sprintf("%s.yaml: column %q reads key %q, which nothing on %s writes",
-				name, col.Title, col.Key, name))
 		}
 	}
 	return reports

@@ -23,22 +23,29 @@ import (
 // rows are stored, means a later cache replay with RawStruct stripped renders
 // identical cells, without falling back to fieldpath on a nil RawStruct.
 //
-// A column carrying BOTH a Key and a Path is materialized too:
-// ResolveListColumnCascade merges the catalog's Key onto the defaults'
-// Path, and a cached row would otherwise be blank wherever the fetcher did
-// not write that key itself.
+// A column carrying BOTH a Key and a Path (an operator's file) is
+// materialized too, unless the type produces that key: its producer is then
+// the key's one source, an empty value included.
 //
 // A column is only materialized when Fields does not already carry a
 // non-empty value under the resolved key, so a prior explicit value (or an
 // earlier materialization pass) is never overwritten.
+//
+// MaterializeListFields materializes a column set no type owns; a type's own
+// set goes through materializeListFields, which writes no key the type
+// produces (ResourceTypeDef.ReadsPath).
 func MaterializeListFields(r resource.Resource, columns []ColumnDef) resource.Resource {
+	return materializeListFields(r, columns, nil)
+}
+
+func materializeListFields(r resource.Resource, columns []ColumnDef, td *resource.ResourceTypeDef) resource.Resource {
 	if r.RawStruct == nil {
 		return r
 	}
 	out := r
 	copied := false
 	for _, col := range columns {
-		if col.Path == "" {
+		if !td.ReadsPath(col.Key, col.Path) {
 			continue
 		}
 		key := col.Key
@@ -198,7 +205,11 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 	// domain.StatusPhrase + HumanizeStatusPhrase chokepoint — otherwise it
 	// falls through to the raw fieldpath/Fields value further down and a raw
 	// AWS enum ("FAILED", "STALE") reaches the screen.
+	//
+	// A key the type's producers write is the column's one source: Fields
+	// answers, an empty value included, and the path is not read.
 	lifecycleKey := "state"
+	readsPath := r.RawStruct != nil && td.ReadsPath(col.Key, col.Path)
 	if td != nil {
 		lifecycleKey = td.StatusKey()
 	}
@@ -215,7 +226,7 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 		if v, ok := r.Fields[col.Key]; ok && v != "" {
 			return domain.HumanizeStatusPhrase(v)
 		}
-		if col.Path != "" && r.RawStruct != nil {
+		if readsPath {
 			return domain.HumanizeStatusPhrase(fieldpath.ExtractScalar(r.RawStruct, col.Path))
 		}
 		return ""
@@ -233,7 +244,7 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 	// HumanizeStatusPhrase chokepoint the isStatusCol branch above uses,
 	// without touching identity-column RawStruct-over-Fields precedence
 	// (e.g. EC2 InstanceType, which never sets Humanize).
-	if col.Path != "" && r.RawStruct != nil {
+	if readsPath {
 		if val := fieldpath.ExtractScalar(r.RawStruct, col.Path); val != "" {
 			return humanizeListCell(col, val)
 		}

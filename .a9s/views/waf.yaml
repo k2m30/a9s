@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Name: 141f2e161b230f88
-  ID: bd7c8c21a8c76cba
+  Name: 49cd2c5c00dfc200
+  ID: 3fc51f965f3d4eda
   Status: 516e63265dd02620
   Rules: 504bb9f2903c0611
-  Description: 0022b6f6290d9419
+  Description: 1786bb31adf580e1
 detail_hashes:
   Name: 1e4a1612672f42b2
   Id: 75be4e070c3dd9b3
@@ -13,11 +13,9 @@ detail_hashes:
   LockToken: 94f100795d363f1a
 list:
   Name:
-    path: Name
     key: name
     width: 28
   ID:
-    path: Id
     key: id
     width: 38
   Status:
@@ -27,7 +25,6 @@ list:
     key: rules_summary
     width: 18
   Description:
-    path: Description
     key: description
     width: 36
 

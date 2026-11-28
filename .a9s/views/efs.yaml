@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Name: 141f2e161b230f88
-  File System ID: 69edb187ae96f448
+  Name: 49cd2c5c00dfc200
+  File System ID: 75630e8e418552d1
   Status: 793ab4f12f570394
-  Perf Mode: 0d02af0924cbefb6
-  Encrypted: 956f4cdf07855f30
-  Mounts: 0725df7c5a84c96b
+  Perf Mode: 2dad600f11d2d65a
+  Encrypted: e73516e547dd83bf
+  Mounts: b01c24891701a9a7
 detail_hashes:
   FileSystemId: 829222dfd7589b06
   Name: 1e4a1612672f42b2
@@ -22,26 +22,21 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Name:
-    path: Name
     key: name
     width: 28
   File System ID:
-    path: FileSystemId
     key: file_system_id
     width: 22
   Status:
     key: status
     width: 24
   Perf Mode:
-    path: PerformanceMode
     key: performance_mode
     width: 16
   Encrypted:
-    path: Encrypted
     key: encrypted
     width: 10
   Mounts:
-    path: NumberOfMountTargets
     key: mount_targets
     width: 8
 

@@ -183,18 +183,19 @@ var verbatimDetailPaths = map[string]string{
 
 	// The same identifiers reached by the SDK path the detail projector reads
 	// off RawStruct, which the flat Fields pass never saw.
-	"alarm/MetricName":        "identifier: the CloudWatch metric's own name",
-	"alarm/Namespace":         "identifier: the CloudWatch namespace",
-	"ami/UsageOperation":      "identifier: UsageOperation, the billing code the AMI's usage is charged under",
-	"cf/Id":                   "identifier: the CloudFront distribution id",
-	"iam-group/GroupId":       "identifier: the IAM group id",
-	"iam-user/UserId":         "identifier: the IAM user id",
-	"msk/CurrentVersion":      "identifier: CurrentVersion, the cluster revision string a change call has to quote back",
-	"policy/PolicyId":         "identifier: the IAM policy id",
-	"policy/PolicyName":       "identifier: the policy's own name",
-	"role/RoleId":             "identifier: the IAM role id",
-	"role/RoleName":           "identifier: the role's own name",
-	"sns-sub/SubscriptionArn": "verbatim: SNS puts the literal \"PendingConfirmation\" in the ARN field of an unconfirmed subscription; the field holds an ARN a person copies, so its contents are never reworded",
+	"alarm/MetricName":          "identifier: the CloudWatch metric's own name",
+	"alarm/Namespace":           "identifier: the CloudWatch namespace",
+	"ami/UsageOperation":        "identifier: UsageOperation, the billing code the AMI's usage is charged under",
+	"cf/Id":                     "identifier: the CloudFront distribution id",
+	"elb/CanonicalHostedZoneId": "identifier: CanonicalHostedZoneId, the Route 53 hosted zone id an alias record to the load balancer names",
+	"iam-group/GroupId":         "identifier: the IAM group id",
+	"iam-user/UserId":           "identifier: the IAM user id",
+	"msk/CurrentVersion":        "identifier: CurrentVersion, the cluster revision string a change call has to quote back",
+	"policy/PolicyId":           "identifier: the IAM policy id",
+	"policy/PolicyName":         "identifier: the policy's own name",
+	"role/RoleId":               "identifier: the IAM role id",
+	"role/RoleName":             "identifier: the role's own name",
+	"sns-sub/SubscriptionArn":   "verbatim: SNS puts the literal \"PendingConfirmation\" in the ARN field of an unconfirmed subscription; the field holds an ARN a person copies, so its contents are never reworded",
 }
 
 // rawEnumDetailDebtCeiling is how many entries rawEnumDetailDebt is allowed to

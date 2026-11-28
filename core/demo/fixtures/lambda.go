@@ -274,6 +274,10 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
 				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
 			},
+			Layers: []lambdatypes.Layer{{
+				Arn:      aws.String("arn:aws:lambda:us-east-1:123456789012:layer:pillow-python312:4"),
+				CodeSize: 4718592,
+			}},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},
 		{

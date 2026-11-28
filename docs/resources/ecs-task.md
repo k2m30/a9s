@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `ecs-task`
 - **Display name**: ECS Tasks
 - **AWS API reference**: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html>
-- **List API**: `ListTasks` + `DescribeTasks` (list-mode enumeration requires both; `ListTasks` returns ARNs only, `DescribeTasks` returns the full `Task` shape. The task list is scoped to a parent cluster — tasks are a child view under `ecs`/`ecs-svc`.)
+- **List API**: `ListTasks` + `DescribeTasks` (list-mode enumeration requires both; `ListTasks` returns ARNs only, `DescribeTasks` returns the full `Task` shape. The task list is scoped to a parent cluster — tasks are a child view under `ecs`/`ecs-svc`. `ListTasks` is asked twice per cluster, for desired status `RUNNING` (its default) and `STOPPED`, so a stopped task ECS still keeps is listed.)
 - **Describe API (if any)**: `DescribeTasks` used for Wave 2 (same shape as list-mode; Wave 2 simply re-reads `StopCode` / container `ExitCode` on the already-fetched Task). `DescribeTaskDefinition` is required for related-panel pivots to `ecr`, `logs`, `role`, `secrets`, `ssm` (see §2).
 
 ## 2. Related Resources Panel (detail view, right column)

@@ -1,6 +1,6 @@
 generated: 12
 list_hashes:
-  Stream Name: 542136f41792481c
+  Stream Name: fad9cd5f6ecd5cc1
   Last Event: 5f2a920d5f47956b
   First Event: 1628ee6c8b8f4c3b
 detail_hashes:
@@ -13,7 +13,6 @@ detail_hashes:
   UploadSequenceToken: 3ae3623e7c9ebbdb
 list:
   Stream Name:
-    path: LogStreamName
     key: stream_name
     width: 48
   Last Event:

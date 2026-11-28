@@ -3,6 +3,7 @@
 package catalog
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -91,12 +92,24 @@ type ResourceTypeDef struct {
 	// types back — an access key, a role id, an API operation name — must
 	// stay verbatim or it stops being the thing they can search for.
 	HumanizeFields []string
+	// RowTypes is every struct type a list row of this type carries as its
+	// RawStruct: one per lane for a type whose fetcher stores more than one
+	// (an REST and an HTTP API, a described and a listed server). A column or
+	// detail path is checked against these types, and
+	// core/config/views_reference.yaml is generated from them.
+	RowTypes []reflect.Type
 	// ComputedDetailPaths lists the detail-view paths of this type whose value
-	// is assembled outside the AWS SDK struct the list is built from — a policy
-	// document or an attribute map fetched on detail open, a value the
-	// projector synthesises. core/config/views_reference.yaml reflects that
-	// struct alone, so the type declares these paths here.
+	// is assembled outside the RowTypes structs — a policy document or an
+	// attribute map fetched on detail open, a value the projector synthesises.
 	ComputedDetailPaths []string
+	// ReplayKeys maps a dotted detail path to the Fields key the fetcher
+	// writes the same value under. A row replayed from the disk cache carries
+	// Fields and no struct, and its detail reads such a path from that key.
+	ReplayKeys map[string]string
+	// ListOmits names the RowTypes members AWS documents its list call does
+	// not return, though the struct has a field for them; the Get or Describe
+	// call returns them. The demo answers the list call without them.
+	ListOmits []string
 
 	// ─── Behavior ──────────────────────────────────────────────────────────
 

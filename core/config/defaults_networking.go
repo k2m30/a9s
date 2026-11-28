@@ -126,7 +126,7 @@ func networkingDefaultViews() map[string]ViewDef {
 			Detail: []DetailField{
 				{Path: "Target.Id"}, {Path: "Target.Port"}, {Path: "Target.AvailabilityZone"},
 				{Path: "TargetHealth.State"}, {Path: "TargetHealth.Reason"}, {Path: "TargetHealth.Description"},
-				{Path: "HealthCheckPort"}, {Path: "AnomalyDetection"},
+				{Path: "HealthCheckPort"},
 			},
 		},
 		"transfer_agreements": {

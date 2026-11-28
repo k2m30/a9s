@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"net/url"
+	"reflect"
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -13,6 +14,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 )
 
 func colorPipeline(r domain.Resource) domain.Color {
@@ -47,8 +54,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CloudFormation Stacks",
 		ShortName:      "cfn",
+		RowTypes:       []reflect.Type{reflect.TypeFor[cfntypes.Stack]()},
 		RefToID:        cfnRefToID,
-		HumanizeFields: []string{"status", "StackStatus"},
+		HumanizeFields: []string{"status", "StackStatus", "DetailedStatus"},
 		Aliases:        []string{"cfn", "cloudformation", "stacks"},
 		Category:       "CI/CD",
 		CloudTrailKey:  "ResourceName:ID",
@@ -61,13 +69,13 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/stackinfo?stackId="+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "stack_name", Title: "Stack Name", Path: "StackName", Width: 36},
-			{Key: "status", Title: "Status", Path: "StackStatus", Width: 24},
+			{Key: "stack_name", Title: "Stack Name", Width: 36},
+			{Key: "status", Title: "Status", Width: 24},
 			{Key: "drift_status", Title: "Drift", Width: 14},
 			{Title: "Reason", Path: "StackStatusReason", Width: 32},
-			{Key: "creation_time", Title: "Created", Path: "CreationTime", Width: 22},
-			{Key: "last_updated", Title: "Updated", Path: "LastUpdatedTime", Width: 22},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "creation_time", Title: "Created", Width: 22},
+			{Key: "last_updated", Title: "Updated", Width: 22},
+			{Key: "description", Title: "Description", Width: 30},
 		},
 		Children: []domain.ChildViewDef{
 			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
@@ -114,6 +122,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodePipelines",
 		ShortName:      "pipeline",
+		RowTypes:       []reflect.Type{reflect.TypeFor[cptypes.PipelineSummary]()},
 		RefToID:        pipelineRefToID,
 		LifecycleKey:   "last_status",
 		HumanizeFields: []string{"pipeline_type", "ExecutionMode"},
@@ -124,12 +133,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "codesuite/codepipeline/pipelines/"+url.PathEscape(r.ID)+"/view?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Pipeline Name", Path: "Name", Width: 30},
-			{Key: "pipeline_type", Title: "Type", Path: "PipelineType", Width: 6},
+			{Key: "name", Title: "Pipeline Name", Width: 30},
+			{Key: "pipeline_type", Title: "Type", Width: 6},
 			{Key: "last_status", Title: "Status", Width: 18},
-			{Key: "version", Title: "Version", Path: "Version", Width: 9},
-			{Key: "created", Title: "Created", Path: "Created", Width: 22},
-			{Key: "updated", Title: "Updated", Path: "Updated", Width: 22},
+			{Key: "version", Title: "Version", Width: 9},
+			{Key: "created", Title: "Created", Width: 22},
+			{Key: "updated", Title: "Updated", Width: 22},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "pipeline_stages",
@@ -163,6 +172,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodeBuild Projects",
 		ShortName:      "cb",
+		RowTypes:       []reflect.Type{reflect.TypeFor[cbtypes.Project]()},
 		RefToID:        cbRefToID,
 		LifecycleKey:   "last_build",
 		HumanizeFields: []string{"source_type"},
@@ -180,11 +190,11 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "codesuite/codebuild/"+acct+"/projects/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Project Name", Path: "Name", Width: 32},
-			{Key: "source_type", Title: "Source Type", Path: "Source.Type", Width: 14},
+			{Key: "name", Title: "Project Name", Width: 32},
+			{Key: "source_type", Title: "Source Type", Width: 14},
 			{Key: "last_build", Title: "Status", Width: 18},
-			{Key: "description", Title: "Description", Path: "Description", Width: 36},
-			{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22},
+			{Key: "description", Title: "Description", Width: 36},
+			{Key: "last_modified", Title: "Last Modified", Width: 22},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "cb_builds",
@@ -235,6 +245,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "ECR Repositories",
 		ShortName:      "ecr",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ecrtypes.Repository]()},
 		RefToID:        ecrRefToID,
 		HumanizeFields: []string{"tag_mutability", "ImageTagMutability"},
 		Aliases:        []string{"ecr", "container-registry"},
@@ -244,15 +255,15 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "ecr/repositories/"+url.PathEscape(r.ID)+"/?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "repository_name", Title: "Repository", Path: "RepositoryName", Width: 36},
+			{Key: "repository_name", Title: "Repository", Width: 36},
 			{Key: "state", Title: "Status", Width: 12},
-			{Key: "uri", Title: "URI", Path: "RepositoryUri", Width: 60},
-			{Key: "tag_mutability", Title: "Tag Mutability", Path: "ImageTagMutability", Width: 16},
+			{Key: "uri", Title: "URI", Width: 60},
+			{Key: "tag_mutability", Title: "Tag Mutability", Width: 16},
 			{Key: "scanning", Title: "Scan", Width: 12},
 			{Key: "critical_vulns", Title: "Critical", Width: 8},
 			{Key: "high_vulns", Title: "High", Width: 6},
 			{Key: "images_scanned", Title: "Scanned", Width: 8},
-			{Key: "created_at", Title: "Created", Path: "CreatedAt", Width: 22},
+			{Key: "created_at", Title: "Created", Width: 22},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "ecr_images",
@@ -298,6 +309,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:          "CodeArtifact Repos",
 		ShortName:     "codeartifact",
+		RowTypes:      []reflect.Type{reflect.TypeFor[codeartifacttypes.RepositorySummary]()},
 		RefToID:       codeartifactRefToID,
 		Aliases:       []string{"codeartifact", "artifact", "ca"},
 		Category:      "CI/CD",
@@ -333,12 +345,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(domainName)+"/r/"+url.PathEscape(repoName))
 		},
 		Columns: []domain.Column{
-			{Key: "repo_name", Title: "Repository", Path: "Name", Width: 28},
+			{Key: "repo_name", Title: "Repository", Width: 28},
 			{Key: "state", Title: "Status", Width: 12},
-			{Key: "domain_name", Title: "Domain", Path: "DomainName", Width: 24},
+			{Key: "domain_name", Title: "Domain", Width: 24},
 			{Key: "package_count", Title: "Packages", Width: 8},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
-			{Key: "domain_owner", Title: "Owner", Path: "DomainOwner", Width: 14},
+			{Key: "description", Title: "Description", Width: 30},
+			{Key: "domain_owner", Title: "Owner", Width: 14},
 		},
 		Color:          colorCodeArtifact,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CodeArtifact} }),
@@ -371,6 +383,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:         "CodeBuild Builds",
 		ShortName:    "cb_builds",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cbtypes.Build]()},
 		LifecycleKey: "build_status",
 		ConsoleURL: func(r domain.Resource, region, accountID string) string {
 			buildID := r.Fields["build_id"]
@@ -427,6 +440,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:         "Build Logs",
 		ShortName:    "cb_build_logs",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cwlogstypes.OutputLogEvent]()},
 		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group_name"], r.Fields["log_stream_name"])
@@ -441,6 +455,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "Pipeline Stages",
 		ShortName: "pipeline_stages",
+		RowTypes:  []reflect.Type{reflect.TypeFor[PipelineStageRow]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			name := r.Fields["pipeline_name"]
 			if name == "" {

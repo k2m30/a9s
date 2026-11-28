@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `iam-user`
 - **Display name**: IAM Users
 - **AWS API reference**: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html>
-- **List API**: `ListUsers` (global; IAM is region-less — one call covers the account).
+- **List API**: `ListUsers` (global; IAM is region-less — one call covers the account). `ListUsers` does not return `PermissionsBoundary` or `Tags` (`ListOmits`); the detail takes those two members from `GetUser`, read once per session.
 - **Describe API (if any)**: `ListAccessKeys` + `GetAccessKeyLastUsed` (per key) + `ListMFADevices` + `GetLoginProfile`, all per user. Wave 3 alternative is the account-wide `GenerateCredentialReport` + `GetCredentialReport`, which is OUT OF SCOPE (§3.3).
 
 ## 2. Related Resources Panel (detail view, right column)

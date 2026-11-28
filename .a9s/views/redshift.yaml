@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Cluster ID: 9e7aa6cb9c5dcd91
+  Cluster ID: f3d01ce078be36df
   Status: 62c0be96a8e69686
   Pending: e960fba0d3c5fef4
-  Node Type: d17f14cf77b64332
-  Nodes: f4470ff64a013be2
-  Database: 63ee66c41b644bf8
-  Endpoint: 20a5ba5d67017c52
+  Node Type: 830cf0bde94526d6
+  Nodes: 86eb9d7b3542134a
+  Database: ec8dbec5f669fe03
+  Endpoint: d5c546ec2ff33351
 detail_hashes:
   ClusterIdentifier: 638be02d6fa022e4
   ClusterStatus: 5fce4988f21b4d4e
@@ -21,7 +21,6 @@ detail_hashes:
   AvailabilityZone: 498a95b163a5e4df
 list:
   Cluster ID:
-    path: ClusterIdentifier
     key: cluster_id
     width: 36
   Status:
@@ -32,19 +31,15 @@ list:
     path: PendingModifiedValues.NodeType
     width: 14
   Node Type:
-    path: NodeType
     key: node_type
     width: 16
   Nodes:
-    path: NumberOfNodes
     key: num_nodes
     width: 7
   Database:
-    path: DBName
     key: db_name
     width: 16
   Endpoint:
-    path: Endpoint.Address
     key: endpoint
     width: 44
 

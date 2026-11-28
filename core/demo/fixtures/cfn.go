@@ -229,6 +229,7 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			StackName:                   aws.String("stack-stuck-update"),
 			EnableTerminationProtection: aws.Bool(true),
 			StackStatus:                 cfntypes.StackStatusUpdateInProgress,
+			DetailedStatus:              cfntypes.DetailedStatusConfigurationComplete,
 			CreationTime:                aws.Time(mustParseCFNTime("2025-08-15T14:00:00+00:00")),
 			LastUpdatedTime:             aws.Time(time.Now().Add(-3 * time.Hour)),
 			Description:                 aws.String("Database migration stack — update stalled on RDS parameter group change"),
@@ -355,6 +356,7 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			StackStatusReason:           aws.String("User Initiated"),
 			CreationTime:                aws.Time(mustParseCFNTime("2025-08-01T10:00:00+00:00")),
 			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-01T09:00:00+00:00")),
+			DeletionTime:                aws.Time(mustParseCFNTime("2026-04-01T09:20:00+00:00")),
 			Description:                 aws.String("Decommissioned proof-of-concept environment"),
 			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-decommissioned-poc/dddd6666-eeee-7777-ffff-888888888888"),
 			RoleARN:                     aws.String(prodCIDeployRoleARN),
@@ -431,6 +433,8 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 				ResourceType:         aws.String("AWS::Lambda::Function"),
 				ResourceStatus:       cfntypes.ResourceStatusCreateFailed,
 				ResourceStatusReason: aws.String("Resource handler returned message: \"Layer arn:aws:lambda:us-east-1:123456789012:layer:legacy-utils:3 does not exist.\" (HandlerErrorCode: NotFound)"),
+				ResourceProperties:   aws.String(`{"FunctionName":"acme-legacy-api","Runtime":"python3.12","Handler":"app.handler","Layers":["arn:aws:lambda:us-east-1:123456789012:layer:legacy-utils:3"]}`),
+				ClientRequestToken:   aws.String("Console-CreateStack-7f3a9c2e-5b41-4d8e-a6f0-1c2d3e4f5a6b"),
 			},
 			{
 				EventId:           aws.String("evt-legacy-003"),
@@ -514,6 +518,10 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 				ResourceType:         aws.String("AWS::EC2::VPC"),
 				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
 				LastUpdatedTimestamp: aws.Time(time.Date(2024, 10, 15, 9, 5, 0, 0, time.UTC)),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+					LastCheckTimestamp:       aws.Time(time.Date(2026, 4, 20, 6, 0, 0, 0, time.UTC)),
+				},
 			},
 			{
 				LogicalResourceId:    aws.String("PublicSubnet1"),
@@ -521,6 +529,10 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 				ResourceType:         aws.String("AWS::EC2::Subnet"),
 				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
 				LastUpdatedTimestamp: aws.Time(time.Date(2024, 10, 15, 9, 8, 0, 0, time.UTC)),
+				ModuleInfo: &cfntypes.ModuleInfo{
+					TypeHierarchy:      aws.String("Acme::Network::Subnet::MODULE"),
+					LogicalIdHierarchy: aws.String("PublicSubnetModule"),
+				},
 			},
 			// FlowLogsBucket — required for the cfn:s3 related-panel pivot
 			// (checkCfnS3 → ListStackResources → AWS::S3::Bucket).

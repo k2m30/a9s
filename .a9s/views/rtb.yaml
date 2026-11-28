@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
   Name: 49cd2c5c00dfc200
-  Route Table ID: 42f868ba8131671e
-  VPC ID: 51b18126b8707aee
+  Route Table ID: df5ed09528e63272
+  VPC ID: 8fd38a59c94f4eb1
   Status: d2c744644111625b
   Routes: 8532bba9b0943607
   Assoc.: 137147c1579af348
@@ -19,11 +19,9 @@ list:
     key: name
     width: 28
   Route Table ID:
-    path: RouteTableId
     key: route_table_id
     width: 26
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
   Status:

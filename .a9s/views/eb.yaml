@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Environment: fd6c6796f39d92a5
-  Application: 63e0e69c447ab4ee
-  Status: 2bb69a4a55078c29
-  Health: 9804ed6634b3dcfa
-  Version: 2c0f99d9cd05e414
+  Environment: 15a85b5e0bc2e44e
+  Application: 09c6ccfa6361774f
+  Status: 168e38cf521a9b36
+  Health: 12be026f8ffba83f
+  Version: 602b9dad71aed84a
 detail_hashes:
   EnvironmentName: 1b579ae2359c8835
   EnvironmentId: cbdccc51043c73d3
@@ -22,23 +22,18 @@ detail_hashes:
   EnvironmentArn: 05c1c4dbaf1b61a0
 list:
   Environment:
-    path: EnvironmentName
     key: environment_name
     width: 28
   Application:
-    path: ApplicationName
     key: application_name
     width: 24
   Status:
-    path: Status
     key: status
     width: 12
   Health:
-    path: Health
     key: health
     width: 10
   Version:
-    path: VersionLabel
     key: version_label
     width: 16
 

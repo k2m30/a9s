@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
   Name: 825a9ede861cbc56
-  ENI ID: 852eb845cabc22e4
-  Status: 2bb69a4a55078c29
-  Type: 1ee6dd6750ec5839
-  VPC ID: 51b18126b8707aee
-  Private IP: 290b8e0aa43d1dd5
+  ENI ID: 1ee8bc126d66748a
+  Status: 168e38cf521a9b36
+  Type: 96cdd389f322fccc
+  VPC ID: 8fd38a59c94f4eb1
+  Private IP: 7b4fe5a21cb395e9
 detail_hashes:
   NetworkInterfaceId: b4dbc076d06b8a57
   Status: 37925f95190b7a7e
@@ -31,23 +31,18 @@ list:
     key: name
     width: 24
   ENI ID:
-    path: NetworkInterfaceId
     key: eni_id
     width: 26
   Status:
-    path: Status
     key: status
     width: 12
   Type:
-    path: InterfaceType
     key: type
     width: 14
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
   Private IP:
-    path: PrivateIpAddress
     key: private_ip
     width: 16
 

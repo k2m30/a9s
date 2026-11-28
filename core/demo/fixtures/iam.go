@@ -280,6 +280,11 @@ func buildIAMRoles() []iamtypes.Role {
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2025, 1, 20, 14, 0, 0, 0, time.UTC)),
 			Description: aws.String("CI/CD deployment role for CodePipeline"),
+			PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+				PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				PermissionsBoundaryArn:  aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy"),
+			},
+			Tags: []iamtypes.Tag{{Key: aws.String("team"), Value: aws.String("platform")}},
 			// AssumeRolePolicyDocument — required for the role:iam-group and
 			// role:iam-user related-panel pivots (checkRoleIamGroup /
 			// checkRoleIamUser, offline parse of Principal.AWS ARNs). Models
@@ -705,23 +710,28 @@ func buildIAMPolicies() []iamtypes.Policy {
 			IsAttachable:     true,
 		},
 		{
-			PolicyName:       aws.String("acme-s3-read-only"),
-			PolicyId:         aws.String("ANPAEXAMPLE111111111"),
-			Arn:              aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
-			AttachmentCount:  aws.Int32(5),
-			Path:             aws.String("/"),
-			CreateDate:       aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
-			DefaultVersionId: aws.String("v3"),
-			Description:      aws.String("Allows EC2 and S3 read access"),
+			PolicyName:      aws.String("acme-s3-read-only"),
+			PolicyId:        aws.String("ANPAEXAMPLE111111111"),
+			Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
+			AttachmentCount: aws.Int32(5),
+			// alice.johnson's permissions boundary.
+			PermissionsBoundaryUsageCount: aws.Int32(1),
+			Path:                          aws.String("/"),
+			CreateDate:                    aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
+			DefaultVersionId:              aws.String("v3"),
+			Description:                   aws.String("Allows EC2 and S3 read access"),
+			UpdateDate:                    aws.Time(time.Date(2025, 8, 4, 16, 20, 0, 0, time.UTC)),
+			Tags:                          []iamtypes.Tag{{Key: aws.String("owner"), Value: aws.String("data-platform")}},
 		},
 		{
-			PolicyName:       aws.String("acme-deploy-policy"),
-			PolicyId:         aws.String("ANPAEXAMPLE222222222"),
-			Arn:              aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy"),
-			AttachmentCount:  aws.Int32(3),
-			Path:             aws.String("/"),
-			CreateDate:       aws.Time(time.Date(2025, 1, 15, 11, 30, 0, 0, time.UTC)),
-			DefaultVersionId: aws.String("v1"),
+			PolicyName:                    aws.String("acme-deploy-policy"),
+			PolicyId:                      aws.String("ANPAEXAMPLE222222222"),
+			Arn:                           aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy"),
+			AttachmentCount:               aws.Int32(3),
+			PermissionsBoundaryUsageCount: aws.Int32(1),
+			Path:                          aws.String("/"),
+			CreateDate:                    aws.Time(time.Date(2025, 1, 15, 11, 30, 0, 0, time.UTC)),
+			DefaultVersionId:              aws.String("v1"),
 		},
 		{
 			PolicyName:       aws.String("acme-secrets-access"),
@@ -886,6 +896,11 @@ func buildIAMUsers() []iamtypes.User {
 			Path:             aws.String("/"),
 			CreateDate:       aws.Time(time.Date(2024, 6, 15, 9, 0, 0, 0, time.UTC)),
 			PasswordLastUsed: aws.Time(time.Now().AddDate(0, 0, -10)),
+			PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+				PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				PermissionsBoundaryArn:  aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
+			},
+			Tags: []iamtypes.Tag{{Key: aws.String("department"), Value: aws.String("engineering")}},
 		},
 		{
 			UserName:         aws.String("bob.smith"),

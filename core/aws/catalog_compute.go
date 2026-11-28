@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"net/url"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 // ecsTaskStopCodeFailedDef is the stop-code finding, declared once. The
@@ -214,9 +219,11 @@ const CostExplorerServiceNameEC2 = "Amazon Elastic Compute Cloud - Compute"
 // computeTypes is the declarative catalog for all COMPUTE category resource types.
 var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "EC2 Instances",
-		ShortName: "ec2",
-		RefToID:   ec2RefToID,
+		Name:       "EC2 Instances",
+		ShortName:  "ec2",
+		RowTypes:   []reflect.Type{reflect.TypeFor[ec2types.Instance]()},
+		ReplayKeys: map[string]string{"State.Name": "state"},
+		RefToID:    ec2RefToID,
 		// UserData is base64 on DescribeInstanceAttribute and is decoded onto
 		// InstanceEnriched when the detail opens.
 		ComputedDetailPaths:     []string{"UserData"},
@@ -229,14 +236,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "state", Title: "Status", Path: "State.Name", Width: 12},
+			{Key: "state", Title: "Status", Width: 12},
 			{Key: "instance_status", Title: "Health", Width: 12},
 			{Key: "lifecycle", Title: "Lifecycle", Width: 12},
-			{Key: "type", Title: "Type", Path: "InstanceType", Width: 14},
-			{Key: "private_ip", Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
-			{Key: "public_ip", Title: "Public IP", Path: "PublicIpAddress", Width: 16},
-			{Key: "instance_id", Title: "Instance ID", Path: "InstanceId", Width: 20},
-			{Key: "launch_time", Title: "Launch Time", Path: "LaunchTime", Width: 22},
+			{Key: "type", Title: "Type", Width: 14},
+			{Key: "private_ip", Title: "Private IP", Width: 16},
+			{Key: "public_ip", Title: "Public IP", Width: 16},
+			{Key: "instance_id", Title: "Instance ID", Width: 20},
+			{Key: "launch_time", Title: "Launch Time", Width: 22},
 		},
 		Color:          colorEC2,
 		StateEnum:      enumValues[ec2types.InstanceStateName](),
@@ -324,6 +331,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Services",
 		ShortName:      "ecs-svc",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ecstypes.Service]()},
 		RefToID:        ecsSvcRefToID,
 		HumanizeFields: []string{"launch_type", "status", "SchedulingStrategy"},
 		Aliases:        []string{"ecs-svc", "ecs-services"},
@@ -342,12 +350,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 32},
+			{Key: "service_name", Title: "Service Name", Width: 32},
 			{Key: "cluster", Title: "Cluster", Width: 24},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12},
-			{Key: "desired_count", Title: "Desired", Path: "DesiredCount", Width: 9},
-			{Key: "running_count", Title: "Running", Path: "RunningCount", Width: 9},
-			{Key: "launch_type", Title: "Launch Type", Path: "LaunchType", Width: 12},
+			{Key: "status", Title: "Status", Width: 12},
+			{Key: "desired_count", Title: "Desired", Width: 9},
+			{Key: "running_count", Title: "Running", Width: 9},
+			{Key: "launch_type", Title: "Launch Type", Width: 12},
 		},
 		Children: []domain.ChildViewDef{
 			{
@@ -423,6 +431,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Clusters",
 		ShortName:      "ecs",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ecstypes.Cluster]()},
 		RefToID:        ecsRefToID,
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"ecs", "ecs-clusters"},
@@ -433,11 +442,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ecs/v2/clusters/"+url.PathEscape(r.ID)+"?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_name", Title: "Cluster Name", Path: "ClusterName", Width: 32},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12},
-			{Key: "running_tasks", Title: "Running", Path: "RunningTasksCount", Width: 9},
-			{Key: "pending_tasks", Title: "Pending", Path: "PendingTasksCount", Width: 9},
-			{Key: "services_count", Title: "Services", Path: "ActiveServicesCount", Width: 10},
+			{Key: "cluster_name", Title: "Cluster Name", Width: 32},
+			{Key: "status", Title: "Status", Width: 12},
+			{Key: "running_tasks", Title: "Running", Width: 9},
+			{Key: "pending_tasks", Title: "Pending", Width: 9},
+			{Key: "services_count", Title: "Services", Width: 10},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      ecsClusterStatuses,
@@ -477,6 +486,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Tasks",
 		ShortName:      "ecs-task",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ecstypes.Task]()},
 		RefToID:        ecsTaskRefToID,
 		HumanizeFields: []string{"stop_code", "launch_type", "status", "LastStatus", "DesiredStatus", "Connectivity"},
 		Aliases:        []string{"ecs-task", "ecs-tasks", "tasks"},
@@ -491,15 +501,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "task_id", Title: "Task ID", Path: "TaskArn", Width: 38},
-			{Key: "cluster", Title: "Cluster", Path: "ClusterArn", Width: 24},
-			{Key: "status", Title: "Status", Path: "LastStatus", Width: 12},
+			{Key: "task_id", Title: "Task ID", Width: 38},
+			{Key: "cluster", Title: "Cluster", Width: 24},
+			{Key: "status", Title: "Status", Width: 12},
 			{Title: "Stop Code", Path: "StopCode", Width: 24},
 			{Title: "Health", Path: "HealthStatus", Width: 12},
-			{Key: "task_definition", Title: "Task Definition", Path: "TaskDefinitionArn", Width: 30},
-			{Key: "launch_type", Title: "Launch", Path: "LaunchType", Width: 10},
-			{Key: "cpu", Title: "CPU", Path: "Cpu", Width: 6},
-			{Key: "memory", Title: "Memory", Path: "Memory", Width: 8},
+			{Key: "task_definition", Title: "Task Definition", Width: 30},
+			{Key: "launch_type", Title: "Launch", Width: 10},
+			{Key: "cpu", Title: "CPU", Width: 6},
+			{Key: "memory", Title: "Memory", Width: 8},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      ecsTaskStatuses,
@@ -558,6 +568,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:      "Lambda Functions",
 		ShortName: "lambda",
+		RowTypes:  []reflect.Type{reflect.TypeFor[lambdatypes.FunctionConfiguration]()},
 		// Concurrency is a GetFunction field and lands on FunctionEnriched
 		// when the detail opens.
 		ComputedDetailPaths: []string{"Concurrency"},
@@ -570,13 +581,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "lambda/home?region="+region+"#/functions/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "function_name", Title: "Function Name", Path: "FunctionName", Width: 36},
-			{Key: "runtime", Title: "Runtime", Path: "Runtime", Width: 16},
-			{Key: "memory", Title: "Memory", Path: "MemorySize", Width: 8},
-			{Key: "timeout", Title: "Timeout", Path: "Timeout", Width: 8},
-			{Key: "state", Title: "Status", Path: "State", Width: 10},
-			{Key: "handler", Title: "Handler", Path: "Handler", Width: 30},
-			{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22},
+			{Key: "function_name", Title: "Function Name", Width: 36},
+			{Key: "runtime", Title: "Runtime", Width: 16},
+			{Key: "memory", Title: "Memory", Width: 8},
+			{Key: "timeout", Title: "Timeout", Width: 8},
+			{Key: "state", Title: "Status", Width: 10},
+			{Key: "handler", Title: "Handler", Width: 30},
+			{Key: "last_modified", Title: "Last Modified", Width: 22},
 		},
 		Children: []domain.ChildViewDef{
 			{
@@ -658,6 +669,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "Auto Scaling Groups",
 		ShortName:      "asg",
+		RowTypes:       []reflect.Type{reflect.TypeFor[asgtypes.AutoScalingGroup]()},
 		RefToID:        asgRefToID,
 		HumanizeFields: []string{"HealthCheckType"},
 		Aliases:        []string{"asg", "autoscaling", "auto-scaling"},
@@ -668,12 +680,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#AutoScalingGroupDetails:id="+url.PathEscape(r.ID)+";view=details")
 		},
 		Columns: []domain.Column{
-			{Key: "asg_name", Title: "ASG Name", Path: "AutoScalingGroupName", Width: 36},
-			{Key: "min_size", Title: "Min", Path: "MinSize", Width: 6},
-			{Key: "max_size", Title: "Max", Path: "MaxSize", Width: 6},
-			{Key: "desired", Title: "Desired", Path: "DesiredCapacity", Width: 8},
-			{Key: "instances", Title: "Instances", Path: "Instances", Width: 10},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12},
+			{Key: "asg_name", Title: "ASG Name", Width: 36},
+			{Key: "min_size", Title: "Min", Width: 6},
+			{Key: "max_size", Title: "Max", Width: 6},
+			{Key: "desired", Title: "Desired", Width: 8},
+			{Key: "instances", Title: "Instances", Width: 10},
+			{Key: "status", Title: "Status", Width: 12},
 		},
 		Children: []domain.ChildViewDef{
 			{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
@@ -727,6 +739,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:          "EBS Volumes",
 		ShortName:     "ebs",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.Volume]()},
 		RefToID:       ebsRefToID,
 		Aliases:       []string{"ebs", "volumes", "ebs-vol"},
 		Category:      "COMPUTE",
@@ -736,17 +749,17 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "volume_id", Title: "Volume ID", Path: "VolumeId", Width: 22},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
-			{Key: "size", Title: "Size (GiB)", Path: "Size", Width: 10},
-			{Key: "type", Title: "Type", Path: "VolumeType", Width: 8},
-			{Key: "iops", Title: "IOPS", Path: "Iops", Width: 8},
-			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10},
+			{Key: "volume_id", Title: "Volume ID", Width: 22},
+			{Key: "state", Title: "Status", Width: 12},
+			{Key: "size", Title: "Size (GiB)", Width: 10},
+			{Key: "type", Title: "Type", Width: 8},
+			{Key: "iops", Title: "IOPS", Width: 8},
+			{Key: "encrypted", Title: "Encrypted", Width: 10},
 			// Wide enough for the two instance ids a Multi-Attach volume
 			// commonly carries; the related panel counts them all.
-			{Key: "attached_to", Title: "Attached To", Path: "Attachments", Width: 40},
-			{Key: "az", Title: "AZ", Path: "AvailabilityZone", Width: 16},
-			{Key: "created", Title: "Created", Path: "CreateTime", Width: 18},
+			{Key: "attached_to", Title: "Attached To", Width: 40},
+			{Key: "az", Title: "AZ", Width: 16},
+			{Key: "created", Title: "Created", Width: 18},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ec2types.VolumeState](),
@@ -787,6 +800,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:          "EBS Snapshots",
 		ShortName:     "ebs-snap",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.Snapshot]()},
 		Aliases:       []string{"ebs-snap", "snapshots", "snap"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
@@ -795,14 +809,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "snapshot_id", Title: "Snapshot ID", Path: "SnapshotId", Width: 24},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
-			{Key: "volume_id", Title: "Volume ID", Path: "VolumeId", Width: 22},
-			{Key: "size", Title: "Size (GiB)", Path: "VolumeSize", Width: 10},
-			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
-			{Key: "started", Title: "Started", Path: "StartTime", Width: 18},
-			{Key: "progress", Title: "Progress", Path: "Progress", Width: 10},
+			{Key: "snapshot_id", Title: "Snapshot ID", Width: 24},
+			{Key: "state", Title: "Status", Width: 12},
+			{Key: "volume_id", Title: "Volume ID", Width: 22},
+			{Key: "size", Title: "Size (GiB)", Width: 10},
+			{Key: "encrypted", Title: "Encrypted", Width: 10},
+			{Key: "description", Title: "Description", Width: 30},
+			{Key: "started", Title: "Started", Width: 18},
+			{Key: "progress", Title: "Progress", Width: 10},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ec2types.SnapshotState](),
@@ -843,6 +857,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:          "AMIs",
 		ShortName:     "ami",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.Image]()},
 		Aliases:       []string{"ami", "amis", "images"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
@@ -851,15 +866,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#ImageDetails:imageId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 32},
-			{Key: "image_id", Title: "Image ID", Path: "ImageId", Width: 22},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "name", Title: "Name", Width: 32},
+			{Key: "image_id", Title: "Image ID", Width: 22},
+			{Key: "state", Title: "Status", Width: 12},
 			{Key: "deprecated", Title: "Deprecated", Width: 22},
-			{Key: "architecture", Title: "Arch", Path: "Architecture", Width: 10},
-			{Key: "platform", Title: "Platform", Path: "PlatformDetails", Width: 16},
-			{Key: "root_device_type", Title: "Root Device", Path: "RootDeviceType", Width: 14},
-			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22},
-			{Key: "public", Title: "Public", Path: "Public", Width: 8},
+			{Key: "architecture", Title: "Arch", Width: 10},
+			{Key: "platform", Title: "Platform", Width: 16},
+			{Key: "root_device_type", Title: "Root Device", Width: 14},
+			{Key: "creation_date", Title: "Created", Width: 22},
+			{Key: "public", Title: "Public", Width: 8},
 		},
 		StubCreator: func(id string) domain.Resource {
 			return domain.Resource{
@@ -908,8 +923,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "Launch Templates",
-		ShortName:     "lt",
+		Name:      "Launch Templates",
+		ShortName: "lt",
+		RowTypes:  []reflect.Type{reflect.TypeFor[*LTRaw]()},
+		ReplayKeys: map[string]string{
+			"Template.LaunchTemplateName": "name", "Template.DefaultVersionNumber": "default_version",
+			"Template.LatestVersionNumber": "latest_version", "Template.CreatedBy": "created_by", "Template.CreateTime": "created",
+		},
 		Aliases:       []string{"lt", "launch-template", "launchtemplate", "launch-templates", "lts"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
@@ -960,6 +980,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 	{
 		Name:         "Lambda Invocations",
 		ShortName:    "lambda_invocations",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cwlogstypes.FilteredLogEvent]()},
 		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
@@ -990,6 +1011,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 	{
 		Name:         "Lambda Invocation Logs",
 		ShortName:    "lambda_invocation_logs",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cwlogstypes.FilteredLogEvent]()},
 		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
@@ -1008,6 +1030,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 	{
 		Name:         "Scaling Activities",
 		ShortName:    "asg_activities",
+		RowTypes:     []reflect.Type{reflect.TypeFor[asgtypes.Activity]()},
 		LifecycleKey: "status_code",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			name := r.Fields["asg_name"]

@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -19,9 +21,11 @@ type PolicyEnriched struct {
 	Document any `json:"Document,omitempty" yaml:"Document,omitempty"`
 }
 
-// enrichPolicy fetches the policy document for a top-level IAM policy.
-// All top-level policies are managed (Scope=Local), so only the managed
-// document path is needed. Session-cached via PolicyDocs.
+// enrichPolicy reads the policy through GetPolicy, which returns the members
+// ListPolicies leaves out (the policy catalog entry's ListOmits), and attaches
+// its default version's document. All top-level policies are managed
+// (Scope=Local), so only the managed document path is needed. The document is
+// session-cached via PolicyDocs.
 func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 	return enrichDetail(ctx, clients, res, detailEnrichSpec[iamtypes.Policy, any]{
 		unwrap: unwrapEnriched(func(w PolicyEnriched) iamtypes.Policy { return w.Policy }),
@@ -31,17 +35,28 @@ func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (reso
 			}
 			return *policy.Arn, nil
 		},
-		cache: policyDocsCache,
+		answer: func(ctx context.Context, c *ServiceClients, id string) (*iamtypes.Policy, error) {
+			api, ok := c.IAM.(IAMGetPolicyAPI)
+			if !ok {
+				return nil, fmt.Errorf("IAM client does not support GetPolicy")
+			}
+			out, err := api.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: aws.String(id)})
+			if err != nil {
+				return nil, fmt.Errorf("GetPolicy: %w", err)
+			}
+			return out.Policy, nil
+		},
+		listType: "policy",
+		cache:    policyDocsCache,
 		cacheKey: func(id string, _ iamtypes.Policy, _ resource.Resource) string {
 			return ManagedKey(id)
 		},
-		fetch: func(ctx context.Context, c *ServiceClients, id string, _ iamtypes.Policy, _ resource.Resource) (any, error) {
-			getPolicyAPI, ok1 := c.IAM.(IAMGetPolicyAPI)
-			getPolicyVersionAPI, ok2 := c.IAM.(IAMGetPolicyVersionAPI)
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("IAM client does not support GetPolicy/GetPolicyVersion")
+		fetch: func(ctx context.Context, c *ServiceClients, id string, policy iamtypes.Policy, _ resource.Resource) (any, error) {
+			api, ok := c.IAM.(IAMGetPolicyVersionAPI)
+			if !ok {
+				return nil, fmt.Errorf("IAM client does not support GetPolicyVersion")
 			}
-			return FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, id)
+			return fetchPolicyVersionDocument(ctx, api, id, policy.DefaultVersionId)
 		},
 		wrap: func(policy iamtypes.Policy, doc any) any {
 			return PolicyEnriched{Policy: policy, Document: doc}

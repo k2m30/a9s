@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Port: a9b36f353907abf5
-  Protocol: 307b206951ae1f38
+  Port: 9117b15e2799a6ac
+  Protocol: a8dab65fb35df868
   Action: 6f7ca90ed73590ac
   Target: 3a81b14843c364c9
-  SSL Policy: d2e667dd5eebd811
+  SSL Policy: 3fc7f94db3f923e9
   Certificate: 8a4f75dcc5682c24
 detail_hashes:
   ListenerArn: ff28018a3cbc3bd3
@@ -17,11 +17,9 @@ detail_hashes:
   MutualAuthentication: bb815dcfdecdc5dc
 list:
   Port:
-    path: Port
     key: port
     width: 8
   Protocol:
-    path: Protocol
     key: protocol
     width: 10
   Action:
@@ -31,7 +29,6 @@ list:
     key: default_action_target
     width: 32
   SSL Policy:
-    path: SslPolicy
     key: ssl_policy
     width: 24
   Certificate:

@@ -200,6 +200,42 @@ var sharedCodePipelineFixtures = shared(func() *CodePipelineFixtures {
 		States: map[string][]cptypes.StageState{
 			"acme-frontend-deploy": {
 				{
+					StageName: aws.String("Source"),
+					LatestExecution: &cptypes.StageExecution{
+						Status: cptypes.StageExecutionStatusSucceeded,
+					},
+					ActionStates: []cptypes.ActionState{
+						{
+							ActionName: aws.String("FetchSource"),
+							CurrentRevision: &cptypes.ActionRevision{
+								RevisionId:       aws.String("4f2a9c1d7e3b5a6f8c0d2e4f6a8b0c1d3e5f7a9b"),
+								RevisionChangeId: aws.String("4f2a9c1d7e3b5a6f8c0d2e4f6a8b0c1d3e5f7a9b"),
+								Created:          aws.Time(time.Date(2026, 3, 22, 9, 58, 0, 0, time.UTC)),
+							},
+							LatestExecution: &cptypes.ActionExecution{
+								Status:           cptypes.ActionExecutionStatusSucceeded,
+								LastStatusChange: aws.Time(time.Date(2026, 3, 22, 10, 0, 0, 0, time.UTC)),
+							},
+						},
+					},
+				},
+				{
+					StageName: aws.String("Approve"),
+					LatestExecution: &cptypes.StageExecution{
+						Status: cptypes.StageExecutionStatusSucceeded,
+					},
+					ActionStates: []cptypes.ActionState{
+						{
+							ActionName: aws.String("ReleaseApproval"),
+							LatestExecution: &cptypes.ActionExecution{
+								Status:           cptypes.ActionExecutionStatusSucceeded,
+								LastStatusChange: aws.Time(time.Date(2026, 3, 22, 10, 20, 0, 0, time.UTC)),
+								Token:            aws.String("3b0e6f4a-2c8d-4e1f-9a7b-5c6d7e8f9a0b"),
+							},
+						},
+					},
+				},
+				{
 					StageName: aws.String("Deploy"),
 					LatestExecution: &cptypes.StageExecution{
 						Status: cptypes.StageExecutionStatusFailed,
@@ -208,8 +244,11 @@ var sharedCodePipelineFixtures = shared(func() *CodePipelineFixtures {
 						{
 							ActionName: aws.String("DeployToS3"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status: cptypes.ActionExecutionStatusFailed,
+								Status:               cptypes.ActionExecutionStatusFailed,
+								LastStatusChange:     aws.Time(time.Date(2026, 3, 22, 10, 22, 0, 0, time.UTC)),
+								ExternalExecutionUrl: aws.String("https://s3.console.aws.amazon.com/s3/buckets/acme-frontend-prod"),
 								ErrorDetails: &cptypes.ErrorDetails{
+									Code:    aws.String("JobFailed"),
 									Message: aws.String("Access Denied: insufficient permissions to write to target bucket"),
 								},
 							},

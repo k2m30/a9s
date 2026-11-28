@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Cluster Name: a1ff5437a3fc6b46
-  Version: afe447c4e3a20b90
-  Status: 78d294393c20d2aa
-  Endpoint: c88357e86510aac5
-  Platform Version: d2e9cc223e337423
+  Cluster Name: d661c453392b7ed2
+  Version: 785a55379afbb79f
+  Status: 70337a7b5ad55e3f
+  Endpoint: 01b528d66e153482
+  Platform Version: bdd6015c3269d1df
 detail_hashes:
   Name: 1e4a1612672f42b2
   Version: 6342d6bffe05ee59
@@ -22,23 +22,18 @@ detail_hashes:
   "key:health_issues": 1e21b7533fcfec08
 list:
   Cluster Name:
-    path: Name
     key: cluster_name
     width: 28
   Version:
-    path: Version
     key: version
     width: 10
   Status:
-    path: Status
     key: status
     width: 14
   Endpoint:
-    path: Endpoint
     key: endpoint
     width: 48
   Platform Version:
-    path: PlatformVersion
     key: platform_version
     width: 18
 

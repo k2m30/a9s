@@ -312,40 +312,46 @@ func TestReplay_SavedRowLeavesOneAnswerForAColumnTitle(t *testing.T) {
 	}
 }
 
-// replayKeyedPathColumn reports a type's first non-status column that declares
-// both a Key and a Path — the shape where Fields already holds a value the SDK
-// struct cannot see (a Wave-2 override), so the save lane must not overwrite it
-// with the struct scalar.
-func replayKeyedPathColumn(td resource.ResourceTypeDef) (config.ListColumn, bool) {
-	lifecycleKey := td.LifecycleKey
-	if lifecycleKey == "" {
-		lifecycleKey = "state"
+// replayKeyedPathView is the type's default view as an operator's file that
+// gives its first non-status produced-key column a path as well, one that
+// resolves on the struct the type stores. A key the type produces is that
+// column's one source, so the path beside it must not reach Fields either.
+func replayKeyedPathView(td resource.ResourceTypeDef) (config.ViewDef, config.ListColumn, bool) {
+	path := ""
+	for _, d := range config.DefaultViewDef(td.ShortName).Detail {
+		if d.Path != "" && td.CellPath(d.Path) {
+			path = d.Path
+			break
+		}
 	}
-	for _, col := range resource.ResolveListColumnCascade(nil, td.ShortName, &td) {
-		if col.Key == "" || col.Path == "" {
+	if path == "" {
+		return config.ViewDef{}, config.ListColumn{}, false
+	}
+	cols := resource.ResolveListColumnCascade(nil, td.ShortName, &td)
+	for i, col := range cols {
+		if !td.Produces(col.Key) || col.Key == "status" || col.Key == td.StatusKey() {
 			continue
 		}
-		if col.Key == "status" || col.Key == lifecycleKey {
-			continue
-		}
-		return col, true
+		cols[i].Path = path
+		return config.ViewDef{List: cols}, cols[i], true
 	}
-	return config.ListColumn{}, false
+	return config.ViewDef{}, config.ListColumn{}, false
 }
 
 // TestReplay_KeyedColumnValueSurvivesTheSave pins the boundary of the save
 // lane's write. A keyed column's Fields entry can hold a value no SDK struct
 // carries — a Wave-2 enrichment result is the everyday case — and the live
-// frame renders that value, not the struct's. If the save lane overwrites a
-// populated key with the struct scalar on its way to disk, the restart drops
-// the enrichment and shows the raw field instead.
+// frame renders that value, not the struct's, even when the operator's view
+// gives the column a path too. If the save lane overwrites a populated key
+// with the struct scalar on its way to disk, the restart drops the enrichment
+// and shows the raw field instead.
 func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 	clients := demo.NewServiceClients()
 	const override = "overridden-by-wave-2"
 
 	covered := 0
 	for _, td := range resource.AllResourceTypes() {
-		col, ok := replayKeyedPathColumn(td)
+		view, col, ok := replayKeyedPathView(td)
 		if !ok {
 			continue
 		}
@@ -363,6 +369,7 @@ func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 
 			profile, region := "replay-keyed-"+td.ShortName, "us-east-1"
 			ctrl := newTestControllerForProfile(t, profile, region)
+			ctrl.SetViewConfig(&config.ViewsConfig{Views: map[string]config.ViewDef{td.ShortName: view}})
 			ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 			ctrl.ApplyResourcesLoaded(td.ShortName, rows, nil, false)
 
@@ -386,7 +393,7 @@ func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 		})
 	}
 	if covered == 0 {
-		t.Fatal("no registered type resolves a non-status column with both a Key and a Path; the save lane's overwrite boundary is untested")
+		t.Fatal("no registered type has a non-status produced-key column and a detail path on its stored struct; the save lane's overwrite boundary is untested")
 	}
 }
 

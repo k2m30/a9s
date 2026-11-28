@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Repository: 235d96df2e362c57
+  Repository: 6d8675f5b8e3b007
   Status: 516e63265dd02620
-  Domain: 56308e05a80047b1
+  Domain: 495db8f1ffa3d15a
   Packages: 9f199fba021faeb7
-  Description: db8526853ab7a372
-  Owner: 60cadc6844bb541e
+  Description: b9919eabf9baef1f
+  Owner: e9f9f3571cd3fc42
 detail_hashes:
   Name: 1e4a1612672f42b2
   DomainName: dce31d3d792a5d93
@@ -16,25 +16,21 @@ detail_hashes:
   CreatedTime: ff6a8050019eb8c5
 list:
   Repository:
-    path: Name
     key: repo_name
     width: 28
   Status:
     key: state
     width: 12
   Domain:
-    path: DomainName
     key: domain_name
     width: 24
   Packages:
     key: package_count
     width: 8
   Description:
-    path: Description
     key: description
     width: 30
   Owner:
-    path: DomainOwner
     key: domain_owner
     width: 14
 

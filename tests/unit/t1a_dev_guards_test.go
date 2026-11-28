@@ -18,7 +18,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
-	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -235,24 +234,21 @@ func TestT1aDevGuard_NoFindingPhraseStoredInTheLifecycleField(t *testing.T) {
 }
 
 // G4: a type whose AWS answer carries a lifecycle value declares a state
-// table. The catalog says which types: a status column that reads the struct,
-// or a lifecycle field that holds a value of an SDK enum field of the struct.
+// table. The demo rows say which types: the lifecycle key holds the value of
+// a status or state field of the struct the type stores.
 func TestT1aDevGuard_EveryTypeWithAnAWSLifecycleDeclaresATable(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	inScope := 0
 	for _, td := range catalog.All() {
 		reason := ""
-		for _, c := range td.Columns {
-			if config.IsStatusColumn(c.Key, td.StatusKey()) && c.Path != "" {
-				reason = "its status column reads " + c.Path
+		for _, r := range byType[td.ShortName] {
+			v := r.Fields[td.StatusKey()]
+			if v == "" {
+				continue
 			}
-		}
-		if reason == "" {
-			for _, r := range byType[td.ShortName] {
-				if s, _, ok := t1aDevFindState(reflect.ValueOf(r.RawStruct), r.Fields[td.StatusKey()], 0); ok && r.Fields[td.StatusKey()] != "" && s.enum {
-					reason = "Fields[" + td.StatusKey() + "] holds the SDK enum " + s.key()
-					break
-				}
+			if s, _, ok := t1aDevFindState(reflect.ValueOf(r.RawStruct), v, 0); ok {
+				reason = "Fields[" + td.StatusKey() + "] holds " + s.key()
+				break
 			}
 		}
 		if reason == "" {

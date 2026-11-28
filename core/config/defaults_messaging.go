@@ -85,7 +85,6 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Path: "ExecutionArn"}, {Path: "Name"}, {Path: "Status"},
 				{Path: "StartDate"}, {Path: "StopDate"},
 				{Path: "StateMachineArn"}, {Path: "StateMachineAliasArn"}, {Path: "StateMachineVersionArn"},
-				{Path: "MapRunArn"}, {Path: "ItemCount"},
 				{Path: "RedriveCount"}, {Path: "RedriveDate"},
 			},
 		},

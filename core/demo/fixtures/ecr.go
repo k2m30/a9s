@@ -247,12 +247,15 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 			// carries the warning tier of the vulnerability signal rather
 			// than the broken one acme/api-service carries.
 			{
-				ImageTags:        []string{"v1.4.0", "latest"},
-				ImageDigest:      aws.String("sha256:5c1f0a9b7e2d"),
-				ImageSizeInBytes: aws.Int64(61_000_000),
-				ImagePushedAt:    aws.Time(mustParseECRTime("2026-03-19T11:00:00+00:00")),
-				RegistryId:       aws.String("123456789012"),
-				RepositoryName:   aws.String(ECRHighVulnerabilities),
+				ImageTags:              []string{"v1.4.0", "latest"},
+				ImageDigest:            aws.String("sha256:5c1f0a9b7e2d"),
+				ImageSizeInBytes:       aws.Int64(61_000_000),
+				ImagePushedAt:          aws.Time(mustParseECRTime("2026-03-19T11:00:00+00:00")),
+				RegistryId:             aws.String("123456789012"),
+				ImageManifestMediaType: aws.String("application/vnd.docker.distribution.manifest.v2+json"),
+				ArtifactMediaType:      aws.String("application/vnd.docker.container.image.v1+json"),
+				LastRecordedPullTime:   aws.Time(mustParseECRTime("2026-03-23T08:00:00+00:00")),
+				RepositoryName:         aws.String(ECRHighVulnerabilities),
 				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
 					FindingSeverityCounts: map[string]int32{
 						string(ecrtypes.FindingSeverityHigh): 3,
@@ -264,12 +267,15 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 			// Issue: CRITICAL vulnerability findings on the latest image —
 			// required for EnrichECRRepository's Wave-2 "!" issue check.
 			{
-				ImageTags:        []string{"v2.5.1", "latest"},
-				ImageDigest:      aws.String("sha256:abc123def456"),
-				ImageSizeInBytes: aws.Int64(85_000_000),
-				ImagePushedAt:    aws.Time(mustParseECRTime("2026-03-22T03:20:00+00:00")),
-				RegistryId:       aws.String("123456789012"),
-				RepositoryName:   aws.String("acme/api-service"),
+				ImageTags:              []string{"v2.5.1", "latest"},
+				ImageDigest:            aws.String("sha256:abc123def456"),
+				ImageSizeInBytes:       aws.Int64(85_000_000),
+				ImagePushedAt:          aws.Time(mustParseECRTime("2026-03-22T03:20:00+00:00")),
+				RegistryId:             aws.String("123456789012"),
+				ImageManifestMediaType: aws.String("application/vnd.docker.distribution.manifest.v2+json"),
+				ArtifactMediaType:      aws.String("application/vnd.docker.container.image.v1+json"),
+				LastRecordedPullTime:   aws.Time(mustParseECRTime("2026-03-23T08:00:00+00:00")),
+				RepositoryName:         aws.String("acme/api-service"),
 				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
 					FindingSeverityCounts: map[string]int32{
 						string(ecrtypes.FindingSeverityCritical): 2,
@@ -278,12 +284,15 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 				},
 			},
 			{
-				ImageTags:        []string{"v2.5.0"},
-				ImageDigest:      aws.String("sha256:def789abc012"),
-				ImageSizeInBytes: aws.Int64(84_500_000),
-				ImagePushedAt:    aws.Time(mustParseECRTime("2026-03-15T10:00:00+00:00")),
-				RegistryId:       aws.String("123456789012"),
-				RepositoryName:   aws.String("acme/api-service"),
+				ImageTags:              []string{"v2.5.0"},
+				ImageDigest:            aws.String("sha256:def789abc012"),
+				ImageSizeInBytes:       aws.Int64(84_500_000),
+				ImagePushedAt:          aws.Time(mustParseECRTime("2026-03-15T10:00:00+00:00")),
+				RegistryId:             aws.String("123456789012"),
+				ImageManifestMediaType: aws.String("application/vnd.docker.distribution.manifest.v2+json"),
+				ArtifactMediaType:      aws.String("application/vnd.docker.container.image.v1+json"),
+				LastRecordedPullTime:   aws.Time(mustParseECRTime("2026-03-23T08:00:00+00:00")),
+				RepositoryName:         aws.String("acme/api-service"),
 			},
 		},
 	}

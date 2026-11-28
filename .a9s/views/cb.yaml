@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Project Name: ccf624bd5d10b167
-  Source Type: 11e2d04b238611e6
+  Project Name: 0a591d8bbe5347bc
+  Source Type: 8c1224a38881097e
   Status: 63fae56aeb98e723
-  Description: 0022b6f6290d9419
-  Last Modified: 4f3fe753e3fcb2cb
+  Description: 1786bb31adf580e1
+  Last Modified: f8051c8ba1a2c983
 detail_hashes:
   Name: 1e4a1612672f42b2
   Description: 170fb1f14fe6d129
@@ -22,22 +22,18 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Project Name:
-    path: Name
     key: name
     width: 32
   Source Type:
-    path: Source.Type
     key: source_type
     width: 14
   Status:
     key: last_build
     width: 18
   Description:
-    path: Description
     key: description
     width: 36
   Last Modified:
-    path: LastModified
     key: last_modified
     width: 22
 

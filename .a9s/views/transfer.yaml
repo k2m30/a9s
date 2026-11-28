@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Server Id: c0793d3d91ab28d7
+  Server Id: 2d08d09a9429bc78
   Status: 567ed47cf133ae50
-  Domain: f8f6188e74874b1d
-  Endpoint: 6450038f4c96f5b8
-  Identity Provider: a0feb347352f02d4
-  Users: 0ee3cbf73c99d49b
+  Domain: a9d3825b26c9b1de
+  Endpoint: 9993d1399d5feac1
+  Identity Provider: 3c1cbf704ecb3005
+  Users: c63d3accc41a4e31
 detail_hashes:
   ServerId: f684b484bcd5527b
   Arn: fb866fb55912dfcd
@@ -24,26 +24,21 @@ detail_hashes:
   As2ServiceManagedEgressIpAddresses: ae362dc19c8af381
 list:
   Server Id:
-    path: ServerId
     key: server_id
     width: 32
   Status:
     key: status
     width: 32
   Domain:
-    path: Domain
     key: domain
     width: 10
   Endpoint:
-    path: EndpointType
     key: endpoint_type
     width: 14
   Identity Provider:
-    path: IdentityProviderType
     key: identity_provider_type
     width: 20
   Users:
-    path: UserCount
     key: user_count
     width: 8
 

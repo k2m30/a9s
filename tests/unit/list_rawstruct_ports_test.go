@@ -74,111 +74,6 @@ func openListControllerWithConfig(t *testing.T, shortName string, cfg *config.Vi
 	return c
 }
 
-func TestListRawStruct_AllTypes(t *testing.T) {
-	tests := []struct {
-		shortName   string
-		rawStruct   any
-		expectInRow []string
-	}{
-		{"ec2", realisticEC2Instance(), []string{"i-0abcdef1234567890", "running", "t3.medium"}},
-		{"dbi", realisticRDSInstance(), []string{"prod-db-01", "mysql", "db.r5.large"}},
-		{"redis", realisticRedisReplicationGroup(), []string{"redis-prod-001", "cache.r6g.large"}},
-		{"dbc", realisticDocDBCluster(), []string{"docdb-prod-cluster", "5.0.0"}},
-		{"eks", realisticEKSCluster(), []string{"prod-cluster", "1.28"}},
-		{"secrets", realisticSecretListEntry(), []string{"prod/database/password", "Production database password"}},
-		{"s3", realisticS3Bucket(), []string{"my-production-bucket", "2025-06-15"}},
-		{"lambda", realisticLambdaFunction(), []string{"my-api-handler", "python3.12"}},
-		{"alarm", realisticAlarm(), []string{"HighCPUAlarm", "alarm", "CPUUtilization"}},
-		{"sns", realisticSNSTopic(), []string{"arn:aws:sns:us-east-1:123456789012:my-notifications"}},
-		{"elb", realisticELB(), []string{"my-app-alb", "application", "internet-faci"}},
-		{"tg", realisticTargetGroup(), []string{"my-app-tg", "8080", "http", "/health"}},
-		{"ecs", realisticECSClusterStruct(), []string{"prod-cluster", "active"}},
-		{"ecs-svc", realisticECSService(), []string{"api-service", "active", "fargate"}},
-		{"ecs-task", realisticECSTask(), []string{"running", "256", "512"}},
-		{"cfn", realisticCFNStack(), []string{"my-app-stack", "create complete"}},
-		{"role", realisticIAMRole(), []string{"lambda-exec-role", "/"}},
-		{"logs", realisticLogGroup(), []string{"/aws/lambda/my-api-handler"}},
-		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "string"}},
-		{"ddb", realisticDDBTable(), []string{"users-table"}},
-		{"acm", realisticACMCertificate(), []string{"example.com", "issued", "amazon issued"}},
-		{"asg", realisticASG(), []string{"my-app-asg"}},
-		{"vpc", realisticVPC(), []string{"vpc-0abc1234def56789a", "10.0.0.0/16", "available"}},
-		{"sg", realisticSecurityGroup(), []string{"sg-0abc1234def56789a", "web-sg", "vpc-0abc1234"}},
-		{"ng", realisticNodeGroup(), []string{"prod-ng-01", "prod-cluster", "active"}},
-		{"subnet", realisticSubnet(), []string{"subnet-0abc1234def56789a", "10.0.1.0/24", "us-east-1a"}},
-		{"nat", realisticNATGateway(), []string{"nat-0abc1234def56789a", "available"}},
-		{"igw", realisticInternetGateway(), []string{"igw-0abc1234def56789a"}},
-		{"eip", realisticEIP(), []string{"eipalloc-0abc1234def56789a", "54.123.45.67"}},
-		{"tgw", realisticTransitGateway(), []string{"tgw-0abc1234def56789a", "available"}},
-		{"vpce", realisticVPCEndpoint(), []string{"vpce-0abc1234def56789a", "com.amazonaws.us-east-1.s3"}},
-		{"eni", realisticENI(), []string{"eni-0abc1234def56789a", "in-use", "10.0.1.42"}},
-		{"dbi-snap", realisticDBISnapshot(), []string{"dbi-snap-prod-20250615", "prod-db-01"}},
-		{"dbc-snap", realisticDBCSnapshot(), []string{"dbc-snap-prod-20250615", "docdb-prod-cluster"}},
-		{"sns-sub", realisticSNSSubscription(), []string{"email", "user@example.com"}},
-		{"iam-user", realisticIAMUser(), []string{"deploy-user", "AIDAEXAMPLEUSERID"}},
-		{"iam-group", realisticIAMGroup(), []string{"developers", "AGPAEXAMPLEGROUPID"}},
-		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "deployed"}},
-		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
-		// apigw's API ID, Protocol and Endpoint columns read mapped fields, not
-		// RawStruct paths: the list merges the REST (v1) and HTTP (v2) lanes, whose
-		// SDK structs share no field names, and only the mapped keys answer for both.
-		// Name and Description still resolve through a RawStruct path.
-		{"apigw", realisticAPIGW(), []string{"prod-api", "Production REST API"}},
-		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
-		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
-		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "enabled"}},
-		{"sfn", realisticSFN(), []string{"order-processing", "standard"}},
-		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "v2"}},
-		{"kinesis", realisticKinesis(), []string{"events-stream", "active"}},
-		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
-		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
-		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "ready"}},
-		// Six cells above name a value in readable form rather than the SDK
-		// constant — tg's protocol, ecs-svc's launch type, ssm's and sfn's type,
-		// pipeline's type, msk's cluster type — because each field is declared in
-		// ResourceTypeDef.HumanizeFields. Those words reach the screen only because
-		// the column read the field off RawStruct.
-		//
-		// ses's Identity column takes a RawStruct path (.a9s/views/ses.yaml: path:
-		// IdentityName); its Type column reads the mapped identity_type field.
-		{"ses", realisticSESIdentity(), []string{"example.com"}},
-		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
-		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
-		{"athena", realisticAthena(), []string{"analytics-wg", "enabled"}},
-		{"codeartifact", realisticCodeArtifact(), []string{"shared-libs", "my-domain"}},
-		{"cb", realisticCodeBuild(), []string{"build-project", "codecommit"}},
-		{"opensearch", realisticOpenSearch(), []string{"search-prod", "OpenSearch_2.11"}},
-		{"kms", realisticKMS(), []string{"12345678-1234-1234-1234-123456789012", "enabled"}},
-		{"msk", realisticMSK(), []string{"events-kafka", "provisioned", "active"}},
-		{"backup", realisticBackup(), []string{"daily-backup-plan", "abc12345-1234-1234-1234-123456789012"}},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.shortName, func(t *testing.T) {
-			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
-			res := resource.Resource{ID: "test-id", Name: "test-name", RawStruct: tc.rawStruct}
-			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
-			// The Status cell of a type with a state table comes from findings
-			// alone, and this row carries none, so its lifecycle value is not
-			// on screen.
-			lifecycle := map[string]bool{}
-			if td := resource.FindResourceType(tc.shortName); td != nil {
-				for _, s := range td.StateEnum {
-					lifecycle[domain.HumanizeStatusPhrase(s)] = true
-				}
-			}
-			for _, expected := range tc.expectInRow {
-				if lifecycle[expected] {
-					continue
-				}
-				if !strings.Contains(joined, expected) {
-					t.Errorf("%s row cells should contain %q from RawStruct, got: %q", tc.shortName, expected, joined)
-				}
-			}
-		})
-	}
-}
-
 // The view owns which columns exist and their order; the catalog owns what
 // each cell reads. For a title both declare, the cell reads the catalog's
 // Fields key (ExtractCellValue's precedence), so a warm-cache row renders
@@ -406,7 +301,10 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			Endpoint:             &rdstypes.Endpoint{Address: new("prod-rds-test.cluster-xyz.us-west-2.rds.amazonaws.com")},
 		}
 		c := openListControllerWithConfig(t, "dbi", cfg)
-		res := resource.Resource{ID: "prod-rds-test", Name: "prod-rds-test", RawStruct: db}
+		res := resource.Resource{ID: "prod-rds-test", Name: "prod-rds-test", Fields: map[string]string{
+			"db_identifier": "prod-rds-test",
+			"endpoint":      "prod-rds-test.cluster-xyz.us-west-2.rds.amazonaws.com",
+		}, RawStruct: db}
 		joined := wave3RowCellsJoined(t, c, "dbi", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-rds-test.cluster-xyz") {
 			t.Errorf("RDS with production config should show endpoint prefix, got: %q", joined)
@@ -422,7 +320,9 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			ConfigurationEndpoint: &elasticachetypes.Endpoint{Address: new("prod-redis-test.clustercfg.usw2.cache.amazonaws.com")},
 		}
 		c := openListControllerWithConfig(t, "redis", cfg)
-		res := resource.Resource{ID: "prod-redis-test", Name: "prod-redis-test", RawStruct: rg}
+		res := resource.Resource{ID: "prod-redis-test", Name: "prod-redis-test", Fields: map[string]string{
+			"endpoint": "prod-redis-test.clustercfg.usw2.cache.amazonaws.com",
+		}, RawStruct: rg}
 		joined := wave3RowCellsJoined(t, c, "redis", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-redis-test.clustercfg") {
 			t.Errorf("Redis with production config should show endpoint prefix, got: %q", joined)
@@ -437,7 +337,9 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			Endpoint:            new("prod-docdb-test.cluster-abc.us-west-2.docdb.amazonaws.com"),
 		}
 		c := openListControllerWithConfig(t, "dbc", cfg)
-		res := resource.Resource{ID: "prod-docdb-test", Name: "prod-docdb-test", RawStruct: cluster}
+		res := resource.Resource{ID: "prod-docdb-test", Name: "prod-docdb-test", Fields: map[string]string{
+			"endpoint": "prod-docdb-test.cluster-abc.us-west-2.docdb.amazonaws.com",
+		}, RawStruct: cluster}
 		joined := wave3RowCellsJoined(t, c, "dbc", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-docdb-test.cluster-abc") {
 			t.Errorf("DocDB with production config should show endpoint prefix, got: %q", joined)
@@ -453,7 +355,9 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			PlatformVersion: new("eks.9"),
 		}
 		c := openListControllerWithConfig(t, "eks", cfg)
-		res := resource.Resource{ID: "prod-eks-test", Name: "prod-eks-test", RawStruct: cluster}
+		res := resource.Resource{ID: "prod-eks-test", Name: "prod-eks-test", Fields: map[string]string{
+			"endpoint": "https://prod-eks-test.gr7.us-west-2.eks.amazonaws.com",
+		}, RawStruct: cluster}
 		joined := wave3RowCellsJoined(t, c, "eks", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-eks-test.gr7") {
 			t.Errorf("EKS with production config should show endpoint prefix, got: %q", joined)
@@ -463,20 +367,24 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	t.Run("Secrets", func(t *testing.T) {
 		secret := smtypes.SecretListEntry{Name: new("prod/test/secret"), Description: new("Production test secret")}
 		c := openListControllerWithConfig(t, "secrets", cfg)
-		res := resource.Resource{ID: "prod/test/secret", Name: "prod/test/secret", RawStruct: secret}
+		res := resource.Resource{ID: "prod/test/secret", Name: "prod/test/secret", Fields: map[string]string{
+			"secret_name": "prod/test/secret", "description": "Production test secret",
+		}, RawStruct: secret}
 		joined := wave3RowCellsJoined(t, c, "secrets", []resource.Resource{res})
 		if !strings.Contains(joined, "Production test secret") {
-			t.Errorf("Secrets with production config should show description from RawStruct, got: %q", joined)
+			t.Errorf("Secrets with production config should show Fields[description], got: %q", joined)
 		}
 	})
 
 	t.Run("S3", func(t *testing.T) {
 		bucket := s3types.Bucket{Name: new("prod-config-bucket"), CreationDate: new(testTime)}
 		c := openListControllerWithConfig(t, "s3", cfg)
-		res := resource.Resource{ID: "prod-config-bucket", Name: "prod-config-bucket", RawStruct: bucket}
+		res := resource.Resource{ID: "prod-config-bucket", Name: "prod-config-bucket", Fields: map[string]string{
+			"name": "prod-config-bucket", "creation_date": testTime.Format("2006-01-02 15:04"),
+		}, RawStruct: bucket}
 		joined := wave3RowCellsJoined(t, c, "s3", []resource.Resource{res})
 		if !strings.Contains(joined, "2025-06-15") {
-			t.Errorf("S3 with production config should show creation date from RawStruct, got: %q", joined)
+			t.Errorf("S3 with production config should show Fields[creation_date], got: %q", joined)
 		}
 	})
 }

@@ -497,8 +497,9 @@ func (c *Core) saveAvailabilityCache(
 
 // materializeListFieldsForSave resolves shortName's list column set (via
 // Core.saveColumns when the renderer registered one, else the built-in-
-// defaults-only cascade in resolveSaveColumns) and writes each Path-backed
-// column's RawStruct scalar into Fields per saveFieldKey: every renderable
+// defaults-only cascade in resolveSaveColumns) and writes the RawStruct
+// scalar of each column whose cell reads the struct into Fields per
+// saveFieldKey: every renderable
 // list column is cached, driven by the column CONFIG, no hardcode. Shared by both save lanes via SaveTypeRows
 // (one materializer for the list-open lane and the sweep lane).
 //
@@ -506,8 +507,9 @@ func (c *Core) saveAvailabilityCache(
 // app.MaterializeListFields: cache.Row never carries RawStruct, so a column
 // whose live cell came from the struct has to leave that exact value behind
 // under the key the replayed row reads, or the restart shows something the
-// screen never did. saveFieldKey holds the whole rule, including which
-// columns the save must NOT touch.
+// screen never did. ResourceTypeDef.ReadsPath says which columns read the
+// struct at all, as it does for the cell; saveFieldKey says under which key
+// and whether a value already there outranks the struct.
 //
 // A resource whose RawStruct is nil (e.g. a cache-replay round-trip) passes
 // through unchanged.
@@ -524,9 +526,10 @@ func (c *Core) materializeListFieldsForSave(shortName string, resources []resour
 	if len(columns) == 0 {
 		return resources
 	}
+	td := resource.FindResourceType(shortName)
 	out := make([]resource.Resource, len(resources))
 	for i, r := range resources {
-		out[i] = materializeResourceFields(r, columns)
+		out[i] = materializeResourceFields(r, columns, td)
 	}
 	return out
 }
@@ -542,17 +545,18 @@ func resolveSaveColumns(shortName string) []config.ListColumn {
 }
 
 // materializeResourceFields is the single-resource core of
-// materializeListFieldsForSave: for every Path-backed column it writes the
-// RawStruct scalar into Fields under the key saveFieldKey names, when
-// saveFieldKey says the save owes that column a value at all.
-func materializeResourceFields(r resource.Resource, columns []config.ListColumn) resource.Resource {
+// materializeListFieldsForSave: for every column whose cell reads the struct
+// (ResourceTypeDef.ReadsPath) it writes the RawStruct scalar into Fields
+// under the key saveFieldKey names, when saveFieldKey says the save owes
+// that column a value at all.
+func materializeResourceFields(r resource.Resource, columns []config.ListColumn, td *resource.ResourceTypeDef) resource.Resource {
 	if r.RawStruct == nil {
 		return r
 	}
 	out := r
 	copied := false
 	for _, col := range columns {
-		if col.Path == "" {
+		if !td.ReadsPath(col.Key, col.Path) {
 			continue
 		}
 		key, owed := saveFieldKey(col, out.Fields)

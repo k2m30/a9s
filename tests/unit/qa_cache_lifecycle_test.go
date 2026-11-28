@@ -38,6 +38,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
@@ -77,15 +80,6 @@ func bootSeedFromDisk(ctrl *app.Controller, profile, region string) app.ViewStat
 	return vs
 }
 
-// s3RawFixture is a minimal AWS-SDK-shaped struct satisfying s3's real
-// default column Paths (Name, BucketRegion, CreationDate) via
-// fieldpath.ExtractScalar's case-insensitive field-name fallback.
-type s3RawFixture struct {
-	Name         string
-	BucketRegion string
-	CreationDate string
-}
-
 // setNoopS3Fetcher installs a paginated fetcher for "s3" that the tests never
 // invoke (every fetch result is delivered via deliverVerifyFetch): it keeps
 // GetPaginatedFetcher("s3") non-nil, as for any registered type, and
@@ -107,21 +101,24 @@ func registerNoopS3Fetcher(t *testing.T) {
 	t.Cleanup(func() { resource.CleanupPaginatedForTest(lifecycleShortName) })
 }
 
-// newS3Resource builds one realistic s3 resource.Resource with a RawStruct
-// satisfying the real default s3 columns (Name/BucketRegion/CreationDate) plus
-// a Fields["status"] and optional findings.
+// newS3Resource is the row the s3 fetcher builds from a ListBuckets entry:
+// the keys it writes in Fields and the Bucket it stores, whose BucketRegion
+// is what the Region column reads.
 func newS3Resource(id, region, status string, findings ...domain.Finding) resource.Resource {
+	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	return resource.Resource{
 		ID:   id,
 		Name: id,
 		Type: lifecycleShortName,
 		Fields: map[string]string{
-			"status": status,
+			"name":          id,
+			"creation_date": created.Format("2006-01-02 15:04"),
+			"status":        status,
 		},
-		RawStruct: s3RawFixture{
-			Name:         id,
-			BucketRegion: region,
-			CreationDate: "2024-01-01T00:00:00Z",
+		RawStruct: s3types.Bucket{
+			Name:         aws.String(id),
+			BucketRegion: aws.String(region),
+			CreationDate: aws.Time(created),
 		},
 		Findings: findings,
 	}
@@ -631,8 +628,8 @@ func TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged(t *testing.T) {
 	resource.CleanupPaginatedForTest(lifecycleShortName)
 
 	beforeTF := readTypeFile(t, profile, region)
-	if _, present := beforeTF.Rows[0].Fields["bucket_owner"]; present {
-		t.Fatal("fixture assumption broken — 'bucket_owner' must not be a field the OLD config ever materialized")
+	if _, present := beforeTF.Rows[0].Fields["bucket_arn"]; present {
+		t.Fatal("fixture assumption broken — 'bucket_arn' must not be a field the OLD config ever materialized")
 	}
 
 	viewsDir := filepath.Join(tmp, "views")
@@ -646,8 +643,8 @@ func TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged(t *testing.T) {
   Bucket Name:
     path: Name
     width: 36
-  Bucket Owner:
-    path: OwnerName
+  Bucket ARN:
+    path: BucketArn
     width: 24
 detail:
   - Name
@@ -691,7 +688,7 @@ detail:
 		t.Fatalf("ListBody.Rows = %d under the new config, want 1 (cached row still seeds)", len(lb.Rows))
 	}
 
-	wantTitles := []string{"Status", "Bucket Name", "Bucket Owner"}
+	wantTitles := []string{"Status", "Bucket Name", "Bucket ARN"}
 	if len(lb.Columns) != len(wantTitles) {
 		t.Fatalf("ListBody.Columns = %d, want %d: %+v", len(lb.Columns), len(wantTitles), lb.Columns)
 	}
@@ -711,30 +708,12 @@ detail:
 		t.Errorf("seeded row Cells = %d, want %d (one cell per new-config column)", len(lb.Rows[0].Cells), len(wantTitles))
 	}
 
-	// The seeded row has no "bucket_owner" key; the first live re-fetch carries
-	// OwnerName in a fresh RawStruct, so the new column fills in and persists.
-	freshWithOwner := []resource.Resource{
-		{
-			ID:   "bucket-s4-1",
-			Name: "bucket-s4-1",
-			Type: lifecycleShortName,
-			Fields: map[string]string{
-				"status": "active",
-			},
-			RawStruct: struct {
-				Name         string
-				BucketRegion string
-				CreationDate string
-				OwnerName    string
-			}{
-				Name:         "bucket-s4-1",
-				BucketRegion: region,
-				CreationDate: "2024-01-01T00:00:00Z",
-				OwnerName:    "team-platform",
-			},
-		},
-	}
-	vsLoaded := deliverVerifyFetch(ctrl2, freshWithOwner, false)
+	const bucketARN = "arn:aws:s3express:us-east-1:123456789012:bucket/bucket-s4-1"
+	freshWithARN := []resource.Resource{newS3Resource("bucket-s4-1", region, "active")}
+	bucket := freshWithARN[0].RawStruct.(s3types.Bucket)
+	bucket.BucketArn = aws.String(bucketARN)
+	freshWithARN[0].RawStruct = bucket
+	vsLoaded := deliverVerifyFetch(ctrl2, freshWithARN, false)
 	lbLoaded := vsLoaded.Body.List
 	if lbLoaded == nil {
 		t.Fatal("Body.List is nil after the verify fetch under the new config")
@@ -750,8 +729,8 @@ detail:
 		t.Fatalf("persisted TypeFile.Rows = %d after the verify+save, want 1", len(afterTF.Rows))
 	}
 	got := afterTF.Rows[0]
-	if v, present := got.Fields["bucket_owner"]; !present || v != "team-platform" {
-		t.Errorf(`persisted bucket-s4-1.Fields["bucket_owner"] = %q (present=%v), want "team-platform" — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present)
+	if v, present := got.Fields["bucket_arn"]; !present || v != bucketARN {
+		t.Errorf(`persisted bucket-s4-1.Fields["bucket_arn"] = %q (present=%v), want %q — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present, bucketARN)
 	}
 	// "name", matching scenarios 1 and 3 above: this scenario's YAML declares
 	// a Key-LESS column titled "Bucket Name", and a loaded view file comes

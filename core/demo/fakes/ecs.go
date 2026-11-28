@@ -5,6 +5,7 @@
 package fakes
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -117,6 +118,8 @@ func (f *ECSFake) DescribeServices(_ context.Context, input *ecs.DescribeService
 func (f *ECSFake) ListTasks(_ context.Context, input *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
 	clusterFilter := aws.ToString(input.Cluster)
 	serviceFilter := aws.ToString(input.ServiceName)
+	// "The default status filter is RUNNING" (ListTasksInput.DesiredStatus).
+	status := cmp.Or(input.DesiredStatus, ecstypes.DesiredStatusRunning)
 	var arns []string
 	for _, t := range f.fix.Tasks {
 		// The real ListTasks accepts either the cluster's short name or its
@@ -129,12 +132,12 @@ func (f *ECSFake) ListTasks(_ context.Context, input *ecs.ListTasksInput, _ ...f
 		if serviceFilter != "" && aws.ToString(t.Group) != "service:"+serviceFilter {
 			continue
 		}
-		if input.DesiredStatus != "" && aws.ToString(t.DesiredStatus) != string(input.DesiredStatus) {
+		if aws.ToString(t.DesiredStatus) != string(status) {
 			continue
 		}
 		arns = append(arns, aws.ToString(t.TaskArn))
 	}
-	if serviceFilter == "" && input.DesiredStatus == "" {
+	if serviceFilter == "" && status == ecstypes.DesiredStatusRunning {
 		arns = append(arns, inCluster(f.fix.UnavailableTasks, clusterFilter)...)
 	}
 	return &ecs.ListTasksOutput{TaskArns: arns}, nil

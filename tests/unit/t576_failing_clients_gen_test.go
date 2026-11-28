@@ -1466,6 +1466,17 @@ func (w t576IAM) GetRolePolicy(ctx context.Context, in *iam.GetRolePolicyInput, 
 	return res, err
 }
 
+func (w t576IAM) GetUser(ctx context.Context, in *iam.GetUserInput, o ...func(*iam.Options)) (*iam.GetUserOutput, error) {
+	if err := w.inj.before("IAM", "GetUser", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetUser(context.Context, *iam.GetUserInput, ...func(*iam.Options)) (*iam.GetUserOutput, error)
+	}).GetUser(ctx, in, o...)
+	w.inj.after("IAM", "GetUser", in, res)
+	return res, err
+}
+
 func (w t576IAM) ListAccessKeys(ctx context.Context, in *iam.ListAccessKeysInput, o ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
 	if err := w.inj.before("IAM", "ListAccessKeys", in); err != nil {
 		return nil, err

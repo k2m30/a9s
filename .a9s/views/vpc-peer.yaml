@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Pcx Id: 0a5e9448264e946b
-  Status: 1c04b74c931e5399
-  Requester VPC: 780e069d7a570f7d
-  Requester Owner: 3d9705f90ce285b3
-  Accepter VPC: d5b31630c7d98cb8
-  Accepter Owner: 2115160ca81eb129
+  Pcx Id: 3ea813c74dfc1eba
+  Status: 6a83f47a325c2b6d
+  Requester VPC: 3770cda0f529d826
+  Requester Owner: 2b1cccd8174b17a2
+  Accepter VPC: e1d1ac60b4e0b437
+  Accepter Owner: 5f517271812c1057
   Expires: 3b19e68b5f78ea84
 detail_hashes:
   VpcPeeringConnectionId: 1ec1fbddeacdf345
@@ -17,27 +17,21 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Pcx Id:
-    path: VpcPeeringConnectionId
     key: pcx_id
     width: 24
   Status:
-    path: Status.Code
     key: status
     width: 34
   Requester VPC:
-    path: RequesterVpcInfo.VpcId
     key: requester_vpc
     width: 22
   Requester Owner:
-    path: RequesterVpcInfo.OwnerId
     key: requester_owner
     width: 14
   Accepter VPC:
-    path: AccepterVpcInfo.VpcId
     key: accepter_vpc
     width: 22
   Accepter Owner:
-    path: AccepterVpcInfo.OwnerId
     key: accepter_owner
     width: 14
   Expires:

@@ -58,10 +58,7 @@ func stage4PinReadTypeFile(t *testing.T, profile, region, shortName string) cach
 	return tf
 }
 
-// stage4PinRawFixture satisfies s3's real default column Paths (Bucket Name
-// -> Name, Region -> BucketRegion, Creation Date -> CreationDate) via
-// fieldpath.ExtractScalar's case-insensitive field-name fallback — mirrors
-// qa_cache_lifecycle_test.go's s3RawFixture.
+// stage4PinRawFixture stands in for the SDK struct an s3 row carries.
 type stage4PinRawFixture struct {
 	Name         string
 	BucketRegion string

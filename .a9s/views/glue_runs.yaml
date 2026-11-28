@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
   Run ID: ea0c7ff97f6ee90c
-  State: 5e25e1f653912151
-  Started: f592ea332447c9ed
+  State: 50c6e4f060decd74
+  Started: ba69c673f235eb29
   Execution Time: 2c0d1db529f5def6
-  Error Message: fac26521e49ddac6
+  Error Message: 4e98f958de9e59fc
   DPU Hours: 52465352399639cb
 detail_hashes:
   Id: 75be4e070c3dd9b3
@@ -31,18 +31,15 @@ list:
     key: run_id_short
     width: 12
   State:
-    path: JobRunState
     key: job_run_state
     width: 12
   Started:
-    path: StartedOn
     key: started_on
     width: 22
   Execution Time:
     key: execution_time_human
     width: 14
   Error Message:
-    path: ErrorMessage
     key: error_message
     width: 44
   DPU Hours:

@@ -198,6 +198,8 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 			SecurityGroupIds:    []string{fixtProdWebALBSGID, fixtProdAPIInternalSGID},
 			BlockDeviceMappings: ltEncryptedRootVolume(ltPrimaryKMSKeyID),
 			MetadataOptions:     ltHealthyMetadataOptions(),
+			IamInstanceProfile:  &ec2types.LaunchTemplateIamInstanceProfileSpecification{Name: aws.String("acme-ec2-instance-profile")},
+			KeyName:             aws.String("acme-prod-key"),
 		}, "2026-06-01T10:00:00Z"),
 
 		// eks-node-lt: NetworkInterfaces[] (Groups ∪ SubnetId) instead of the
@@ -222,6 +224,7 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 		SSMAmiLTID: version(SSMAmiLTID, 1, &ec2types.ResponseLaunchTemplateData{
 			ImageId:             aws.String("resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"),
 			InstanceType:        ec2types.InstanceTypeT3Medium,
+			SecurityGroups:      []string{"default"},
 			BlockDeviceMappings: ltEncryptedRootVolume(ltPrimaryKMSKeyID),
 			MetadataOptions:     ltHealthyMetadataOptions(),
 		}, "2025-04-10T08:00:00Z"),

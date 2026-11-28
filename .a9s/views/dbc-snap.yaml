@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Snapshot ID: d986cf7fd1c96b73
-  Cluster ID: f13937105fefa2f4
+  Snapshot ID: 92ce1050562f8f1e
+  Cluster ID: 0ad8ec61ecfcb494
   Status: 567ed47cf133ae50
-  Engine: d1392eb8994ac982
-  Type: 914d703eca6e6c38
-  Created: b525065403ee1d90
-  Storage: f9e42772e9b724d8
+  Engine: 3f201dc01532fd88
+  Type: a3a385ab89b643da
+  Created: 308777fbb782ca2e
+  Storage: 4fc18e5570a45ff0
 detail_hashes:
   DBClusterSnapshotIdentifier: 15207311ef616902
   DBClusterSnapshotArn: a86ff9d7bb9eff5e
@@ -28,30 +28,24 @@ detail_hashes:
   AvailabilityZones: 6e756300e4e860aa
 list:
   Snapshot ID:
-    path: DBClusterSnapshotIdentifier
     key: snapshot_id
     width: 36
   Cluster ID:
-    path: DBClusterIdentifier
     key: cluster_id
     width: 28
   Status:
     key: status
     width: 32
   Engine:
-    path: Engine
     key: engine
     width: 12
   Type:
-    path: SnapshotType
     key: snapshot_type
     width: 12
   Created:
-    path: SnapshotCreateTime
     key: snapshot_create_time
     width: 22
   Storage:
-    path: StorageType
     key: storage_type
     width: 10
 

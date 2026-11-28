@@ -38,12 +38,13 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 	// skipped, not made with a possibly-empty ClusterArns, when this page found
 	// no cluster ARNs to describe.
 	if len(listOutput.ClusterArns) > 0 {
-		// Configuration and Tags are returned only when named in Include; the
-		// related checkers read the execute-command key and the
-		// CloudFormation stack tag from them.
+		// Configuration, Settings and Tags are returned only when named in
+		// Include: the related checkers read the execute-command key and the
+		// CloudFormation stack tag, and the detail shows the settings
+		// (Container Insights among them).
 		descOutput, err := describeAPI.DescribeClusters(ctx, &ecs.DescribeClustersInput{
 			Clusters: listOutput.ClusterArns,
-			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldConfigurations, ecstypes.ClusterFieldTags},
+			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldConfigurations, ecstypes.ClusterFieldSettings, ecstypes.ClusterFieldTags},
 		})
 		var ans listedAnswer
 		var clusters []ecstypes.Cluster

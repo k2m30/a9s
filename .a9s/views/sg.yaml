@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Group Name: 2dd15992bef264a3
-  Group ID: 5beae91f20dfbae5
+  Group Name: e40d629a20701a93
+  Group ID: 5d01533ac303d639
   Status: f38f192cfc3cb359
-  VPC ID: 51b18126b8707aee
-  Description: 0022b6f6290d9419
+  VPC ID: 8fd38a59c94f4eb1
+  Description: 1786bb31adf580e1
 detail_hashes:
   GroupId: 473858615d139f6e
   GroupName: 7e9b2fa1ab81711a
@@ -17,22 +17,18 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Group Name:
-    path: GroupName
     key: group_name
     width: 28
   Group ID:
-    path: GroupId
     key: group_id
     width: 24
   Status:
     key: risk_summary
     width: 22
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
   Description:
-    path: Description
     key: description
     width: 36
 

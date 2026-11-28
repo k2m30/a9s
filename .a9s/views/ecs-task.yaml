@@ -1,14 +1,14 @@
 generated: 12
 list_hashes:
-  Task ID: 64aae8b49750182a
-  Cluster: 6b632c2f7cbc5672
-  Status: e06b45a4b8bcbc54
+  Task ID: 3934b9b9c04e4222
+  Cluster: c3bab12c86575436
+  Status: 168e38cf521a9b36
   Stop Code: ec61fd19d4704bbe
   Health: 1215616905807a55
-  Task Definition: 34ec37c7b352fd5a
-  Launch: 0058ea7e4447a0e0
-  CPU: a82ee819d6f73421
-  Memory: 095cf0a18e23e87b
+  Task Definition: e323379940005412
+  Launch: 891c763d57ca338c
+  CPU: d7856d269f511012
+  Memory: 930d5a96cd2e7be0
 detail_hashes:
   TaskArn: a02d0e79684e1edc
   ClusterArn: be3a87d4853b3411
@@ -35,15 +35,12 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Task ID:
-    path: TaskArn
     key: task_id
     width: 38
   Cluster:
-    path: ClusterArn
     key: cluster
     width: 24
   Status:
-    path: LastStatus
     key: status
     width: 12
   Stop Code:
@@ -53,19 +50,15 @@ list:
     path: HealthStatus
     width: 12
   Task Definition:
-    path: TaskDefinitionArn
     key: task_definition
     width: 30
   Launch:
-    path: LaunchType
     key: launch_type
     width: 10
   CPU:
-    path: Cpu
     key: cpu
     width: 6
   Memory:
-    path: Memory
     key: memory
     width: 8
 

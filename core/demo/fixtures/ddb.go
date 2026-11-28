@@ -264,6 +264,7 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 			AttributeDefinitions: []ddbtypes.AttributeDefinition{
 				{AttributeName: aws.String("OrderId"), AttributeType: ddbtypes.ScalarAttributeTypeS},
 				{AttributeName: aws.String("CustomerId"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+				{AttributeName: aws.String("CreatedAt"), AttributeType: ddbtypes.ScalarAttributeTypeS},
 			},
 			KeySchema: []ddbtypes.KeySchemaElement{
 				{AttributeName: aws.String("OrderId"), KeyType: ddbtypes.KeyTypeHash},
@@ -275,6 +276,19 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 					IndexArn:       aws.String(OrdersProdARN + "/index/CustomerId-index"),
 					IndexStatus:    ddbtypes.IndexStatusActive,
 					IndexSizeBytes: aws.Int64(536_870_912),
+					ItemCount:      aws.Int64(12_345_678),
+				},
+			},
+			LocalSecondaryIndexes: []ddbtypes.LocalSecondaryIndexDescription{
+				{
+					IndexName: aws.String("OrderId-CreatedAt-index"),
+					IndexArn:  aws.String(OrdersProdARN + "/index/OrderId-CreatedAt-index"),
+					KeySchema: []ddbtypes.KeySchemaElement{
+						{AttributeName: aws.String("OrderId"), KeyType: ddbtypes.KeyTypeHash},
+						{AttributeName: aws.String("CreatedAt"), KeyType: ddbtypes.KeyTypeRange},
+					},
+					Projection:     &ddbtypes.Projection{ProjectionType: ddbtypes.ProjectionTypeKeysOnly},
+					IndexSizeBytes: aws.Int64(134_217_728),
 					ItemCount:      aws.Int64(12_345_678),
 				},
 			},

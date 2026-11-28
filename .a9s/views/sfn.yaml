@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Name: 821963eee092fc8f
-  Type: c91dbfdc8f69b774
+  Name: 2a8d13cfe6ea5a6f
+  Type: 22fd06d015a8a6c1
   Status: 516e63265dd02620
   Last Run: cfdf87e5c2120e2e
-  ARN: 49f5a2aa182dab13
-  Created: 1c65911b21c57efa
+  ARN: 03b55909657849c4
+  Created: 06fa9fce319ddf50
 detail_hashes:
   Name: 1e4a1612672f42b2
   StateMachineArn: 2d99785285fa58ed
@@ -15,11 +15,9 @@ detail_hashes:
   RoleArn: 53f87cbcf258bdaa
 list:
   Name:
-    path: Name
     key: name
     width: 36
   Type:
-    path: Type
     key: type
     width: 10
   Status:
@@ -29,11 +27,9 @@ list:
     key: last_run
     width: 18
   ARN:
-    path: StateMachineArn
     key: arn
     width: 60
   Created:
-    path: CreationDate
     key: creation_date
     width: 22
 

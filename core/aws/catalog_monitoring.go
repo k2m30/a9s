@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"net/url"
+	"reflect"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
@@ -14,6 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
+
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 )
 
 func colorCTEvents(r domain.Resource) domain.Color {
@@ -36,6 +39,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "CloudWatch Alarms",
 		ShortName:      "alarm",
+		RowTypes:       []reflect.Type{reflect.TypeFor[cwtypes.MetricAlarm]()},
 		HumanizeFields: []string{"state", "StateValue", "ComparisonOperator"},
 		ListTitle:      "alarms",
 		Aliases:        []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
@@ -45,12 +49,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#alarmsV2:alarm/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "alarm_name", Title: "Alarm Name", Path: "AlarmName", Width: 36},
-			{Key: "state", Title: "Status", Path: "StateValue", Width: 12},
+			{Key: "alarm_name", Title: "Alarm Name", Width: 36},
+			{Key: "state", Title: "Status", Width: 12},
 			{Title: "Actions On", Path: "ActionsEnabled", Width: 10},
-			{Key: "metric_name", Title: "Metric", Path: "MetricName", Width: 24},
-			{Key: "namespace", Title: "Namespace", Path: "Namespace", Width: 24},
-			{Key: "threshold", Title: "Threshold", Path: "Threshold", Width: 12},
+			{Key: "metric_name", Title: "Metric", Width: 24},
+			{Key: "namespace", Title: "Namespace", Width: 24},
+			{Key: "threshold", Title: "Threshold", Width: 12},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "alarm_history",
@@ -95,6 +99,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "CloudWatch Log Groups",
 		ShortName:      "logs",
+		RowTypes:       []reflect.Type{reflect.TypeFor[cwlogstypes.LogGroup]()},
 		RefToID:        logsRefToID,
 		HumanizeFields: []string{"DataProtectionStatus", "LogGroupClass"},
 		Aliases:        []string{"logs", "loggroups", "log-groups", "cwlogs", "log_groups"},
@@ -104,7 +109,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#logsV2:log-groups/log-group/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "log_group_name", Title: "Log Group Name", Path: "LogGroupName", Width: 48},
+			{Key: "log_group_name", Title: "Log Group Name", Width: 48},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "stored_bytes", Title: "Size", Width: 14, SortKey: "stored_bytes_raw"},
 			{Key: "retention", Title: "Retention", Width: 12},
@@ -153,6 +158,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:             "CloudTrail Trails",
 		ShortName:        "trail",
+		RowTypes:         []reflect.Type{reflect.TypeFor[cloudtrailtypes.Trail]()},
 		RefToID:          trailRefToID,
 		Aliases:          []string{"trail", "cloudtrail", "trails"},
 		Category:         "MONITORING",
@@ -166,11 +172,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "cloudtrailv2/home?region="+region+"#/trails/"+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "trail_name", Title: "Trail Name", Path: "Name", Width: 28},
+			{Key: "trail_name", Title: "Trail Name", Width: 28},
 			{Key: "state", Title: "Status", Width: 12},
-			{Key: "s3_bucket", Title: "S3 Bucket", Path: "S3BucketName", Width: 28},
-			{Key: "home_region", Title: "Home Region", Path: "HomeRegion", Width: 16},
-			{Key: "multi_region", Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14},
+			{Key: "s3_bucket", Title: "S3 Bucket", Width: 28},
+			{Key: "home_region", Title: "Home Region", Width: 16},
+			{Key: "multi_region", Title: "Multi-Region", Width: 14},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudTrail} }),
@@ -216,6 +222,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:         "CloudTrail Events",
 		ShortName:    "ct-events",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cloudtrailtypes.Event]()},
 		LifecycleKey: "status",
 		Aliases:      []string{"event", "events", "ct-events", "cloudtrail-events"},
 		Category:     "MONITORING",
@@ -275,6 +282,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Log Streams",
 		ShortName: "log_streams",
+		RowTypes:  []reflect.Type{reflect.TypeFor[cwlogstypes.LogStream]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["stream_name"])
 		},
@@ -293,6 +301,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:         "Log Events",
 		ShortName:    "log_events",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cwlogstypes.OutputLogEvent]()},
 		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
@@ -308,6 +317,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:         "Alarm History",
 		ShortName:    "alarm_history",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cwtypes.AlarmHistoryItem]()},
 		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			name := r.Fields["alarm_name"]

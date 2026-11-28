@@ -1,9 +1,9 @@
 generated: 12
 list_hashes:
-  Stream Name: 120d63429419f6c0
-  Status: a0231b6154398747
-  Mode: 37df4721a62a3034
-  Created: 79f8ba12ce996bba
+  Stream Name: a3669ede12f8439a
+  Status: 168e38cf521a9b36
+  Mode: f8011daf2eddf1ed
+  Created: 8085aada8897893b
 detail_hashes:
   StreamName: 79ae8d5a44938a58
   StreamARN: bef436123c129a40
@@ -12,19 +12,15 @@ detail_hashes:
   StreamCreationTimestamp: db5b9a09c0d8f44d
 list:
   Stream Name:
-    path: StreamName
     key: stream_name
     width: 36
   Status:
-    path: StreamStatus
     key: status
     width: 12
   Mode:
-    path: StreamModeDetails.StreamMode
     key: stream_mode
     width: 14
   Created:
-    path: StreamCreationTimestamp
     key: creation_time
     width: 22
 

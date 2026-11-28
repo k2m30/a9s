@@ -11,7 +11,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/jsonyaml"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -113,6 +115,14 @@ type detailEnrichSpec[R any, P any] struct {
 	// Fields["role_name"], not anything on R).
 	id func(R, resource.Resource) (string, error)
 
+	// answer, when set, reads the item again through its Get call, and the
+	// members the list call of listType leaves out (that type's ListOmits)
+	// are taken from it; every other member stays as the row listed it. The
+	// answer is cached under "answer:" and cacheKey when the enricher is
+	// cached. nil leaves the listed item as it is.
+	answer   func(ctx context.Context, c *ServiceClients, id string) (*R, error)
+	listType string
+
 	// cache returns the session-scoped cache this enricher reads/writes, or
 	// nil for an uncached enricher — cacheKey is never called in that case.
 	cache func(*DetailEnrichmentCtx) docCache
@@ -125,6 +135,7 @@ type detailEnrichSpec[R any, P any] struct {
 	// client capability asserts, API calls, and
 	// payload transforms. id is the value id() already validated —
 	// role_policies ignores it where its branching needs row fields instead.
+	// nil for an enricher whose answer is all it reads: wrap gets P's zero.
 	fetch func(ctx context.Context, c *ServiceClients, id string, r R, res resource.Resource) (P, error)
 
 	// wrap builds the enriched RawStruct from the unwrapped item and the
@@ -186,10 +197,38 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 		return res, err
 	}
 
+	// Every coalescing decorator (core/aws/coalesce.go) keys its singleflight
+	// group by this operation's ID: calls this enricher and its sibling
+	// related checkers make while opening/refreshing THIS detail share
+	// in-flight work, but an explicit refresh mints a brand-new operation ID
+	// (core/runtime.Core.BeginDetailOperation), so it can never join a
+	// pre-refresh call still in flight under the old one.
+	fetchCtx := WithDetailOp(ctx, dctx.OpID)
 	var cacheKey string
-	var cacheName string
 	if cache != nil {
 		cacheKey = spec.cacheKey(id, item, res)
+	}
+	if spec.answer != nil {
+		got, answerErr := cachedAnswer(dctx, cache, "answer:"+cacheKey, func() (*R, error) {
+			return spec.answer(fetchCtx, dctx.Clients, id)
+		})
+		if answerErr != nil {
+			return res, answerErr
+		}
+		var omits []string
+		if td := catalog.FindAny(spec.listType); td != nil {
+			omits = td.ListOmits
+		}
+		item = takeOmitted(item, got, omits)
+	}
+	if spec.fetch == nil {
+		var none P
+		res.RawStruct = spec.wrap(item, none)
+		return res, nil
+	}
+
+	var cacheName string
+	if cache != nil {
 		cacheName = cacheDisplayName(cache)
 		// dctx.SkipCache (set for an explicit refresh) bypasses only the
 		// READ — cacheKey is still computed and the fetch result below is
@@ -213,13 +252,6 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 		}
 	}
 
-	// Every coalescing decorator (core/aws/coalesce.go) keys its singleflight
-	// group by this operation's ID: calls this enricher and its sibling
-	// related checkers make while opening/refreshing THIS detail share
-	// in-flight work, but an explicit refresh mints a brand-new operation ID
-	// (core/runtime.Core.BeginDetailOperation), so it can never join a
-	// pre-refresh call still in flight under the old one.
-	fetchCtx := WithDetailOp(ctx, dctx.OpID)
 	payload, err := spec.fetch(fetchCtx, dctx.Clients, id, item, res)
 	if err != nil {
 		// A partial payload is what was read; it is shown with the error and
@@ -251,6 +283,22 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	return res, nil
 }
 
+// cachedAnswer is the Get answer read once per session under key, as the
+// payload beside it is: an explicit refresh reads it again, and a failed read
+// is never stored. An uncached enricher reads it every time.
+func cachedAnswer[R any](dctx *DetailEnrichmentCtx, cache docCache, key string, read func() (R, error)) (R, error) {
+	if cache != nil && !dctx.SkipCache {
+		if got, hit := cache.Get(key).(R); hit {
+			return got, nil
+		}
+	}
+	got, err := read()
+	if err == nil && cache != nil {
+		cache.SetIfNewer(key, got, dctx.OpID)
+	}
+	return got, err
+}
+
 // parseJSONOrRaw attempts to json.Unmarshal s into a generic value, falling
 // back to the raw string when it doesn't parse as JSON — the shared idiom
 // behind sfn definitions, cfn templates, sns attribute values, and s3
@@ -263,4 +311,19 @@ func parseJSONOrRaw(s string) any {
 		return s
 	}
 	return parsed
+}
+
+// takeOmitted is listed with the members named in omits taken from got, the
+// Get call's answer: the list call never returns those, and every other
+// member is what the row listed, so the detail and the row agree on it.
+func takeOmitted[T any](listed T, got *T, omits []string) T {
+	if got == nil {
+		return listed
+	}
+	out := listed
+	dst, src := reflect.ValueOf(&out).Elem(), reflect.ValueOf(got).Elem()
+	for _, name := range omits {
+		dst.FieldByName(name).Set(src.FieldByName(name))
+	}
+	return out
 }

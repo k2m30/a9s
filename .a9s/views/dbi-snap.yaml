@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Snapshot ID: 2cc6fce0bd0abbbe
-  DB Instance: 8fb0d64cd969e596
+  Snapshot ID: 92ce1050562f8f1e
+  DB Instance: 54167e1f476a39e2
   Status: 567ed47cf133ae50
-  Engine: d1392eb8994ac982
-  Type: 914d703eca6e6c38
-  Created: dbe508ebe53e697f
+  Engine: 3f201dc01532fd88
+  Type: a3a385ab89b643da
+  Created: e4d35f532ced6834
 detail_hashes:
   DBSnapshotIdentifier: b122881841faf71b
   DBSnapshotArn: d67b688727efaac0
@@ -28,26 +28,21 @@ detail_hashes:
   SourceRegion: 99a264f7f2f3e8b1
 list:
   Snapshot ID:
-    path: DBSnapshotIdentifier
     key: snapshot_id
     width: 36
   DB Instance:
-    path: DBInstanceIdentifier
     key: db_instance
     width: 28
   Status:
     key: status
     width: 32
   Engine:
-    path: Engine
     key: engine
     width: 12
   Type:
-    path: SnapshotType
     key: snapshot_type
     width: 12
   Created:
-    path: SnapshotCreateTime
     key: created
     width: 22
 

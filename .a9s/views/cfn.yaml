@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Stack Name: 6a32f0d3c7d748fb
-  Status: 11a8c9781f53218d
+  Stack Name: ad691b7e4443e443
+  Status: 793ab4f12f570394
   Drift: eef82d5842efdb15
   Reason: 359a417cbc6f120c
-  Created: 7a6dab8b926267ef
-  Updated: 2b48f821b39e7f8f
-  Description: db8526853ab7a372
+  Created: 8085aada8897893b
+  Updated: 4753a7cd1f2cf305
+  Description: b9919eabf9baef1f
 detail_hashes:
   StackName: 4060d964a1325a2c
   StackId: 92cb7d95f8b691b3
@@ -27,11 +27,9 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Stack Name:
-    path: StackName
     key: stack_name
     width: 36
   Status:
-    path: StackStatus
     key: status
     width: 24
   Drift:
@@ -41,15 +39,12 @@ list:
     path: StackStatusReason
     width: 32
   Created:
-    path: CreationTime
     key: creation_time
     width: 22
   Updated:
-    path: LastUpdatedTime
     key: last_updated
     width: 22
   Description:
-    path: Description
     key: description
     width: 30
 

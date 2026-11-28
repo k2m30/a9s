@@ -51,7 +51,7 @@ func (f *IAMFake) hasGroup(name string) bool {
 }
 
 func (f *IAMFake) ListRoles(_ context.Context, _ *iam.ListRolesInput, _ ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
-	return &iam.ListRolesOutput{Roles: f.fix.Roles}, nil
+	return &iam.ListRolesOutput{Roles: listAnswer("role", f.fix.Roles)}, nil
 }
 
 func (f *IAMFake) ListPolicies(_ context.Context, input *iam.ListPoliciesInput, _ ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
@@ -73,11 +73,22 @@ func (f *IAMFake) ListPolicies(_ context.Context, input *iam.ListPoliciesInput, 
 			policies = append(policies, policy)
 		}
 	}
-	return &iam.ListPoliciesOutput{Policies: policies}, nil
+	return &iam.ListPoliciesOutput{Policies: listAnswer("policy", policies)}, nil
 }
 
 func (f *IAMFake) ListUsers(_ context.Context, _ *iam.ListUsersInput, _ ...func(*iam.Options)) (*iam.ListUsersOutput, error) {
-	return &iam.ListUsersOutput{Users: f.fix.Users}, nil
+	return &iam.ListUsersOutput{Users: listAnswer("iam-user", f.fix.Users)}, nil
+}
+
+func (f *IAMFake) GetUser(_ context.Context, input *iam.GetUserInput, _ ...func(*iam.Options)) (*iam.GetUserOutput, error) {
+	name := aws.ToString(input.UserName)
+	for i := range f.fix.Users {
+		if aws.ToString(f.fix.Users[i].UserName) == name {
+			u := f.fix.Users[i]
+			return &iam.GetUserOutput{User: &u}, nil
+		}
+	}
+	return nil, noSuchEntity("User with name", name)
 }
 
 func (f *IAMFake) ListGroups(_ context.Context, _ *iam.ListGroupsInput, _ ...func(*iam.Options)) (*iam.ListGroupsOutput, error) {

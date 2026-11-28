@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
-  Name: 0804cc29dc2dba48
-  Type: 356d71307faa5d28
-  TTL: 950c4a277cbd6342
+  Name: b72a0c84b3e2d08e
+  Type: 81e85afad90f6b17
+  TTL: 4bc8a96fed21d550
   Values: c247815c13b028ba
 detail_hashes:
   Name: 1e4a1612672f42b2
@@ -19,15 +19,12 @@ detail_hashes:
   MultiValueAnswer: 5ac772f7594327bf
 list:
   Name:
-    path: Name
     key: name
     width: 40
   Type:
-    path: Type
     key: type
     width: 8
   TTL:
-    path: TTL
     key: ttl
     width: 8
   Values:

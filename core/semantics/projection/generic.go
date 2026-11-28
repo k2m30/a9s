@@ -39,6 +39,10 @@ var FieldAliasProvider func(shortName string, fields map[string]string) map[stri
 // Set by core/resource.init().
 var FieldKeysProvider func(shortName string) []string
 
+// ReplayKeysProvider returns a resource type's ReplayKeys. Set by
+// core/resource.WireProjection.
+var ReplayKeysProvider func(shortName string) map[string]string
+
 // ─── Generic projectors ───────────────────────────────────────────────────
 
 // GenericWithConfig returns a DetailProjector using the provided view
@@ -89,15 +93,9 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	var detailFields []config.DetailField
 	var pathKeys map[string]string
 	if shortName != "" && cfg != nil {
-		vd := config.GetViewDef(cfg, shortName)
-		detailFields = vd.Detail
-		for _, col := range vd.List {
-			if col.Path != "" && col.Key != "" {
-				if pathKeys == nil {
-					pathKeys = make(map[string]string, len(vd.List))
-				}
-				pathKeys[col.Path] = col.Key
-			}
+		detailFields = config.GetViewDef(cfg, shortName).Detail
+		if ReplayKeysProvider != nil {
+			pathKeys = ReplayKeysProvider(shortName)
 		}
 	}
 

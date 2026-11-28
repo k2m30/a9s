@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"net/url"
+	"reflect"
 	"strings"
 
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
@@ -14,6 +15,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // colorGlue prefers colorFromAnyFinding so real fetched resources (Findings
@@ -31,6 +35,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:          "Glue Jobs",
 		ShortName:     "glue",
+		RowTypes:      []reflect.Type{reflect.TypeFor[gluetypes.Job]()},
 		Aliases:       []string{"glue", "glue-jobs"},
 		Category:      "DATA & ANALYTICS",
 		CloudTrailKey: "ResourceName:ID",
@@ -38,13 +43,13 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "gluestudio/home?region="+region+"#/editor/job/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "job_name", Title: "Job Name", Path: "Name", Width: 32},
+			{Key: "job_name", Title: "Job Name", Width: 32},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "last_run", Title: "Last Run", Width: 14},
-			{Key: "glue_version", Title: "Version", Path: "GlueVersion", Width: 10},
-			{Key: "worker_type", Title: "Worker Type", Path: "WorkerType", Width: 14},
-			{Key: "num_workers", Title: "Workers", Path: "NumberOfWorkers", Width: 9},
-			{Key: "last_modified", Title: "Last Modified", Path: "LastModifiedOn", Width: 22},
+			{Key: "glue_version", Title: "Version", Width: 10},
+			{Key: "worker_type", Title: "Worker Type", Width: 14},
+			{Key: "num_workers", Title: "Workers", Width: 9},
+			{Key: "last_modified", Title: "Last Modified", Width: 22},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "glue_runs",
@@ -86,6 +91,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "Athena Workgroups",
 		ShortName:      "athena",
+		RowTypes:       []reflect.Type{reflect.TypeFor[AthenaWorkGroupRow]()},
 		HumanizeFields: []string{"state"},
 		Aliases:        []string{"athena", "workgroups"},
 		Category:       "DATA & ANALYTICS",
@@ -94,11 +100,11 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "athena/home?region="+region+"#/workgroups/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "workgroup_name", Title: "Workgroup", Path: "Name", Width: 28},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "workgroup_name", Title: "Workgroup", Width: 28},
+			{Key: "state", Title: "Status", Width: 12},
 			{Key: "cost_cap", Title: "Cost Cap", Width: 12},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
-			{Key: "engine_version", Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
+			{Key: "description", Title: "Description", Width: 30},
+			{Key: "engine_version", Title: "Engine", Width: 28},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[athenatypes.WorkGroupState](),
@@ -129,6 +135,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "Managed Airflow",
 		ShortName:      "mwaa",
+		RowTypes:       []reflect.Type{reflect.TypeFor[*mwaatypes.Environment]()},
 		HumanizeFields: []string{"webserver_access_mode", "endpoint_management", "last_update_status", "Status"},
 		Aliases:        []string{"mwaa", "airflow"},
 		Category:       "DATA & ANALYTICS",
@@ -138,14 +145,14 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "mwaa/home?region="+region+"#environments/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 32},
+			{Key: "name", Title: "Name", Width: 32},
 			{Key: "status", Title: "Status", Width: 32},
-			{Key: "airflow_version", Title: "Airflow", Path: "AirflowVersion", Width: 10},
-			{Key: "environment_class", Title: "Class", Path: "EnvironmentClass", Width: 14},
-			{Key: "max_workers", Title: "Workers", Path: "MaxWorkers", Width: 9},
-			{Key: "schedulers", Title: "Schedulers", Path: "Schedulers", Width: 10},
-			{Key: "webserver_access_mode", Title: "Access", Path: "WebserverAccessMode", Width: 16},
-			{Key: "created_at", Title: "Created", Path: "CreatedAt", Width: 22},
+			{Key: "airflow_version", Title: "Airflow", Width: 10},
+			{Key: "environment_class", Title: "Class", Width: 14},
+			{Key: "max_workers", Title: "Workers", Width: 9},
+			{Key: "schedulers", Title: "Schedulers", Width: 10},
+			{Key: "webserver_access_mode", Title: "Access", Width: 16},
+			{Key: "created_at", Title: "Created", Width: 22},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[mwaatypes.EnvironmentStatus](),
@@ -204,6 +211,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:         "Job Runs",
 		ShortName:    "glue_runs",
+		RowTypes:     []reflect.Type{reflect.TypeFor[gluetypes.JobRun]()},
 		LifecycleKey: "job_run_state",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			job := r.Fields["job_name"]
@@ -238,6 +246,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "S3 Objects",
 		ShortName: "s3_objects",
+		RowTypes:  []reflect.Type{reflect.TypeFor[s3types.Object](), reflect.TypeFor[s3types.CommonPrefix]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			bucket := r.Fields["bucket"]
 			key := r.Fields["key"]

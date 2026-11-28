@@ -1199,6 +1199,7 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 	return []cwtypes.AlarmHistoryItem{
 		{
 			AlarmName:       aws.String(alarmName),
+			AlarmType:       cwtypes.AlarmTypeMetricAlarm,
 			Timestamp:       aws.Time(t0.Add(2 * time.Hour)),
 			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
 			HistorySummary:  aws.String("Alarm updated from ALARM to OK"),
@@ -1206,6 +1207,7 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 		},
 		{
 			AlarmName:       aws.String(alarmName),
+			AlarmType:       cwtypes.AlarmTypeMetricAlarm,
 			Timestamp:       aws.Time(t0.Add(1 * time.Hour)),
 			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
 			HistorySummary:  aws.String("Alarm updated from OK to ALARM"),
@@ -1213,6 +1215,7 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 		},
 		{
 			AlarmName:       aws.String(alarmName),
+			AlarmType:       cwtypes.AlarmTypeMetricAlarm,
 			Timestamp:       aws.Time(t0),
 			HistoryItemType: cwtypes.HistoryItemTypeConfigurationUpdate,
 			HistorySummary:  aws.String("Alarm \"" + alarmName + "\" created"),
@@ -1235,6 +1238,7 @@ func flappingAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 	// transition that ran it.
 	return slices.Insert(items, 2, cwtypes.AlarmHistoryItem{
 		AlarmName:       aws.String(alarmName),
+		AlarmType:       cwtypes.AlarmTypeMetricAlarm,
 		Timestamp:       aws.Time(t0.Add(1 * time.Hour)),
 		HistoryItemType: cwtypes.HistoryItemTypeAction,
 		HistorySummary:  aws.String("Successfully executed action arn:aws:sns:us-east-1:123456789012:acme-oncall"),

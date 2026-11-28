@@ -740,6 +740,7 @@ func buildRDSEvents() []rdstypes.Event {
 	return []rdstypes.Event{
 		{
 			SourceIdentifier: aws.String("prod-api-primary"),
+			SourceArn:        aws.String("arn:aws:rds:us-east-1:123456789012:db:prod-api-primary"),
 			SourceType:       rdstypes.SourceTypeDbInstance,
 			Message:          aws.String("Automatic backup completed for DB instance prod-api-primary"),
 			EventCategories:  []string{"backup"},

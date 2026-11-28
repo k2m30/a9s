@@ -94,6 +94,10 @@ var sharedR53Fixtures = shared(func() *R53Fixtures {
 				Name:                   aws.String("vpc-private.acme-corp.com."),
 				CallerReference:        aws.String("2025-11-01T00:00:00Z"),
 				ResourceRecordSetCount: aws.Int64(1),
+				LinkedService: &r53types.LinkedService{
+					ServicePrincipal: aws.String("servicediscovery.amazonaws.com"),
+					Description:      aws.String("arn:aws:servicediscovery:us-east-1:123456789012:namespace/ns-4b2c6d8e0f1a3b5c"),
+				},
 				Config: &r53types.HostedZoneConfig{
 					Comment:     aws.String("Private zone associated with the production VPC"),
 					PrivateZone: true,
@@ -170,6 +174,50 @@ var sharedR53Fixtures = shared(func() *R53Fixtures {
 					ResourceRecords: []r53types.ResourceRecord{
 						{Value: aws.String("10 inbound-smtp.us-east-1.amazonaws.com.")},
 					},
+				},
+				// One record per routing policy, each told apart from the
+				// other records of its name by its SetIdentifier.
+				{
+					Name:            aws.String("www.acme-corp.com."),
+					Type:            r53types.RRTypeCname,
+					TTL:             aws.Int64(60),
+					SetIdentifier:   aws.String("blue"),
+					Weight:          aws.Int64(90),
+					HealthCheckId:   aws.String("8f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"),
+					ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("blue.acme-corp.com.")}},
+				},
+				{
+					Name:            aws.String("status.acme-corp.com."),
+					Type:            r53types.RRTypeCname,
+					TTL:             aws.Int64(60),
+					SetIdentifier:   aws.String("status-primary"),
+					Failover:        r53types.ResourceRecordSetFailoverPrimary,
+					HealthCheckId:   aws.String("2a3b4c5d-6e7f-4809-a1b2-c3d4e5f6a7b8"),
+					ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("status-primary.acme-corp.com.")}},
+				},
+				{
+					Name:            aws.String("eu.acme-corp.com."),
+					Type:            r53types.RRTypeCname,
+					TTL:             aws.Int64(300),
+					SetIdentifier:   aws.String("europe"),
+					GeoLocation:     &r53types.GeoLocation{ContinentCode: aws.String("EU")},
+					ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("eu-west-1.acme-corp.com.")}},
+				},
+				{
+					Name:            aws.String("api-latency.acme-corp.com."),
+					Type:            r53types.RRTypeCname,
+					TTL:             aws.Int64(60),
+					SetIdentifier:   aws.String("us-east-1"),
+					Region:          r53types.ResourceRecordSetRegionUsEast1,
+					ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("api-use1.acme-corp.com.")}},
+				},
+				{
+					Name:             aws.String("pool.acme-corp.com."),
+					Type:             r53types.RRTypeA,
+					TTL:              aws.Int64(60),
+					SetIdentifier:    aws.String("pool-1"),
+					MultiValueAnswer: aws.Bool(true),
+					ResourceRecords:  []r53types.ResourceRecord{{Value: aws.String("198.51.100.20")}},
 				},
 				// ACM DNS-validation CNAME — required for the r53:acm
 				// related-panel pivot (checkR53ACM). Validation record name

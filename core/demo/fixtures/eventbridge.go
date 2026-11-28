@@ -19,6 +19,19 @@ type EventBridgeFixtures struct {
 
 const prodEBRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
 
+// EBRuleTargetKinds is the rule whose targets are the kinds that carry their
+// own parameters: an ECS task, a Batch job, an API destination, an AppSync
+// mutation and a SageMaker pipeline. Each target has a dead-letter queue.
+const EBRuleTargetKinds = "acme-integration-fanout"
+
+// EBRuleManaged is a rule an AWS service created on the account's behalf:
+// Auto Scaling's rule for capacity rebalancing.
+const EBRuleManaged = "acme-web-prod-asg-managed-rule"
+
+// ebTargetDLQ is the dead-letter queue every EBRuleTargetKinds target sends a
+// failed delivery to.
+var ebTargetDLQ = &eventbridgetypes.DeadLetterConfig{Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq")}
+
 // EBRuleForOneClustersService names both a service group and a cluster, so it
 // belongs to the acme-batch log-aggregator and not to the acme-staging
 // service of that name.
@@ -169,10 +182,9 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 			EventPattern: aws.String(`{"source":["aws.codecommit"],"detail-type":["CodeCommit Repository State Change"],"detail":{"referenceName":["main"]}}`),
 			Description:  aws.String("Triggers acme-api-deploy on main branch push"),
 		},
-		// scheduled-report-generator — ENABLED with exactly one target that
-		// carries a DeadLetterConfig, so EnrichEventBridgeRuleTargets raises
-		// no eb-rule.target-issue finding. The only demo rule with no
-		// finding at all.
+		// scheduled-report-generator — ENABLED with targets that each carry
+		// a DeadLetterConfig, so EnrichEventBridgeRuleTargets raises no
+		// eb-rule.target-issue finding.
 		{
 			Name:               aws.String("scheduled-report-generator"),
 			Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/scheduled-report-generator"),
@@ -184,6 +196,21 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 	}
 
 	rules = append(rules, eventbridgetypes.Rule{
+		Name:         aws.String(EBRuleTargetKinds),
+		Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/" + EBRuleTargetKinds),
+		State:        eventbridgetypes.RuleStateEnabled,
+		EventBusName: aws.String("default"),
+		EventPattern: aws.String(`{"source":["acme.integrations"],"detail-type":["PartnerSyncRequested"]}`),
+		Description:  aws.String("Starts the partner sync jobs when a sync is requested"),
+	}, eventbridgetypes.Rule{
+		Name:         aws.String(EBRuleManaged),
+		Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/" + EBRuleManaged),
+		State:        eventbridgetypes.RuleStateEnabled,
+		EventBusName: aws.String("default"),
+		EventPattern: aws.String(`{"source":["aws.ec2"],"detail-type":["EC2 Instance Rebalance Recommendation","EC2 Spot Instance Interruption Warning"]}`),
+		Description:  aws.String("This rule is used to route Instance notifications to EC2 Auto Scaling"),
+		ManagedBy:    aws.String("autoscaling.amazonaws.com"),
+	}, eventbridgetypes.Rule{
 		Name:         aws.String(EBRuleOnCustomBus),
 		Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/" + EBCustomBus + "/" + EBRuleOnCustomBus),
 		State:        eventbridgetypes.RuleStateEnabled,
@@ -201,23 +228,91 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 					Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
 				},
 			},
+			{
+				Id:               aws.String("WebhookIngestQueue"),
+				Arn:              aws.String("arn:aws:sqs:us-east-1:123456789012:webhook-ingest-queue.fifo"),
+				SqsParameters:    &eventbridgetypes.SqsParameters{MessageGroupId: aws.String("orders")},
+				DeadLetterConfig: ebTargetDLQ,
+			},
+		},
+		EBRuleManaged: {
+			{
+				Id:               aws.String("autoscaling"),
+				Arn:              aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:11111111-1111-1111-1111-111111111111:autoScalingGroupName/acme-web-prod-asg"),
+				DeadLetterConfig: ebTargetDLQ,
+			},
+		},
+		EBRuleTargetKinds: {
+			{
+				Id:      aws.String("PartnerSyncTask"),
+				Arn:     aws.String(ecsClusterArnServices),
+				RoleArn: aws.String(prodEBRoleARN),
+				EcsParameters: &eventbridgetypes.EcsParameters{
+					TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
+					LaunchType:        eventbridgetypes.LaunchTypeFargate,
+					TaskCount:         aws.Int32(1),
+				},
+				DeadLetterConfig: ebTargetDLQ,
+			},
+			{
+				Id:      aws.String("PartnerReportJob"),
+				Arn:     aws.String("arn:aws:batch:us-east-1:123456789012:job-queue/acme-reports"),
+				RoleArn: aws.String(prodEBRoleARN),
+				BatchParameters: &eventbridgetypes.BatchParameters{
+					JobDefinition: aws.String("acme-report-builder:4"),
+					JobName:       aws.String("partner-sync-report"),
+				},
+				DeadLetterConfig: ebTargetDLQ,
+			},
+			{
+				Id:      aws.String("PartnerWebhook"),
+				Arn:     aws.String("arn:aws:events:us-east-1:123456789012:api-destination/partner-webhook/6f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0"),
+				RoleArn: aws.String(prodEBRoleARN),
+				HttpParameters: &eventbridgetypes.HttpParameters{
+					HeaderParameters: map[string]string{"X-Acme-Source": "eventbridge"},
+				},
+				DeadLetterConfig: ebTargetDLQ,
+			},
+			{
+				Id:      aws.String("PartnerStatusMutation"),
+				Arn:     aws.String("arn:aws:appsync:us-east-1:123456789012:endpoints/graphql-api/a1b2c3d4e5f6g7h8i9j0klmnop"),
+				RoleArn: aws.String(prodEBRoleARN),
+				AppSyncParameters: &eventbridgetypes.AppSyncParameters{
+					GraphQLOperation: aws.String(`mutation PartnerSynced($id: ID!) { partnerSynced(id: $id) { id } }`),
+				},
+				DeadLetterConfig: ebTargetDLQ,
+			},
+			{
+				Id:      aws.String("PartnerScoringPipeline"),
+				Arn:     aws.String("arn:aws:sagemaker:us-east-1:123456789012:pipeline/partner-scoring"),
+				RoleArn: aws.String(prodEBRoleARN),
+				SageMakerPipelineParameters: &eventbridgetypes.SageMakerPipelineParameters{
+					PipelineParameterList: []eventbridgetypes.SageMakerPipelineParameter{{Name: aws.String("PartnerId"), Value: aws.String("all")}},
+				},
+				DeadLetterConfig: ebTargetDLQ,
+			},
 		},
 		"nightly-db-backup": {
 			{
-				Id:  aws.String("LambdaBackupFunction"),
-				Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:db-backup-trigger"),
+				Id:          aws.String("LambdaBackupFunction"),
+				Arn:         aws.String("arn:aws:lambda:us-east-1:123456789012:function:db-backup-trigger"),
+				Input:       aws.String(`{"backupType":"full","retainDays":35}`),
+				RetryPolicy: &eventbridgetypes.RetryPolicy{MaximumRetryAttempts: aws.Int32(3), MaximumEventAgeInSeconds: aws.Int32(3600)},
 			},
 			// KinesisAuditStream — required for eb-rule:kinesis related-panel
 			// pivot (checkEbRuleKinesis). Streams a copy of every backup event.
 			{
-				Id:  aws.String("KinesisAuditStream"),
-				Arn: aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/audit-log-stream"),
+				Id:                aws.String("KinesisAuditStream"),
+				Arn:               aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/audit-log-stream"),
+				RoleArn:           aws.String(prodEBRoleARN),
+				KinesisParameters: &eventbridgetypes.KinesisParameters{PartitionKeyPath: aws.String("$.detail.backup-id")},
 			},
 			// CloudWatchLogsTarget — required for eb-rule:logs related-panel
 			// pivot (checkEbRuleLogs).
 			{
-				Id:  aws.String("CloudWatchLogsTarget"),
-				Arn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/app/legacy/orphan-old:*"),
+				Id:        aws.String("CloudWatchLogsTarget"),
+				Arn:       aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/app/legacy/orphan-old:*"),
+				InputPath: aws.String("$.detail"),
 			},
 			// SQSBackupCompletionQueue — required for sqs:eb-rule related-panel
 			// pivot (checkSQSEbRule calls events:ListRuleNamesByTarget with the
@@ -231,6 +326,10 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 			{
 				Id:  aws.String("SNSAlertTopic"),
 				Arn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
+				InputTransformer: &eventbridgetypes.InputTransformer{
+					InputPathsMap: map[string]string{"instance": "$.detail.instance-id", "state": "$.detail.state"},
+					InputTemplate: aws.String(`"Instance <instance> is now <state>"`),
+				},
 			},
 		},
 		// eb-rule-no-targets: intentionally empty — the rule itself has no targets
@@ -285,7 +384,7 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 				Arn: aws.String("arn:aws:codepipeline:us-east-1:123456789012:acme-api-deploy"),
 			},
 		},
-		// scheduled-report-generator's only target carries a DeadLetterConfig —
+		// scheduled-report-generator's targets carry a DeadLetterConfig —
 		// the DLQ ARN reuses the queue already referenced by
 		// eb-rule-disabled-with-targets's SQSDeadLetterQueue target.
 		"scheduled-report-generator": {
@@ -295,6 +394,17 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 				DeadLetterConfig: &eventbridgetypes.DeadLetterConfig{
 					Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
 				},
+			},
+			{
+				Id:      aws.String("RefreshReportRollups"),
+				Arn:     aws.String("arn:aws:redshift:us-east-1:123456789012:cluster:" + AcmeWarehouseID),
+				RoleArn: aws.String(prodEBRoleARN),
+				RedshiftDataParameters: &eventbridgetypes.RedshiftDataParameters{
+					Database: aws.String("analytics"),
+					DbUser:   aws.String("etl"),
+					Sql:      aws.String("CALL refresh_daily_rollups()"),
+				},
+				DeadLetterConfig: ebTargetDLQ,
 			},
 		},
 	}
@@ -320,5 +430,5 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "eb-rule", Rows: 15, Issues: 0})
+	Register(Pin{ShortName: "eb-rule", Rows: 17, Issues: 0})
 }

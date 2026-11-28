@@ -118,6 +118,7 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SnapshotCreateTime:   aws.Time(recentSnapTime),
 			AllocatedStorage:     aws.Int32(100),
 			StorageType:          aws.String("gp3"),
+			Iops:                 aws.Int32(3000),
 			Encrypted:            aws.Bool(true),
 			KmsKeyId:             aws.String(dbiKMSKeyID),
 			AvailabilityZone:     aws.String("us-east-1a"),

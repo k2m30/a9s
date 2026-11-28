@@ -15,6 +15,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
@@ -35,12 +37,52 @@ var (
 	t9aOperatorField = config.DetailField{Path: "OperatorDetailPath"}
 )
 
-func t9aRetiredColumn() config.ListColumn {
-	return config.ListColumn{Title: "Retired Column", Path: "RetiredPath", Width: 14}
+// t9aSparePath is a scalar field of a struct the type stores that no default
+// column reads: a path an operator may add as a column, and one the load
+// accepts, since a path no stored struct has is reported.
+func t9aSparePath(name string) string {
+	td := catalog.FindAny(name)
+	if td == nil {
+		panic("no catalog type " + name)
+	}
+	used := map[string]bool{}
+	for _, c := range config.DefaultViewDef(name).List {
+		used[c.Path] = true
+	}
+	for _, rt := range td.RowTypes {
+		for rt.Kind() == reflect.Pointer {
+			rt = rt.Elem()
+		}
+		if rt.Kind() != reflect.Struct {
+			continue
+		}
+		for f := range rt.Fields() {
+			if f.IsExported() && !used[f.Name] && td.CellPath(f.Name) {
+				return f.Name
+			}
+			ft := f.Type
+			for ft.Kind() == reflect.Pointer {
+				ft = ft.Elem()
+			}
+			if !f.IsExported() || ft.Kind() != reflect.Struct {
+				continue
+			}
+			for sf := range ft.Fields() {
+				if p := f.Name + "." + sf.Name; !used[p] && td.CellPath(p) {
+					return p
+				}
+			}
+		}
+	}
+	panic(name + " stores no scalar field outside its default columns")
 }
 
-func t9aOperatorColumn() config.ListColumn {
-	return config.ListColumn{Title: "Operator Note", Path: "OperatorPath", Width: 16}
+func t9aRetiredColumn(name string) config.ListColumn {
+	return config.ListColumn{Title: "Retired Column", Path: t9aSparePath(name), Width: 14}
+}
+
+func t9aOperatorColumn(name string) config.ListColumn {
+	return config.ListColumn{Title: "Operator Note", Path: t9aSparePath(name), Width: 16}
 }
 
 func t9aListBlock(cols []config.ListColumn) string {
@@ -177,7 +219,7 @@ func t9aCopyView(v config.ViewDef) config.ViewDef {
 // t9aEarlierDefaults are the ways a build can differ from the one that wrote
 // a file: a detail path it gained, a column it removed, a width or a source it
 // corrected.
-func t9aEarlierDefaults(def config.ViewDef) map[string]config.ViewDef {
+func t9aEarlierDefaults(name string, def config.ViewDef) map[string]config.ViewDef {
 	out := map[string]config.ViewDef{}
 
 	detail := t9aCopyView(def)
@@ -189,7 +231,7 @@ func t9aEarlierDefaults(def config.ViewDef) map[string]config.ViewDef {
 	out["build gained a detail path"] = detail
 
 	removed := t9aCopyView(def)
-	removed.List = append(removed.List, t9aRetiredColumn())
+	removed.List = append(removed.List, t9aRetiredColumn(name))
 	out["build removed a column"] = removed
 
 	if len(def.List) > 0 {
@@ -217,7 +259,7 @@ func TestT9a_UneditedGeneratedFileFollowsTheBuild(t *testing.T) {
 
 	for _, name := range names {
 		def := config.DefaultViewDef(name)
-		changes := t9aEarlierDefaults(def)
+		changes := t9aEarlierDefaults(name, def)
 		for _, change := range slices.Sorted(maps.Keys(changes)) {
 			t.Run(name+"/"+change, func(t *testing.T) {
 				dir := t.TempDir()
@@ -448,7 +490,7 @@ func t9aReversedAndInserted[T any](old []T, after func(T) bool, item T) []T {
 	return slices.Insert(rev, slices.IndexFunc(rev, after)+1, item)
 }
 
-func t9aListMerges(def config.ViewDef) map[string]t9aMerge {
+func t9aListMerges(name string, def config.ViewDef) map[string]t9aMerge {
 	L, n := def.List, len(def.List)
 	other := slices.Clone(def.Detail)
 	if len(other) > 1 {
@@ -467,7 +509,7 @@ func t9aListMerges(def config.ViewDef) map[string]t9aMerge {
 		} else {
 			old[ti].Path += "Before"
 		}
-		old = append(old, t9aRetiredColumn())
+		old = append(old, t9aRetiredColumn(name))
 		want := slices.Clone(L)
 		want[0].Width += 5
 		out[t9aChangedOne] = t9aMerge{with(old), func(t *testing.T, r *yaml.Node) { t9aSetWidth(t, r, L[0].Title, L[0].Width+5) },
@@ -480,12 +522,12 @@ func t9aListMerges(def config.ViewDef) map[string]t9aMerge {
 			config.ViewDef{List: slices.Delete(slices.Clone(L), 1, 2), Detail: def.Detail}}
 
 		out[t9aAdded] = t9aMerge{with(slices.Clone(L[:n-1])),
-			func(t *testing.T, r *yaml.Node) { t9aInsertColumnAfter(t, r, L[0].Title, t9aOperatorColumn()) },
-			config.ViewDef{List: slices.Insert(slices.Clone(L), 1, t9aOperatorColumn()), Detail: def.Detail}}
+			func(t *testing.T, r *yaml.Node) { t9aInsertColumnAfter(t, r, L[0].Title, t9aOperatorColumn(name)) },
+			config.ViewDef{List: slices.Insert(slices.Clone(L), 1, t9aOperatorColumn(name)), Detail: def.Detail}}
 	}
-	owned := t9aRetiredColumn()
+	owned := t9aRetiredColumn(name)
 	owned.Width += 9
-	out[t9aOwned] = t9aMerge{with(append(slices.Clone(L), t9aRetiredColumn())),
+	out[t9aOwned] = t9aMerge{with(append(slices.Clone(L), t9aRetiredColumn(name))),
 		func(t *testing.T, r *yaml.Node) { t9aSetWidth(t, r, owned.Title, owned.Width) },
 		config.ViewDef{List: append(slices.Clone(L), owned), Detail: def.Detail}}
 
@@ -503,7 +545,7 @@ func t9aListMerges(def config.ViewDef) map[string]t9aMerge {
 	return out
 }
 
-func t9aDetailMerges(def config.ViewDef) map[string]t9aMerge {
+func t9aDetailMerges(name string, def config.ViewDef) map[string]t9aMerge {
 	D, m := def.Detail, len(def.Detail)
 	ids := map[string]bool{}
 	for _, f := range D {
@@ -513,7 +555,7 @@ func t9aDetailMerges(def config.ViewDef) map[string]t9aMerge {
 		ids[t9aFieldID(f)] = true
 	}
 	with := func(detail []config.DetailField) config.ViewDef {
-		return config.ViewDef{List: append(slices.Clone(def.List), t9aRetiredColumn()), Detail: detail}
+		return config.ViewDef{List: append(slices.Clone(def.List), t9aRetiredColumn(name)), Detail: detail}
 	}
 	out := map[string]t9aMerge{}
 
@@ -554,11 +596,11 @@ func t9aDetailMerges(def config.ViewDef) map[string]t9aMerge {
 	return out
 }
 
-func t9aMergeFor(block string, def config.ViewDef) map[string]t9aMerge {
+func t9aMergeFor(block, name string, def config.ViewDef) map[string]t9aMerge {
 	if block == "list" {
-		return t9aListMerges(def)
+		return t9aListMerges(name, def)
 	}
-	return t9aDetailMerges(def)
+	return t9aDetailMerges(name, def)
 }
 
 func t9aEditedFile(t *testing.T, m t9aMerge) []byte {
@@ -614,7 +656,7 @@ func TestT9a_OperatorEditsMergeWithTheBuild(t *testing.T) {
 				dir := t.TempDir()
 				want := map[string]config.ViewDef{}
 				for _, name := range names {
-					m, ok := t9aMergeFor(block, config.DefaultViewDef(name))[row]
+					m, ok := t9aMergeFor(block, name, config.DefaultViewDef(name))[row]
 					if !ok {
 						continue
 					}
@@ -643,7 +685,7 @@ func TestT9a_OperatorEditsMergeWithTheBuild(t *testing.T) {
 func TestT9a_ReformatIsNotAnEdit(t *testing.T) {
 	def := t9aDefaults(t, "ec2")
 	old := t9aCopyView(def)
-	old.List = append(old.List, t9aRetiredColumn())
+	old.List = append(old.List, t9aRetiredColumn("ec2"))
 	old.Detail = def.Detail[:len(def.Detail)-1]
 
 	root := t9aParseNode(t, config.GenerateViewYAML(old))
@@ -701,7 +743,7 @@ func TestT9a_EarlierBuildsFileIsReplaced(t *testing.T) {
 	editedDetail.Detail = append(slices.Clone(ec2.Detail[1:]), config.DetailField{Path: t9aOperatorField.Path, Label: t9aOperatorLabel})
 	editedList := t9aCopyView(ec2)
 	editedList.List[0].Width += 7
-	editedList.List = append(editedList.List, t9aOperatorColumn())
+	editedList.List = append(editedList.List, t9aOperatorColumn("ec2"))
 
 	child := config.DefaultViewDef("tg_health")
 	if len(child.List) < 2 {
@@ -777,7 +819,7 @@ func TestT9a_RepositoryOverlayStillWins(t *testing.T) {
 		{Title: "Type", Path: "InstanceType", Width: 12},
 	}}
 	stale := t9aCopyView(def)
-	stale.List = append(stale.List, t9aRetiredColumn())
+	stale.List = append(stale.List, t9aRetiredColumn("ec2"))
 	stale.Detail = def.Detail[:len(def.Detail)-1]
 
 	t.Run("untouched overlay over an operator's global file", func(t *testing.T) {
@@ -796,7 +838,7 @@ func TestT9a_RepositoryOverlayStillWins(t *testing.T) {
 	})
 
 	t.Run("edited overlay merges with the build", func(t *testing.T) {
-		m := t9aListMerges(def)[t9aChangedOne]
+		m := t9aListMerges("ec2", def)[t9aChangedOne]
 		global, project := t.TempDir(), t.TempDir()
 		if err := config.EnsureViewsDir(global); err != nil {
 			t.Fatalf("EnsureViewsDir: %v", err)

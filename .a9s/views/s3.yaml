@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
-  Bucket Name: aaaccd6888cbe08d
+  Bucket Name: 24360e8f0ba5ac57
   Region: 157139652b0f7fbb
-  Creation Date: 3b73b0a2cae9261b
+  Creation Date: 0e32bda610dc77bf
   Status: 567ed47cf133ae50
 detail_hashes:
   Name: 1e4a1612672f42b2
@@ -12,14 +12,12 @@ detail_hashes:
   Policy: 413be23535f2834b
 list:
   Bucket Name:
-    path: Name
     key: name
     width: 36
   Region:
     path: BucketRegion
     width: 14
   Creation Date:
-    path: CreationDate
     key: creation_date
     width: 22
   Status:

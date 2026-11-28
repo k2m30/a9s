@@ -3,11 +3,9 @@
 package unit_test
 
 // misc4_r2b_cascade_arms_test.go — ResolveListColumnCascade reads one
-// declaration one way: the catalog's Key is kept and the default's Path,
-// SortKey and Humanize are borrowed whether or not the built-in defaults
-// hold more columns than the catalog literal, so the same declaration never
-// produces different columns for reasons that have nothing to do with the
-// type.
+// declaration one way: the catalog's Key is kept, and the view's own Path and
+// SortKey are kept beside it, so the same declaration never produces
+// different columns for reasons that have nothing to do with the type.
 
 import (
 	"strings"
@@ -34,17 +32,15 @@ func misc4ResolvedColumn(t *testing.T, short, title string) config.ListColumn {
 }
 
 // TestCatalogKeySurvivesTheSupersetArm pins that a catalog Key reaches the
-// resolved column even when the defaults hold more columns and drive the
-// order. acm is that arm: five catalog columns, six default ones.
+// resolved column, and that a column whose key the fetcher writes reads no
+// path: Fields is its one source.
 func TestCatalogKeySurvivesTheSupersetArm(t *testing.T) {
 	got := misc4ResolvedColumn(t, "acm", "Domain Name")
 	if got.Key != "domain_name" {
-		t.Errorf("acm \"Domain Name\" resolved with Key %q, want \"domain_name\" — "+
-			"the superset arm dropped the catalog's Key", got.Key)
+		t.Errorf("acm \"Domain Name\" resolved with Key %q, want \"domain_name\"", got.Key)
 	}
-	if got.Path != "DomainName" {
-		t.Errorf("acm \"Domain Name\" resolved with Path %q, want \"DomainName\" — "+
-			"the default's rendering hints must survive too", got.Path)
+	if got.Path != "" {
+		t.Errorf("acm \"Domain Name\" resolved with Path %q beside the produced key domain_name, want none", got.Path)
 	}
 }
 
@@ -58,14 +54,13 @@ func TestDefaultOnlyColumnKeepsItsOwnKey(t *testing.T) {
 	}
 }
 
-// TestCatalogArmStillBorrowsTheDefaultsHints pins the other arm: efs has six
-// catalog columns and six default ones, so the catalog drives.
 func TestCatalogArmStillBorrowsTheDefaultsHints(t *testing.T) {
-	got := misc4ResolvedColumn(t, "efs", "Encrypted")
-	if got.Key != "encrypted" {
-		t.Errorf("efs \"Encrypted\" resolved with Key %q, want \"encrypted\"", got.Key)
+	enc := misc4ResolvedColumn(t, "efs", "Encrypted")
+	if enc.Key != "encrypted" || enc.Path != "" {
+		t.Errorf("efs \"Encrypted\" resolved as {Key %q, Path %q}, want {encrypted, none}", enc.Key, enc.Path)
 	}
-	if got.Path != "Encrypted" {
-		t.Errorf("efs \"Encrypted\" resolved with Path %q, want \"Encrypted\"", got.Path)
+	region := misc4ResolvedColumn(t, "s3", "Region")
+	if region.Key != "" || region.Path != "BucketRegion" {
+		t.Errorf("s3 \"Region\" resolved as {Key %q, Path %q}, want {none, BucketRegion}", region.Key, region.Path)
 	}
 }

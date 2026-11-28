@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
@@ -18,6 +19,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
 
 // messagingChildTypes is the declarative child-type catalog for the MESSAGING
@@ -27,6 +31,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:      "EB Rule Targets",
 		ShortName: "eb_rule_targets",
+		RowTypes:  []reflect.Type{reflect.TypeFor[eventbridgetypes.Target]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			rule := r.Fields["rule_name"]
 			if rule == "" {
@@ -52,6 +57,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:         "SFN Executions",
 		ShortName:    "sfn_executions",
+		RowTypes:     []reflect.Type{reflect.TypeFor[sfntypes.ExecutionListItem]()},
 		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["execution_arn"]
@@ -87,6 +93,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:         "SFN Execution History",
 		ShortName:    "sfn_execution_history",
+		RowTypes:     []reflect.Type{reflect.TypeFor[sfntypes.HistoryEvent]()},
 		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["execution_arn"]
@@ -113,6 +120,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:         "SNS Subscriptions",
 		ShortName:    "sns_subscriptions",
+		RowTypes:     []reflect.Type{reflect.TypeFor[snstypes.Subscription]()},
 		LifecycleKey: "confirmation_status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["subscription_arn"]
@@ -164,15 +172,13 @@ func colorSFN(r domain.Resource) domain.Color {
 
 var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "SQS Queues",
-		ShortName: "sqs",
-		// ListQueues returns URLs and GetQueueAttributes a map[string]string,
-		// which the fetcher assembles into the row.
-		ComputedDetailPaths: []string{"QueueUrl", "Attributes"},
-		RefToID:             sqsRefToID,
-		Aliases:             []string{"sqs", "queues"},
-		Category:            "MESSAGING",
-		CloudTrailKey:       "ResourceName:ID",
+		Name:          "SQS Queues",
+		ShortName:     "sqs",
+		RowTypes:      []reflect.Type{reflect.TypeFor[SQSQueueAttributesRow]()},
+		RefToID:       sqsRefToID,
+		Aliases:       []string{"sqs", "queues"},
+		Category:      "MESSAGING",
+		CloudTrailKey: "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -223,6 +229,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "SNS Topics",
 		ShortName: "sns",
+		RowTypes:  []reflect.Type{reflect.TypeFor[snstypes.Topic]()},
 		// Attributes is the GetTopicAttributes map and lands on TopicEnriched
 		// when the detail opens.
 		ComputedDetailPaths: []string{"Attributes"},
@@ -237,7 +244,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "display_name", Title: "Topic Name", Width: 40},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "subs_count", Title: "Subs", Width: 6},
-			{Key: "topic_arn", Title: "Topic ARN", Path: "TopicArn", Width: 60},
+			{Key: "topic_arn", Title: "Topic ARN", Width: 60},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "sns_subscriptions",
@@ -275,6 +282,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "SNS Subscriptions",
 		ShortName:     "sns-sub",
+		RowTypes:      []reflect.Type{reflect.TypeFor[snstypes.Subscription]()},
 		Aliases:       []string{"sns-sub", "sns-subscriptions", "subscriptions"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:Fields.subscription_arn",
@@ -282,10 +290,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/subscription/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "topic_arn", Title: "Topic ARN", Path: "TopicArn", Width: 48},
+			{Key: "topic_arn", Title: "Topic ARN", Width: 48},
 			{Key: "state", Title: "Status", Width: 12},
-			{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10},
-			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
+			{Key: "protocol", Title: "Protocol", Width: 10},
+			{Key: "endpoint", Title: "Endpoint", Width: 48},
 			{Key: "confirmed", Title: "Confirmed", Width: 12},
 			{Key: "subscription_arn", Title: "Subscription ARN", Width: 60},
 		},
@@ -319,6 +327,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		// main menu's category grouping stays contiguous.
 		Name:           "Elastic Beanstalk",
 		ShortName:      "eb",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ebtypes.EnvironmentDescription]()},
 		RefToID:        ebRefToID,
 		HumanizeFields: []string{"Status"},
 		Aliases:        []string{"eb", "beanstalk", "elastic-beanstalk"},
@@ -340,11 +349,11 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				"&environmentName="+url.QueryEscape(appEnv[1]))
 		},
 		Columns: []domain.Column{
-			{Key: "environment_name", Title: "Environment", Path: "EnvironmentName", Width: 28},
-			{Key: "application_name", Title: "Application", Path: "ApplicationName", Width: 24},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12},
-			{Key: "health", Title: "Health", Path: "Health", Width: 10},
-			{Key: "version_label", Title: "Version", Path: "VersionLabel", Width: 16},
+			{Key: "environment_name", Title: "Environment", Width: 28},
+			{Key: "application_name", Title: "Application", Width: 24},
+			{Key: "status", Title: "Status", Width: 12},
+			{Key: "health", Title: "Health", Width: 10},
+			{Key: "version_label", Title: "Version", Width: 16},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ebtypes.EnvironmentStatus](),
@@ -362,10 +371,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEbAlarm, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkEbELB, NeedsTargetCache: false},
-			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEbTG, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG, NeedsTargetCache: false},
-			{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRole, NeedsTargetCache: false, Truncated: true},
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: liveSource("eb", "elb", checkEbELB), NeedsTargetCache: false},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: liveSource("eb", "tg", checkEbTG), NeedsTargetCache: false, Truncated: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: liveSource("eb", "sg", checkEbSG), NeedsTargetCache: false},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: liveSource("eb", "role", checkEbRole), NeedsTargetCache: false, Truncated: true},
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkEbS3, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eb")},
 		},
@@ -387,6 +396,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "EventBridge Rules",
 		ShortName:      "eb-rule",
+		RowTypes:       []reflect.Type{reflect.TypeFor[eventbridgetypes.Rule]()},
 		HumanizeFields: []string{"state"},
 		Aliases:        []string{"eb-rule", "eventbridge"},
 		Category:       "MESSAGING",
@@ -404,12 +414,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "events/home?region="+region+"#/eventbus/"+url.PathEscape(bus)+"/rules/"+url.PathEscape(r.Fields["name"]))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Rule Name", Path: "Name", Width: 28},
-			{Key: "state", Title: "Status", Path: "State", Width: 10},
+			{Key: "name", Title: "Rule Name", Width: 28},
+			{Key: "state", Title: "Status", Width: 10},
 			{Key: "target_count", Title: "Targets", Width: 8},
-			{Key: "event_bus", Title: "Event Bus", Path: "EventBusName", Width: 18},
-			{Key: "schedule", Title: "Schedule", Path: "ScheduleExpression", Width: 24},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "event_bus", Title: "Event Bus", Width: 18},
+			{Key: "schedule", Title: "Schedule", Width: 24},
+			{Key: "description", Title: "Description", Width: 30},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "eb_rule_targets",
@@ -451,6 +461,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "Kinesis Streams",
 		ShortName:      "kinesis",
+		RowTypes:       []reflect.Type{reflect.TypeFor[kinesistypes.StreamSummary]()},
 		RefToID:        kinesisRefToID,
 		HumanizeFields: []string{"stream_mode", "StreamModeDetails.StreamMode", "stream_status", "status"},
 		Aliases:        []string{"kinesis", "streams"},
@@ -461,10 +472,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "kinesis/home?region="+region+"#/streams/details/"+url.PathEscape(r.ID)+"/monitoring")
 		},
 		Columns: []domain.Column{
-			{Key: "stream_name", Title: "Stream Name", Path: "StreamName", Width: 36},
-			{Key: "status", Title: "Status", Path: "StreamStatus", Width: 12},
-			{Key: "stream_mode", Title: "Mode", Path: "StreamModeDetails.StreamMode", Width: 14},
-			{Key: "creation_time", Title: "Created", Path: "StreamCreationTimestamp", Width: 22},
+			{Key: "stream_name", Title: "Stream Name", Width: 36},
+			{Key: "status", Title: "Status", Width: 12},
+			{Key: "stream_mode", Title: "Mode", Width: 14},
+			{Key: "creation_time", Title: "Created", Width: 22},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[kinesistypes.StreamStatus](),
@@ -496,6 +507,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "MSK Clusters",
 		ShortName:      "msk",
+		RowTypes:       []reflect.Type{reflect.TypeFor[kafkatypes.Cluster]()},
 		RefToID:        mskRefToID,
 		HumanizeFields: []string{"cluster_type", "state"},
 		Aliases:        []string{"msk", "kafka"},
@@ -509,10 +521,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "msk/home?region="+region+"#/cluster/"+url.QueryEscape(arn)+"/view?tabId=details")
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_name", Title: "Cluster Name", Path: "ClusterName", Width: 28},
-			{Key: "cluster_type", Title: "Type", Path: "ClusterType", Width: 14},
-			{Key: "state", Title: "Status", Path: "State", Width: 14},
-			{Key: "version", Title: "Version", Path: "CurrentVersion", Width: 14},
+			{Key: "cluster_name", Title: "Cluster Name", Width: 28},
+			{Key: "cluster_type", Title: "Type", Width: 14},
+			{Key: "state", Title: "Status", Width: 14},
+			{Key: "version", Title: "Version", Width: 14},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[kafkatypes.ClusterState](),
@@ -558,6 +570,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "Step Functions",
 		ShortName: "sfn",
+		RowTypes:  []reflect.Type{reflect.TypeFor[sfntypes.StateMachineListItem]()},
 		// Status and RoleArn are DescribeStateMachine fields and land on
 		// StateMachineEnriched when the detail opens.
 		ComputedDetailPaths: []string{"Status", "RoleArn"},
@@ -574,12 +587,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "states/home?region="+region+"#/statemachines/view/"+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 36},
-			{Key: "type", Title: "Type", Path: "Type", Width: 10},
+			{Key: "name", Title: "Name", Width: 36},
+			{Key: "type", Title: "Type", Width: 10},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "last_run", Title: "Last Run", Width: 18},
-			{Key: "arn", Title: "ARN", Path: "StateMachineArn", Width: 60},
-			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22},
+			{Key: "arn", Title: "ARN", Width: 60},
+			{Key: "creation_date", Title: "Created", Width: 22},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "sfn_executions",
@@ -626,6 +639,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "SES Identities",
 		ShortName:      "ses",
+		RowTypes:       []reflect.Type{reflect.TypeFor[sesv2types.IdentityInfo]()},
 		HumanizeFields: []string{"verification_status", "status"},
 		Aliases:        []string{"ses", "email", "ses-identities"},
 		Category:       "MESSAGING",
@@ -635,7 +649,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "ses/home?region="+region+"#/identities/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "identity_name", Title: "Identity", Path: "IdentityName", Width: 36},
+			{Key: "identity_name", Title: "Identity", Width: 36},
 			{Key: "identity_type", Title: "Type", Width: 16},
 			{Key: "status", Title: "Status", Width: 36},
 		},

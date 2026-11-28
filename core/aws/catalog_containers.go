@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"reflect"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -15,12 +16,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 var containersTypes = []catalog.ResourceTypeDef{
 	{
 		Name:           "EKS Clusters",
 		ShortName:      "eks",
+		RowTypes:       []reflect.Type{reflect.TypeFor[*ekstypes.Cluster]()},
 		RefToID:        eksRefToID,
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"eks", "kubernetes", "k8s"},
@@ -31,11 +37,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_name", Title: "Cluster Name", Path: "Name", Width: 28},
-			{Key: "version", Title: "Version", Path: "Version", Width: 10},
-			{Key: "status", Title: "Status", Path: "Status", Width: 14},
-			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
-			{Key: "platform_version", Title: "Platform Version", Path: "PlatformVersion", Width: 18},
+			{Key: "cluster_name", Title: "Cluster Name", Width: 28},
+			{Key: "version", Title: "Version", Width: 10},
+			{Key: "status", Title: "Status", Width: 14},
+			{Key: "endpoint", Title: "Endpoint", Width: 48},
+			{Key: "platform_version", Title: "Platform Version", Width: 18},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ekstypes.ClusterStatus](),
@@ -90,8 +96,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 	{
 		Name:           "EKS Node Groups",
 		ShortName:      "ng",
+		RowTypes:       []reflect.Type{reflect.TypeFor[*ekstypes.Nodegroup]()},
 		RefToID:        ngRefToID,
-		HumanizeFields: []string{"status"},
+		HumanizeFields: []string{"status", "CapacityType"},
 		Aliases:        []string{"ng", "nodegroups", "node-groups"},
 		Category:       "CONTAINERS",
 		// The row id is "<cluster>/<nodegroup>"; both the console path and
@@ -110,11 +117,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(cluster)+"/nodegroups/"+url.PathEscape(ngName))
 		},
 		Columns: []domain.Column{
-			{Key: "nodegroup_name", Title: "Node Group", Path: "NodegroupName", Width: 28},
-			{Key: "cluster_name", Title: "Cluster", Path: "ClusterName", Width: 24},
-			{Key: "status", Title: "Status", Path: "Status", Width: 14},
-			{Key: "instance_types", Title: "Instance Types", Path: "InstanceTypes", Width: 20},
-			{Key: "desired_size", Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9},
+			{Key: "nodegroup_name", Title: "Node Group", Width: 28},
+			{Key: "cluster_name", Title: "Cluster", Width: 24},
+			{Key: "status", Title: "Status", Width: 14},
+			{Key: "instance_types", Title: "Instance Types", Width: 20},
+			{Key: "desired_size", Title: "Desired", Width: 9},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ekstypes.NodegroupStatus](),
@@ -241,6 +248,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "ECR Images",
 		ShortName: "ecr_images",
+		RowTypes:  []reflect.Type{reflect.TypeFor[ecrtypes.ImageDetail]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			repo := r.Fields["repository_name"]
 			if repo == "" {
@@ -271,6 +279,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:         "Service Tasks",
 		ShortName:    "ecs_tasks",
+		RowTypes:     []reflect.Type{reflect.TypeFor[ecstypes.Task]()},
 		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["task_arn"]
@@ -311,6 +320,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Service Events",
 		ShortName: "ecs_svc_events",
+		RowTypes:  []reflect.Type{reflect.TypeFor[ecstypes.ServiceEvent]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["service_arn"]
 			if arn == "" {
@@ -327,6 +337,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Service Logs",
 		ShortName: "ecs_svc_logs",
+		RowTypes:  []reflect.Type{reflect.TypeFor[cwlogstypes.FilteredLogEvent]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			// A line read in its awslogs-region opens that Region's console.
 			if lr := r.Fields["log_region"]; lr != "" {

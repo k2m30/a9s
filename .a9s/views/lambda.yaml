@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Function Name: 9e84fb2c1e7a3eac
-  Runtime: 583388f6bfe5b4e6
-  Memory: 6b0113b350601e32
-  Timeout: f06da9952874a8f3
-  Status: 5da5b3eba930969d
-  Handler: 630b66c565ebdf6f
-  Last Modified: 4f3fe753e3fcb2cb
+  Function Name: c1b978ec27934deb
+  Runtime: f0e42fddce2f756a
+  Memory: 930d5a96cd2e7be0
+  Timeout: 2c15febef678445b
+  Status: 380cdfb2b7580da0
+  Handler: e7ca9f155029f811
+  Last Modified: f8051c8ba1a2c983
 detail_hashes:
   FunctionName: 7c9f999b7489641e
   FunctionArn: 471fe7bc8e0826de
@@ -34,31 +34,24 @@ detail_hashes:
   Concurrency: 0cf96bf97b58526e
 list:
   Function Name:
-    path: FunctionName
     key: function_name
     width: 36
   Runtime:
-    path: Runtime
     key: runtime
     width: 16
   Memory:
-    path: MemorySize
     key: memory
     width: 8
   Timeout:
-    path: Timeout
     key: timeout
     width: 8
   Status:
-    path: State
     key: state
     width: 10
   Handler:
-    path: Handler
     key: handler
     width: 30
   Last Modified:
-    path: LastModified
     key: last_modified
     width: 22
 

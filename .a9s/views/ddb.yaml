@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
-  Table Name: 6ca1e45369fc6193
+  Table Name: e0128639c0da473b
   Status: 567ed47cf133ae50
-  Items: 81a9ae2552054d78
+  Items: c1df2030a3d7ec22
   Size: 7b795da6d38c7c11
   Billing: b2b2877ee72409f8
 detail_hashes:
@@ -24,14 +24,12 @@ detail_hashes:
   AttributeDefinitions: 972553ac85eef4b9
 list:
   Table Name:
-    path: TableName
     key: table_name
     width: 36
   Status:
     key: status
     width: 32
   Items:
-    path: ItemCount
     key: item_count
     width: 12
   Size:

@@ -14,7 +14,6 @@ detail_hashes:
   TargetHealth.Reason: 47b73c35ded06bcc
   TargetHealth.Description: 84989c6b31c3de80
   HealthCheckPort: 789dcf0bedca4052
-  AnomalyDetection: 0cd65c19b8d9a36c
 list:
   Target ID:
     key: target_id
@@ -43,4 +42,3 @@ detail:
   - TargetHealth.Reason
   - TargetHealth.Description
   - HealthCheckPort
-  - AnomalyDetection

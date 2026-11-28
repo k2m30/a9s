@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Node Group: abd83323caecb919
-  Cluster: fa426a143b3ff9b7
-  Status: 78d294393c20d2aa
-  Instance Types: 2b4f973fd4bf7d30
-  Desired: 0557c34e2e25bc8c
+  Node Group: 9f157a90836458d3
+  Cluster: 78e4e8c531913e75
+  Status: 70337a7b5ad55e3f
+  Instance Types: 5a3ca4da069722bf
+  Desired: 052eae98e1bc172e
 detail_hashes:
   NodegroupName: 3878bdc98826f1f0
   ClusterName: 512427c560ea8825
@@ -28,23 +28,18 @@ detail_hashes:
   "key:health_issues": 1e21b7533fcfec08
 list:
   Node Group:
-    path: NodegroupName
     key: nodegroup_name
     width: 28
   Cluster:
-    path: ClusterName
     key: cluster_name
     width: 24
   Status:
-    path: Status
     key: status
     width: 14
   Instance Types:
-    path: InstanceTypes
     key: instance_types
     width: 20
   Desired:
-    path: ScalingConfig.DesiredSize
     key: desired_size
     width: 9
 

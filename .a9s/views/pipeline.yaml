@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Pipeline Name: 5bffa6764cebee86
-  Type: 3ab48e30b9f1509a
+  Pipeline Name: 7fef99091dc43bc7
+  Type: ff649a3e68db6337
   Status: d4f831b19fcb98fe
-  Version: 43f25bbb7d4200ad
-  Created: 6fb713fabf8ac5dc
-  Updated: 56a587465cb338fd
+  Version: d77d42d9389c94c6
+  Created: e4d35f532ced6834
+  Updated: fa1a4471c5d317fa
 detail_hashes:
   Name: 1e4a1612672f42b2
   PipelineType: db877fe2515442b7
@@ -15,26 +15,21 @@ detail_hashes:
   ExecutionMode: b5455d9859739208
 list:
   Pipeline Name:
-    path: Name
     key: name
     width: 30
   Type:
-    path: PipelineType
     key: pipeline_type
     width: 6
   Status:
     key: last_status
     width: 18
   Version:
-    path: Version
     key: version
     width: 9
   Created:
-    path: Created
     key: created
     width: 22
   Updated:
-    path: Updated
     key: updated
     width: 22
 

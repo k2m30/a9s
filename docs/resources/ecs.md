@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: ECS Clusters
 - **AWS API reference**: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html>
 - **List API**: `ListClusters` (returns cluster ARN strings) followed by `DescribeClusters` for the batch (standard ECS list-then-describe pattern — the per-cluster `status`, `pendingTasksCount`, `runningTasksCount`, `registeredContainerInstancesCount` used by Wave 1 are on the `Cluster` describe shape, not the bare list).
-- **Describe API (if any)**: `DescribeClusters(include=STATISTICS)` — Wave 2 enrichment adds task/instance counts to already-loaded clusters.
+- **Describe API (if any)**: `DescribeClusters(include=STATISTICS, SETTINGS)` — `SETTINGS` returns the cluster settings (Container Insights) — Wave 2 enrichment adds task/instance counts to already-loaded clusters.
 
 ## 2. Related Resources Panel (detail view, right column)
 

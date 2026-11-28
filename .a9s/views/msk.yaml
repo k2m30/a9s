@@ -1,9 +1,9 @@
 generated: 12
 list_hashes:
-  Cluster Name: 19542533eb59074a
-  Type: dbbe0fba14d347a8
-  Status: b5c0afbda83c41e6
-  Version: 09789f80355ea091
+  Cluster Name: d661c453392b7ed2
+  Type: 5db5b2525f9f1561
+  Status: 39dbfe662c09fe6e
+  Version: 8e75b3424f8568e2
 detail_hashes:
   ClusterName: 512427c560ea8825
   ClusterArn: be3a87d4853b3411
@@ -16,19 +16,15 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Cluster Name:
-    path: ClusterName
     key: cluster_name
     width: 28
   Type:
-    path: ClusterType
     key: cluster_type
     width: 14
   Status:
-    path: State
     key: state
     width: 14
   Version:
-    path: CurrentVersion
     key: version
     width: 14
 

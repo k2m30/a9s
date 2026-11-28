@@ -14,8 +14,10 @@ import (
 
 // FetchEBEnvironmentsPage fetches a single page of Elastic Beanstalk environments.
 func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI, continuationToken string) (resource.FetchResult, error) {
+	// A terminated environment is listed: the list names its Terminated state.
 	input := &elasticbeanstalk.DescribeEnvironmentsInput{
-		MaxRecords: aws.Int32(DefaultPageSize),
+		MaxRecords:     aws.Int32(DefaultPageSize),
+		IncludeDeleted: aws.Bool(true),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

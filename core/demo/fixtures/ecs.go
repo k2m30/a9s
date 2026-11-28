@@ -342,6 +342,22 @@ func buildECSServices() []ecstypes.Service {
 			TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
 			SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 			CreatedAt:          aws.Time(mustTime("2025-06-15T10:30:00Z")),
+			PlatformVersion:    aws.String("1.4.0"),
+			DeploymentConfiguration: &ecstypes.DeploymentConfiguration{
+				MaximumPercent:           aws.Int32(200),
+				MinimumHealthyPercent:    aws.Int32(100),
+				DeploymentCircuitBreaker: &ecstypes.DeploymentCircuitBreaker{Enable: true, Rollback: true},
+			},
+			Deployments: []ecstypes.Deployment{{
+				Id:             aws.String("ecs-svc/4815162342108153672"),
+				Status:         aws.String("PRIMARY"),
+				TaskDefinition: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
+				DesiredCount:   4,
+				RunningCount:   4,
+				RolloutState:   ecstypes.DeploymentRolloutStateCompleted,
+				CreatedAt:      aws.Time(mustTime("2026-03-18T09:00:00Z")),
+				UpdatedAt:      aws.Time(mustTime("2026-03-18T09:12:00Z")),
+			}},
 			// RoleArn — required for ecs-svc→role related-panel pivot.
 			RoleArn: aws.String("arn:aws:iam::123456789012:role/acme-ecs-service-role"),
 			// LoadBalancers — required for ecs-svc→tg and ecs-svc→elb related-panel
@@ -501,6 +517,7 @@ func buildECSServices() []ecstypes.Service {
 		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 		CreatedAt:          aws.Time(mustTime("2025-01-12T10:00:00Z")),
 		Events: []ecstypes.ServiceEvent{{
+			Id: aws.String("5e9a1c3b-7d2f-4a8e-9b6c-0f1e2d3c4b5a"),
 			Message: aws.String("(service " + ECSServiceBelowDesiredCount + ") (instance i-0a1b2c3d4e5f60001) " +
 				"(port 8080) is unhealthy in (target-group acme-web-tg) due to " +
 				"(reason Health checks failed with these codes: [502])."),
@@ -528,6 +545,7 @@ func buildECSServices() []ecstypes.Service {
 		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 		CreatedAt:          aws.Time(mustTime("2025-06-04T11:00:00Z")),
 		Events: []ecstypes.ServiceEvent{{
+			Id: aws.String("8c4d2e6f-1a3b-4c5d-8e7f-9a0b1c2d3e4f"),
 			Message: aws.String("(service " + ECSServiceNoTasksRunning + ") was unable to place a task " +
 				"because no container instance met all of its requirements. The closest matching " +
 				"container-instance 0a1b2c3d has insufficient memory available. For more information, " +
@@ -586,7 +604,9 @@ func buildECSTasks() []ecstypes.Task {
 			Cpu:               aws.String("512"),
 			Memory:            aws.String("1024"),
 			Group:             aws.String("service:api-gateway"),
+			StartedBy:         aws.String("ecs-svc/4815162342108153672"),
 			StartedAt:         aws.Time(mustTime("2026-03-20T08:15:00Z")),
+			Tags:              []ecstypes.Tag{{Key: aws.String("Environment"), Value: aws.String("prod")}},
 			HealthStatus:      ecstypes.HealthStatusHealthy,
 			Connectivity:      ecstypes.ConnectivityConnected,
 			PlatformVersion:   aws.String("1.4.0"),

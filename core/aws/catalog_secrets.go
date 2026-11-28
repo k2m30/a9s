@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"net/url"
+	"reflect"
 	"strings"
 
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -14,12 +15,15 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
 var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:           "Secrets Manager",
 		ShortName:      "secrets",
+		RowTypes:       []reflect.Type{reflect.TypeFor[smtypes.SecretListEntry]()},
 		RefToID:        secretsRefToID,
 		LifecycleKey:   "status",
 		HumanizeFields: []string{"status"},
@@ -30,12 +34,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "secretsmanager/secret?region="+region+"&name="+url.QueryEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "secret_name", Title: "Secret Name", Path: "Name", Width: 36},
-			{Key: "status", Title: "Status", Path: "Name", Width: 10},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
-			{Key: "last_accessed", Title: "Last Accessed", Path: "LastAccessedDate", Width: 18},
-			{Key: "last_changed", Title: "Last Changed", Path: "LastChangedDate", Width: 18},
-			{Key: "rotation_enabled", Title: "Rotation", Path: "RotationEnabled", Width: 10},
+			{Key: "secret_name", Title: "Secret Name", Width: 36},
+			{Key: "status", Title: "Status", Width: 10},
+			{Key: "description", Title: "Description", Width: 30},
+			{Key: "last_accessed", Title: "Last Accessed", Width: 18},
+			{Key: "last_changed", Title: "Last Changed", Width: 18},
+			{Key: "rotation_enabled", Title: "Rotation", Width: 10},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      []string{secretsStateActive, secretsStateDeleted},
@@ -82,6 +86,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "SSM Parameters",
 		ShortName:      "ssm",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ssmtypes.ParameterMetadata]()},
 		RefToID:        ssmRefToID,
 		LifecycleKey:   "risk",
 		HumanizeFields: []string{"type"},
@@ -95,12 +100,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "systems-manager/parameters/"+name+"/description?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 40},
-			{Key: "type", Title: "Type", Path: "Type", Width: 14},
+			{Key: "name", Title: "Name", Width: 40},
+			{Key: "type", Title: "Type", Width: 14},
 			{Key: "risk", Title: "Status", Width: 10},
-			{Key: "version", Title: "Version", Path: "Version", Width: 8},
-			{Key: "last_modified", Title: "Last Modified", Path: "LastModifiedDate", Width: 22},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "version", Title: "Version", Width: 8},
+			{Key: "last_modified", Title: "Last Modified", Width: 22},
+			{Key: "description", Title: "Description", Width: 30},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SSM} }),
@@ -126,6 +131,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "KMS Keys",
 		ShortName:      "kms",
+		RowTypes:       []reflect.Type{reflect.TypeFor[*kmstypes.KeyMetadata]()},
 		RefToID:        kmsRefToID,
 		HumanizeFields: []string{"status", "KeyManager", "KeySpec", "KeyState", "KeyUsage", "Origin", "MultiRegionKeyType"},
 		Aliases:        []string{"kms", "keys"},
@@ -137,10 +143,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Columns: []domain.Column{
 			{Key: "alias", Title: "Alias", Width: 32},
-			{Key: "key_id", Title: "Key ID", Path: "KeyId", Width: 38},
-			{Key: "status", Title: "Status", Path: "KeyState", Width: 12},
+			{Key: "key_id", Title: "Key ID", Width: 38},
+			{Key: "status", Title: "Status", Width: 12},
 			{Key: "rotation_enabled", Title: "Rotation", Width: 10},
-			{Key: "description", Title: "Description", Path: "Description", Width: 36},
+			{Key: "description", Title: "Description", Width: 36},
 		},
 		Color:                  colorAnyFindingOrHealthy,
 		StateEnum:              enumValues[kmstypes.KeyState](),

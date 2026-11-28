@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  User Name: 6fd48113122f36ac
+  User Name: 0811c1f0f791c941
   MFA: 72ddceafd5be0714
   Status: cd95227e87bde6f1
-  User ID: 2e6edd21106a33c4
-  Path: d416fd403468cb3e
-  Created: 15feb82878e9ee9a
-  Password Last Used: cc56ae16e4a2edcf
+  User ID: 9fb4969eee42494b
+  Path: f9e06cee6f3a2621
+  Created: cbf57c551f7bb916
+  Password Last Used: 206b2b223784da33
 detail_hashes:
   UserName: e9d04b791f722a2c
   UserId: eafc68318870ee19
@@ -18,7 +18,6 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   User Name:
-    path: UserName
     key: user_name
     width: 32
   MFA:
@@ -28,19 +27,15 @@ list:
     key: risk
     width: 14
   User ID:
-    path: UserId
     key: user_id
     width: 22
   Path:
-    path: Path
     key: path
     width: 20
   Created:
-    path: CreateDate
     key: create_date
     width: 22
   Password Last Used:
-    path: PasswordLastUsed
     key: password_last_used
     width: 22
 

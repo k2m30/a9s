@@ -180,10 +180,11 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 			State: &elbv2types.LoadBalancerState{
 				Code: elbv2types.LoadBalancerStateEnumActive,
 			},
-			VpcId:          aws.String(fixtELBProdVPCID),
-			IpAddressType:  elbv2types.IpAddressTypeIpv4,
-			SecurityGroups: []string{"sg-0aaa111111111111a"},
-			CreatedTime:    aws.Time(time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)),
+			VpcId:                 aws.String(fixtELBProdVPCID),
+			IpAddressType:         elbv2types.IpAddressTypeIpv4,
+			SecurityGroups:        []string{"sg-0aaa111111111111a"},
+			CanonicalHostedZoneId: aws.String("Z35SXDOTRQ7X7K"),
+			CreatedTime:           aws.Time(time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)),
 			AvailabilityZones: []elbv2types.AvailabilityZone{
 				{SubnetId: aws.String(fixtELBSubnetA), ZoneName: aws.String("us-east-1a")},
 				{SubnetId: aws.String(fixtELBSubnetB), ZoneName: aws.String("us-east-1b")},
@@ -346,6 +347,9 @@ func buildTargetGroups() []elbv2types.TargetGroup {
 			VpcId:                      aws.String(fixtELBProdVPCID),
 			TargetType:                 elbv2types.TargetTypeEnumInstance,
 			HealthCheckPath:            aws.String("/healthz"),
+			HealthCheckPort:            aws.String("traffic-port"),
+			HealthCheckProtocol:        elbv2types.ProtocolEnumHttps,
+			Matcher:                    &elbv2types.Matcher{HttpCode: aws.String("200")},
 			HealthCheckEnabled:         aws.Bool(true),
 			HealthCheckIntervalSeconds: aws.Int32(30),
 			HealthCheckTimeoutSeconds:  aws.Int32(5),
@@ -446,6 +450,20 @@ func buildListeners(f *ELBFixtures) {
 				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdAPITGARN)},
 			},
 		},
+		{
+			ListenerArn:     aws.String(plainTCPARN + "/listener/cccc3334"),
+			LoadBalancerArn: aws.String(plainTCPARN),
+			Port:            aws.Int32(443),
+			Protocol:        elbv2types.ProtocolEnumTls,
+			SslPolicy:       aws.String("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+			AlpnPolicy:      []string{"HTTP2Preferred"},
+			Certificates: []elbv2types.Certificate{
+				{CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111")},
+			},
+			DefaultActions: []elbv2types.Action{
+				{Type: elbv2types.ActionTypeEnumForward, TargetGroupArn: aws.String(fixtProdAPITGARN)},
+			},
+		},
 	}
 
 	// The only demo listeners on a security policy that still allows a
@@ -492,6 +510,10 @@ func buildListeners(f *ELBFixtures) {
 			Port:            aws.Int32(443),
 			Protocol:        elbv2types.ProtocolEnumHttps,
 			SslPolicy:       aws.String("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+			MutualAuthentication: &elbv2types.MutualAuthenticationAttributes{
+				Mode:                          aws.String("off"),
+				IgnoreClientCertificateExpiry: aws.Bool(false),
+			},
 			// Certificates — required for the elb→acm related-panel pivot
 			// (checkELBACM). ProdACMCertARN1 (acm.go) is the same cert this
 			// ELB's ARN appears under in ACM's InUseBy fixture (acm→elb).
@@ -580,8 +602,9 @@ func buildTargetHealth(f *ELBFixtures) {
 	f.TargetHealth[fixtProdAPITGARN] = []elbv2types.TargetHealthDescription{
 		{
 			Target: &elbv2types.TargetDescription{
-				Id:   aws.String("10.0.1.50"),
-				Port: aws.Int32(8080),
+				Id:               aws.String("10.0.1.50"),
+				Port:             aws.Int32(8080),
+				AvailabilityZone: aws.String("us-east-1a"),
 			},
 			HealthCheckPort: aws.String("8080"),
 			TargetHealth: &elbv2types.TargetHealth{
@@ -633,8 +656,9 @@ func buildRules(f *ELBFixtures) {
 			Priority: aws.String("1"),
 			Conditions: []elbv2types.RuleCondition{
 				{
-					Field:  aws.String("path-pattern"),
-					Values: []string{"/api/*"},
+					Field:             aws.String("path-pattern"),
+					Values:            []string{"/api/*"},
+					PathPatternConfig: &elbv2types.PathPatternConditionConfig{Values: []string{"/api/*"}},
 				},
 			},
 			Actions: []elbv2types.Action{

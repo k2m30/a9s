@@ -34,6 +34,7 @@ func fetchECSTasksPageWithJoin(
 ) (resource.FetchResult, error) {
 	// Memoize DescribeTaskDefinition results across every cluster of the page.
 	seenTaskDefs := make(map[string]taskDefRead)
+	keptTasks := make(map[string]bool)
 	var joinFailures, failures []Failure
 	attempted, joined := 0, 0
 	walk := parentChildWalk{
@@ -42,21 +43,36 @@ func fetchECSTasksPageWithJoin(
 			if err != nil {
 				return nil, nil, fmt.Errorf("listing ECS clusters: %w", err)
 			}
-			return out.ClusterArns, out.NextToken, nil
+			parents := make([]string, 0, 2*len(out.ClusterArns))
+			for _, arn := range out.ClusterArns {
+				parents = append(parents, ecsTaskParent(ecstypes.DesiredStatusRunning, arn), ecsTaskParent(ecstypes.DesiredStatusStopped, arn))
+			}
+			return parents, out.NextToken, nil
 		},
 		listOp: "ecs-task: ListTasks",
-		listChildren: func(ctx context.Context, clusterArn string, token *string) ([]string, *string, error) {
+		listChildren: func(ctx context.Context, parent string, token *string) ([]string, *string, error) {
+			status, clusterArn := ecsTaskParentParts(parent)
 			out, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
-				Cluster:    aws.String(clusterArn),
-				MaxResults: aws.Int32(100),
-				NextToken:  token,
+				Cluster:       aws.String(clusterArn),
+				DesiredStatus: status,
+				MaxResults:    aws.Int32(100),
+				NextToken:     token,
 			})
 			if err != nil {
 				return nil, nil, err
 			}
-			return out.TaskArns, out.NextToken, nil
+			// A task whose desired status changed between the two questions
+			// is in both answers, and is the row of the one it was kept for.
+			var fresh []string
+			for _, arn := range out.TaskArns {
+				if !keptTasks[arn] {
+					fresh = append(fresh, arn)
+				}
+			}
+			return fresh, out.NextToken, nil
 		},
-		describe: func(ctx context.Context, clusterArn string, taskArns []string) ([]resource.Resource, error) {
+		describe: func(ctx context.Context, parent string, taskArns []string) ([]resource.Resource, error) {
+			status, clusterArn := ecsTaskParentParts(parent)
 			// Tags are returned only when named in Include.
 			descOutput, err := describeTasksAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 				Cluster: aws.String(clusterArn),
@@ -70,6 +86,18 @@ func fetchECSTasksPageWithJoin(
 				tasks, ans.gone = descOutput.Tasks, ecsGone(descOutput.Failures)
 			}
 			for _, task := range tasks {
+				// A task whose desired status changed after the list is the
+				// other question's row: STOPPED is the one question, every
+				// other desired status the default one.
+				stopped := ecstypes.DesiredStatus(aws.ToString(task.DesiredStatus)) == ecstypes.DesiredStatusStopped
+				if stopped != (status == ecstypes.DesiredStatusStopped) {
+					if ans.gone == nil {
+						ans.gone = map[string]bool{}
+					}
+					ans.gone[aws.ToString(task.TaskArn)] = true
+					continue
+				}
+				keptTasks[aws.ToString(task.TaskArn)] = true
 				taskID := ""
 				taskArn := ""
 				if task.TaskArn != nil {
@@ -183,6 +211,20 @@ func fetchECSTasksPageWithJoin(
 		JoinAggregates(err, AggregateFailures("ecs-task: DescribeTasks", failures, attempted)),
 		AggregateFailures("ecs-task: DescribeTaskDefinition", joinFailures, joined),
 	)
+}
+
+// ecsTaskParent is the walk parent of one ListTasks question: a cluster and a
+// desired status. ListTasks answers the tasks of one desired status, RUNNING
+// when none is named ("The default status filter is RUNNING",
+// ListTasksInput.DesiredStatus), and the list shows stopped tasks as well, so
+// each cluster is asked once per status.
+func ecsTaskParent(status ecstypes.DesiredStatus, clusterArn string) string {
+	return string(status) + "/" + clusterArn
+}
+
+func ecsTaskParentParts(parent string) (ecstypes.DesiredStatus, string) {
+	status, clusterArn, _ := strings.Cut(parent, "/")
+	return ecstypes.DesiredStatus(status), clusterArn
 }
 
 // taskDefJoinFields holds the per-task fields resolved by ecsJoinTaskDefinition

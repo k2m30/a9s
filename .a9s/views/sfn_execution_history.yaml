@@ -1,6 +1,6 @@
 generated: 12
 list_hashes:
-  Timestamp: 7d4137f1a9c06a48
+  Timestamp: 5bf08271cbcd6527
   Event Type: 467b1d7a4d3f1251
   Status: 168e38cf521a9b36
   State: 0fb808117bfbb17c
@@ -40,7 +40,6 @@ detail_hashes:
   StateExitedEventDetails: e720f51f247a55c4
 list:
   Timestamp:
-    path: Timestamp
     key: timestamp
     width: 22
   Event Type:

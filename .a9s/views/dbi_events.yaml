@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
-  Timestamp: 9881231c16ec9ee6
+  Timestamp: 5bf08271cbcd6527
   Category: 48423d8106af5062
-  Message: 44d5ab2aded48283
+  Message: 255cbdda1db67e9f
 detail_hashes:
   Date: 6d9083ca1e8beb1a
   SourceIdentifier: 7d554d3af7abe486
@@ -12,14 +12,12 @@ detail_hashes:
   Message: d7a5fb00e2f4ecd3
 list:
   Timestamp:
-    path: Date
     key: timestamp
     width: 22
   Category:
     key: event_categories
     width: 18
   Message:
-    path: Message
     key: message
     width: 60
 

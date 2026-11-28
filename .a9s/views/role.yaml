@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Role Name: 83f6ca6c76b88615
+  Role Name: e4fe69ebbf5abffc
   Status: 516e63265dd02620
-  Last Used: f085ea6c30ca8cdc
+  Last Used: 62d902155c0f1a1d
   Trust: 66ee9f84f16f96e9
-  Path: d416fd403468cb3e
-  Created: 15feb82878e9ee9a
-  Description: db8526853ab7a372
+  Path: f9e06cee6f3a2621
+  Created: cbf57c551f7bb916
+  Description: b9919eabf9baef1f
 detail_hashes:
   RoleName: b1b28b0f7ad08665
   RoleId: e959b659af9aac3e
@@ -21,28 +21,24 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Role Name:
-    path: RoleName
     key: role_name
     width: 36
   Status:
     key: state
     width: 12
   Last Used:
-    path: RoleLastUsed.LastUsedDate
+    key: last_used
     width: 22
   Trust:
     key: trust_summary
     width: 12
   Path:
-    path: Path
     key: path
     width: 20
   Created:
-    path: CreateDate
     key: create_date
     width: 22
   Description:
-    path: Description
     key: description
     width: 30
 

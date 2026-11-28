@@ -184,6 +184,11 @@ func osBaseDomain(name, domainID, arn, engineVersion, endpoint string) ostypes.D
 		ServiceSoftwareOptions: &ostypes.ServiceSoftwareOptions{
 			UpdateAvailable: aws.Bool(false),
 		},
+		AdvancedSecurityOptions: &ostypes.AdvancedSecurityOptions{
+			Enabled:                     aws.Bool(true),
+			InternalUserDatabaseEnabled: aws.Bool(false),
+			AnonymousAuthEnabled:        aws.Bool(false),
+		},
 	}
 }
 
@@ -202,6 +207,7 @@ func osPostureWitness(name string, defect func(*ostypes.DomainStatus)) ostypes.D
 		SubnetIds:        []string{OpenSearchSubnetA, OpenSearchSubnetB},
 		SecurityGroupIds: []string{OpenSearchSGA, OpenSearchSGB},
 	}
+	d.Endpoints = map[string]string{"vpc": "vpc-" + name + "-p0st1r.us-east-1.es.amazonaws.com"}
 	defect(&d)
 	return d
 }

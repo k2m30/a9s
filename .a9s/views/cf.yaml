@@ -1,13 +1,13 @@
 generated: 12
 list_hashes:
-  Domain Name: 71b1a428322b442d
-  Distribution ID: ad8c7e7fbd610241
-  Status: 2bb69a4a55078c29
+  Domain Name: 39356e0c9ab65fba
+  Distribution ID: 689031cb66e8b579
+  Status: 168e38cf521a9b36
   WAF: 0db76e22b4d04906
   TLS: 02b9d177ed5a85cd
-  Enabled: f1d553976c94ebd4
-  Aliases: 848f9bf61f6c9c5d
-  Price Class: e8cbae40821f9d33
+  Enabled: ceb5266c137b564d
+  Aliases: 92e8f38bc8d1e55b
+  Price Class: a19b8632376407d5
 detail_hashes:
   Id: 75be4e070c3dd9b3
   DomainName: dce31d3d792a5d93
@@ -23,15 +23,12 @@ detail_hashes:
   DefaultCacheBehavior: 639269faf9010623
 list:
   Domain Name:
-    path: DomainName
     key: domain_name
     width: 40
   Distribution ID:
-    path: Id
     key: distribution_id
     width: 16
   Status:
-    path: Status
     key: status
     width: 12
   WAF:
@@ -41,15 +38,12 @@ list:
     path: ViewerCertificate.MinimumProtocolVersion
     width: 14
   Enabled:
-    path: Enabled
     key: enabled
     width: 9
   Aliases:
-    path: Aliases.Items
     key: aliases
     width: 30
   Price Class:
-    path: PriceClass
     key: price_class
     width: 16
 

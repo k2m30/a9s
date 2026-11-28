@@ -600,9 +600,11 @@ func buildS3Objects() map[string]map[string][]s3types.Object {
 	return map[string]map[string][]s3types.Object{
 		"data-pipeline-logs": {
 			"": {
-				{Key: aws.String("config.json"), Size: aws.Int64(2458), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-03-18T09:15:22+00:00"))},
+				{Key: aws.String("config.json"), Size: aws.Int64(2458), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-03-18T09:15:22+00:00")),
+					ETag: aws.String(`"9b2cf535f27731c974343645a3985328"`), ChecksumAlgorithm: []s3types.ChecksumAlgorithm{s3types.ChecksumAlgorithmCrc64nvme}, ChecksumType: s3types.ChecksumTypeFullObject},
 				{Key: aws.String("schema/pipeline-v2.avro"), Size: aws.Int64(19148), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-01-10T14:32:07+00:00"))},
-				{Key: aws.String("archive/2025-q4-summary.parquet"), Size: aws.Int64(149199462), StorageClass: s3types.ObjectStorageClassGlacier, LastModified: aws.Time(mustTime("2026-01-05T03:00:00+00:00"))},
+				{Key: aws.String("archive/2025-q4-summary.parquet"), Size: aws.Int64(149199462), StorageClass: s3types.ObjectStorageClassGlacier, LastModified: aws.Time(mustTime("2026-01-05T03:00:00+00:00")),
+					ETag: aws.String(`"d41d8cd98f00b204e9800998ecf8427e-18"`), RestoreStatus: &s3types.RestoreStatus{IsRestoreInProgress: aws.Bool(false), RestoreExpiryDate: aws.Time(mustTime("2026-04-02T00:00:00+00:00"))}},
 			},
 			"logs/": {
 				{Key: aws.String("logs/2026/"), Size: aws.Int64(0), StorageClass: s3types.ObjectStorageClassStandard},

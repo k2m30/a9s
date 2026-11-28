@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: IAM Roles
 - **AWS API reference**: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html>
 - **List API**: `ListRoles` (each list entry is a `Role` struct, including the URL-encoded `AssumeRolePolicyDocument`).
-- **Describe API (if any)**: `GetRole` — used in Wave 2 only, to fetch `RoleLastUsed.LastUsedDate` (the list response's `Role` does not carry `RoleLastUsed` reliably; `GetRole` is the canonical source).
+- **Describe API (if any)**: `GetRole`. Wave 2 reads `RoleLastUsed.LastUsedDate` from it for every role, service-linked roles included, and writes the "Last Used" column (`last_used`); `ListRoles` does not return `PermissionsBoundary`, `RoleLastUsed` or `Tags` (`ListOmits`). The detail takes those three members from `GetRole`, read once per session.
 
 ## 2. Related Resources Panel (detail view, right column)
 

@@ -1,8 +1,8 @@
 generated: 12
 list_hashes:
   Timestamp: 5bf08271cbcd6527
-  Logical ID: 4de1aed3538f1b37
-  Type: 9a995c28b9125a5b
+  Logical ID: 89fd8fe3c5672596
+  Type: ac58c21fcb452991
   Status: 46a13ebc90e10d8a
   Reason: 35c293e83598e7e8
 detail_hashes:
@@ -22,11 +22,9 @@ list:
     key: timestamp
     width: 22
   Logical ID:
-    path: LogicalResourceId
     key: logical_resource_id
     width: 28
   Type:
-    path: ResourceType
     key: resource_type
     width: 28
   Status:

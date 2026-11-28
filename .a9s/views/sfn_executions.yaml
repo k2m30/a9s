@@ -1,9 +1,9 @@
 generated: 12
 list_hashes:
-  Name: 821963eee092fc8f
-  Status: 2bb69a4a55078c29
-  Start Date: 8c6e746be24d6312
-  Stop Date: 2f3d01e145780c0f
+  Name: 2a8d13cfe6ea5a6f
+  Status: 168e38cf521a9b36
+  Start Date: 7be102bfff475348
+  Stop Date: 69a7c1ac955f7a62
   Duration: 8105ac895120e341
 detail_hashes:
   ExecutionArn: aadcfb2a03d878f3
@@ -14,25 +14,19 @@ detail_hashes:
   StateMachineArn: 2d99785285fa58ed
   StateMachineAliasArn: 24138b9c83264ead
   StateMachineVersionArn: 1ce109b9fbe2d03e
-  MapRunArn: 27fab7ad98b5c15a
-  ItemCount: a0546ebadfcb4106
   RedriveCount: e5b9907d0f14e8f7
   RedriveDate: f2a62fc767198c93
 list:
   Name:
-    path: Name
     key: name
     width: 36
   Status:
-    path: Status
     key: status
     width: 12
   Start Date:
-    path: StartDate
     key: start_date
     width: 22
   Stop Date:
-    path: StopDate
     key: stop_date
     width: 22
   Duration:
@@ -48,7 +42,5 @@ detail:
   - StateMachineArn
   - StateMachineAliasArn
   - StateMachineVersionArn
-  - MapRunArn
-  - ItemCount
   - RedriveCount
   - RedriveDate

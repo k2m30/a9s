@@ -1,7 +1,7 @@
 generated: 12
 list_hashes:
   Name: 49cd2c5c00dfc200
-  IGW ID: b5c75be0de868377
+  IGW ID: e66770b549cc1a33
   VPC ID: 8fd38a59c94f4eb1
   Status: 516e63265dd02620
 detail_hashes:
@@ -14,7 +14,6 @@ list:
     key: name
     width: 28
   IGW ID:
-    path: InternetGatewayId
     key: igw_id
     width: 26
   VPC ID:

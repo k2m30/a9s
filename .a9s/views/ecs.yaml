@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Cluster Name: f803e20536a9aecf
-  Status: 2bb69a4a55078c29
-  Running: 3ac67be1a398be4a
-  Pending: 9a990dd2a927e67f
-  Services: f2817e46559c75af
+  Cluster Name: b586b1aac931b464
+  Status: 168e38cf521a9b36
+  Running: 5dcd2954f040a7cd
+  Pending: 1529115cffd9ceab
+  Services: ddcb06c9cf1c09f0
 detail_hashes:
   ClusterName: 512427c560ea8825
   ClusterArn: be3a87d4853b3411
@@ -20,23 +20,18 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Cluster Name:
-    path: ClusterName
     key: cluster_name
     width: 32
   Status:
-    path: Status
     key: status
     width: 12
   Running:
-    path: RunningTasksCount
     key: running_tasks
     width: 9
   Pending:
-    path: PendingTasksCount
     key: pending_tasks
     width: 9
   Services:
-    path: ActiveServicesCount
     key: services_count
     width: 10
 

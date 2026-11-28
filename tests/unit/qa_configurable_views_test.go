@@ -904,27 +904,29 @@ func TestQA_NilFields_EKS(t *testing.T) {
 	}
 }
 
+// Every default secrets column shows a value for a realistic ListSecrets
+// entry as the fetcher stores it. The entry was last accessed and changed on
+// testTime, over a year before any run, so it is dormant and its value is
+// stale: Status names the first and counts the second.
 func TestQA_ListViewColumns_Secrets(t *testing.T) {
-	secret := realisticSecretListEntry()
-	vd := config.DefaultViewDef("secrets")
-
-	for _, col := range vd.List {
+	clients := demo.NewServiceClients()
+	clients.SecretsManager = &t9cSecrets{SecretsManagerAPI: clients.SecretsManager, secrets: []smtypes.SecretListEntry{realisticSecretListEntry()}}
+	rows := t9cFetch(t, "secrets", clients)
+	cells := t9cListCells(t, "secrets", rows)["prod/database/password"]
+	want := map[string]string{
+		"Secret Name":   "prod/database/password",
+		"Status":        "dormant (+1)",
+		"Description":   "Production database password",
+		"Last Accessed": testTime.Format("2006-01-02"),
+		"Last Changed":  testTime.Format("2006-01-02"),
+		"Rotation":      "Yes",
+	}
+	for _, col := range config.DefaultViewDef("secrets").List {
 		t.Run(col.Title, func(t *testing.T) {
-			result := fieldpath.ExtractScalar(secret, col.Path)
-			if result == "" {
-				t.Errorf("ExtractScalar(%q) returned empty for realistic SecretListEntry", col.Path)
+			if got := cells[col.Title]; got != want[col.Title] {
+				t.Errorf("secrets %s cell %q, want %q", col.Title, got, want[col.Title])
 			}
 		})
-	}
-
-	if got := fieldpath.ExtractScalar(secret, "Name"); got != "prod/database/password" {
-		t.Errorf("Name: expected %q, got %q", "prod/database/password", got)
-	}
-	if got := fieldpath.ExtractScalar(secret, "Description"); got != "Production database password" {
-		t.Errorf("Description: expected %q, got %q", "Production database password", got)
-	}
-	if got := fieldpath.ExtractScalar(secret, "RotationEnabled"); got != "Yes" {
-		t.Errorf("RotationEnabled: expected %q, got %q", "Yes", got)
 	}
 }
 

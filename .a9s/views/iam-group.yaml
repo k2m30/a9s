@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  Group Name: 4fdeec92bcb3275b
+  Group Name: eacd6588aa4ce164
   Status: 516e63265dd02620
   Members: 4cbc2bd086b6a7ee
-  Group ID: d6d4848701589882
-  Path: d416fd403468cb3e
-  Created: 15feb82878e9ee9a
-  ARN: 530011f36418706d
+  Group ID: 82746fab0839e834
+  Path: f9e06cee6f3a2621
+  Created: cbf57c551f7bb916
+  ARN: 03b55909657849c4
 detail_hashes:
   GroupName: 7e9b2fa1ab81711a
   GroupId: 473858615d139f6e
@@ -15,7 +15,6 @@ detail_hashes:
   CreateDate: 12566b0c4fd518ca
 list:
   Group Name:
-    path: GroupName
     key: group_name
     width: 32
   Status:
@@ -25,19 +24,15 @@ list:
     key: member_count
     width: 9
   Group ID:
-    path: GroupId
     key: group_id
     width: 22
   Path:
-    path: Path
     key: path
     width: 20
   Created:
-    path: CreateDate
     key: create_date
     width: 22
   ARN:
-    path: Arn
     key: arn
     width: 60
 

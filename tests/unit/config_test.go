@@ -82,8 +82,8 @@ func TestConfigLookupChain(t *testing.T) {
 		dir2 := filepath.Join(t.TempDir(), "views")
 		os.MkdirAll(dir1, 0755)
 		os.MkdirAll(dir2, 0755)
-		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromDir1:\n    path: dir1\n    width: 1\n"), 0644)
-		os.WriteFile(filepath.Join(dir2, "ec2.yaml"), []byte("list:\n  FromDir2:\n    path: dir2\n    width: 2\n"), 0644)
+		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromDir1:\n    path: KeyName\n    width: 1\n"), 0644)
+		os.WriteFile(filepath.Join(dir2, "ec2.yaml"), []byte("list:\n  FromDir2:\n    path: Architecture\n    width: 2\n"), 0644)
 
 		cfg, err := config.LoadFromDirs([]string{dir1, dir2})
 		if err != nil {
@@ -101,7 +101,7 @@ func TestConfigLookupChain(t *testing.T) {
 	t.Run("configdir_when_no_cwd", func(t *testing.T) {
 		dir1 := filepath.Join(t.TempDir(), "views")
 		os.MkdirAll(dir1, 0755)
-		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromConfigDir:\n    path: configdir\n    width: 2\n"), 0644)
+		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromConfigDir:\n    path: Hypervisor\n    width: 2\n"), 0644)
 
 		cfg, err := config.LoadFromDirs([]string{dir1, filepath.Join(t.TempDir(), "nonexistent")})
 		if err != nil {
@@ -174,22 +174,16 @@ func TestConfigDefaultViewDef_S3Objects(t *testing.T) {
 		t.Fatalf("expected 4 list columns for s3_objects default, got %d", len(vd.List))
 	}
 
-	wantCols := []struct {
-		title string
-		path  string
-		width int
-	}{
-		{"Key", "Key", 36},
-		{"Size", "", 12},
-		{"Storage Class", "StorageClass", 16},
-		{"Last Modified", "LastModified", 22},
+	wantCols := []config.ListColumn{
+		{Title: "Key", Key: "key", Width: 36},
+		{Title: "Size", Key: "size", Width: 12, SortKey: "size_raw"},
+		{Title: "Storage Class", Key: "storage_class", Width: 16},
+		{Title: "Last Modified", Key: "last_modified", Width: 22},
 	}
 	for i, want := range wantCols {
 		got := vd.List[i]
-		if got.Title != want.title || got.Path != want.path || got.Width != want.width {
-			t.Errorf("s3_objects default List[%d] = {%q, %q, %d}, want {%q, %q, %d}",
-				i, got.Title, got.Path, got.Width,
-				want.title, want.path, want.width)
+		if got.Title != want.Title || got.Key != want.Key || got.Path != want.Path || got.Width != want.Width || got.SortKey != want.SortKey {
+			t.Errorf("s3_objects default List[%d] = %+v, want %+v", i, got, want)
 		}
 	}
 }

@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Name: d723958918589cd8
-  DNS Name: c8d68e78f57d69c6
-  Type: 2a7b5847ac3a531d
-  Scheme: c8ab6f117370c147
-  Status: 5af5e622ba19bf9c
-  VPC ID: 51b18126b8707aee
+  Name: 61bd1f26e94ffe26
+  DNS Name: dc4e90ab0eaa7071
+  Type: 1b4b084be73bba29
+  Scheme: 0917bdde4d106453
+  Status: 516e63265dd02620
+  VPC ID: 8fd38a59c94f4eb1
 detail_hashes:
   LoadBalancerName: ba3e6d2ad6d07ec2
   LoadBalancerArn: ae00a6506bb9493a
@@ -21,27 +21,21 @@ detail_hashes:
   CreatedTime: ff6a8050019eb8c5
 list:
   Name:
-    path: LoadBalancerName
     key: name
     width: 32
   DNS Name:
-    path: DNSName
     key: dns_name
     width: 48
   Type:
-    path: Type
     key: type
     width: 12
   Scheme:
-    path: Scheme
     key: scheme
     width: 14
   Status:
-    path: State.Code
     key: state
     width: 12
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
 

@@ -25,4 +25,10 @@ func WireProjection() {
 	projection.NavFieldsProvider = GetDefaultNavFields
 	projection.FieldAliasProvider = ApplyFieldAliases
 	projection.FieldKeysProvider = GetFieldKeys
+	projection.ReplayKeysProvider = func(shortName string) map[string]string {
+		if td := TypeDef(shortName); td != nil {
+			return td.ReplayKeys
+		}
+		return nil
+	}
 }

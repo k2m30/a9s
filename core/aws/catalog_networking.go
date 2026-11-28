@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"reflect"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -26,6 +27,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Load Balancers",
 		ShortName:     "elb",
+		RowTypes:      []reflect.Type{reflect.TypeFor[elbv2types.LoadBalancer]()},
 		RefToID:       elbRefToID,
 		Aliases:       []string{"elb", "alb", "nlb", "loadbalancers", "load-balancers"},
 		Category:      "NETWORKING",
@@ -38,12 +40,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "ec2/home?region="+region+"#LoadBalancer:loadBalancerArn="+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "LoadBalancerName", Width: 32},
-			{Key: "dns_name", Title: "DNS Name", Path: "DNSName", Width: 48},
-			{Key: "type", Title: "Type", Path: "Type", Width: 12},
-			{Key: "scheme", Title: "Scheme", Path: "Scheme", Width: 14},
-			{Key: "state", Title: "Status", Path: "State.Code", Width: 12},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "name", Title: "Name", Width: 32},
+			{Key: "dns_name", Title: "DNS Name", Width: 48},
+			{Key: "type", Title: "Type", Width: 12},
+			{Key: "scheme", Title: "Scheme", Width: 14},
+			{Key: "state", Title: "Status", Width: 12},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "elb_listeners",
@@ -97,9 +99,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "Target Groups",
 		ShortName:      "tg",
+		RowTypes:       []reflect.Type{reflect.TypeFor[elbv2types.TargetGroup]()},
 		RefToID:        tgRefToID,
 		LifecycleKey:   "health_summary",
-		HumanizeFields: []string{"protocol", "ProtocolVersion"},
+		HumanizeFields: []string{"protocol", "ProtocolVersion", "HealthCheckProtocol"},
 		Aliases:        []string{"tg", "targetgroups", "target-groups"},
 		Category:       "NETWORKING",
 		CloudTrailKey:  "ResourceName:ID",
@@ -111,13 +114,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "ec2/home?region="+region+"#TargetGroup:targetGroupArn="+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "target_group_name", Title: "Target Group", Path: "TargetGroupName", Width: 32},
-			{Key: "port", Title: "Port", Path: "Port", Width: 8},
-			{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10},
+			{Key: "target_group_name", Title: "Target Group", Width: 32},
+			{Key: "port", Title: "Port", Width: 8},
+			{Key: "protocol", Title: "Protocol", Width: 10},
 			{Key: "health_summary", Title: "Status", Width: 14},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
-			{Key: "target_type", Title: "Target Type", Path: "TargetType", Width: 12},
-			{Key: "health_check_path", Title: "Health Check", Path: "HealthCheckPath", Width: 24},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "target_type", Title: "Target Type", Width: 12},
+			{Key: "health_check_path", Title: "Health Check", Width: 24},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "tg_health",
@@ -159,6 +162,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Security Groups",
 		ShortName:     "sg",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.SecurityGroup]()},
 		RefToID:       sgRefToID,
 		LifecycleKey:  "risk_summary",
 		Aliases:       []string{"sg", "securitygroups", "security-groups"},
@@ -168,11 +172,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#SecurityGroup:groupId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "group_name", Title: "Group Name", Path: "GroupName", Width: 28},
-			{Key: "group_id", Title: "Group ID", Path: "GroupId", Width: 24},
+			{Key: "group_name", Title: "Group Name", Width: 28},
+			{Key: "group_id", Title: "Group ID", Width: 24},
 			{Key: "risk_summary", Title: "Status", Width: 22},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
-			{Key: "description", Title: "Description", Path: "Description", Width: 36},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "description", Title: "Description", Width: 36},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
@@ -204,6 +208,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "VPCs",
 		ShortName:     "vpc",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.Vpc]()},
 		RefToID:       vpcRefToID,
 		Aliases:       []string{"vpc", "vpcs"},
 		Category:      "NETWORKING",
@@ -213,10 +218,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
-			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
-			{Key: "is_default", Title: "Default", Path: "IsDefault", Width: 9},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "cidr_block", Title: "CIDR Block", Width: 18},
+			{Key: "state", Title: "Status", Width: 12},
+			{Key: "is_default", Title: "Default", Width: 9},
 			{Key: "flow_logs", Title: "Flow Logs", Width: 10},
 		},
 		Color:          colorAnyFindingOrHealthy,
@@ -254,6 +259,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Subnets",
 		ShortName:     "subnet",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.Subnet]()},
 		RefToID:       subnetRefToID,
 		Aliases:       []string{"subnet", "subnets"},
 		Category:      "NETWORKING",
@@ -263,13 +269,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28},
-			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
-			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18},
-			{Key: "availability_zone", Title: "AZ", Path: "AvailabilityZone", Width: 14},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "subnet_id", Title: "Subnet ID", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "cidr_block", Title: "CIDR Block", Width: 18},
+			{Key: "availability_zone", Title: "AZ", Width: 14},
+			{Key: "state", Title: "Status", Width: 12},
 			{Title: "Public", Path: "MapPublicIpOnLaunch", Width: 8},
-			{Key: "available_ips", Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
+			{Key: "available_ips", Title: "Available IPs", Width: 14},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ec2types.SubnetState](),
@@ -309,6 +315,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Route Tables",
 		ShortName:     "rtb",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.RouteTable]()},
 		Aliases:       []string{"rtb", "routetables", "route-tables"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -317,8 +324,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28},
-			{Key: "route_table_id", Title: "Route Table ID", Path: "RouteTableId", Width: 26},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "route_table_id", Title: "Route Table ID", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
 			{Key: "state", Title: "Status", Width: 8},
 			{Key: "routes_count", Title: "Routes", Width: 8},
 			{Key: "associations_count", Title: "Assoc.", Width: 8},
@@ -358,6 +365,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "NAT Gateways",
 		ShortName:      "nat",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ec2types.NatGateway]()},
 		HumanizeFields: []string{"failure_code"},
 		Aliases:        []string{"nat", "natgateways", "nat-gateways"},
 		Category:       "NETWORKING",
@@ -367,10 +375,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "nat_gateway_id", Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
-			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "nat_gateway_id", Title: "NAT Gateway ID", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "subnet_id", Title: "Subnet ID", Width: 26},
+			{Key: "state", Title: "Status", Width: 12},
 			{Title: "Failure", Path: "FailureCode", Width: 22},
 			{Key: "public_ip", Title: "Public IP", Width: 16},
 		},
@@ -408,6 +416,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Internet Gateways",
 		ShortName:     "igw",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.InternetGateway]()},
 		RefToID:       igwRefToID,
 		Aliases:       []string{"igw", "internetgateways", "internet-gateways"},
 		Category:      "NETWORKING",
@@ -417,7 +426,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28},
-			{Key: "igw_id", Title: "IGW ID", Path: "InternetGatewayId", Width: 26},
+			{Key: "igw_id", Title: "IGW ID", Width: 26},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24},
 			{Key: "state", Title: "Status", Width: 12},
 		},
@@ -448,6 +457,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "Elastic IPs",
 		ShortName:      "eip",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ec2types.Address]()},
 		LifecycleKey:   "status",
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"eip", "elastic-ips", "elasticips"},
@@ -458,12 +468,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "allocation_id", Title: "Allocation ID", Path: "AllocationId", Width: 26},
-			{Key: "public_ip", Title: "Public IP", Path: "PublicIp", Width: 16},
+			{Key: "allocation_id", Title: "Allocation ID", Width: 26},
+			{Key: "public_ip", Title: "Public IP", Width: 16},
 			{Key: "status", Title: "Status", Width: 12},
-			{Key: "association_id", Title: "Association", Path: "AssociationId", Width: 26},
-			{Key: "instance_id", Title: "Instance", Path: "InstanceId", Width: 20},
-			{Key: "domain", Title: "Domain", Path: "Domain", Width: 8},
+			{Key: "association_id", Title: "Association", Width: 26},
+			{Key: "instance_id", Title: "Instance", Width: 20},
+			{Key: "domain", Title: "Domain", Width: 8},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
@@ -500,6 +510,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "VPC Endpoints",
 		ShortName:      "vpce",
+		RowTypes:       []reflect.Type{reflect.TypeFor[ec2types.VpcEndpoint]()},
 		HumanizeFields: []string{"state"},
 		Aliases:        []string{"vpce", "vpc-endpoints", "vpcendpoints"},
 		Category:       "NETWORKING",
@@ -508,12 +519,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#EndpointDetails:vpcEndpointId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 40},
-			{Key: "vpce_id", Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26},
-			{Key: "type", Title: "Type", Path: "VpcEndpointType", Width: 12},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "service_name", Title: "Service Name", Width: 40},
+			{Key: "vpce_id", Title: "Endpoint ID", Width: 26},
+			{Key: "type", Title: "Type", Width: 12},
+			{Key: "state", Title: "Status", Width: 12},
 			{Title: "Last Error", Path: "LastError.Message", Width: 32},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      vpceStates,
@@ -558,6 +569,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Transit Gateways",
 		ShortName:     "tgw",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.TransitGateway]()},
 		RefToID:       tgwRefToID,
 		Aliases:       []string{"tgw", "transit-gateways", "transitgateways"},
 		Category:      "NETWORKING",
@@ -567,11 +579,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28},
-			{Key: "tgw_id", Title: "TGW ID", Path: "TransitGatewayId", Width: 26},
-			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "tgw_id", Title: "TGW ID", Width: 26},
+			{Key: "state", Title: "Status", Width: 12},
 			{Key: "att_status", Title: "Att Issues", Width: 10},
-			{Key: "owner_id", Title: "Owner", Path: "OwnerId", Width: 14},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "owner_id", Title: "Owner", Width: 14},
+			{Key: "description", Title: "Description", Width: 30},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ec2types.TransitGatewayState](),
@@ -605,6 +617,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Network Interfaces",
 		ShortName:     "eni",
+		RowTypes:      []reflect.Type{reflect.TypeFor[ec2types.NetworkInterface]()},
 		Aliases:       []string{"eni", "network-interfaces", "nis"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -614,11 +627,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "eni_id", Title: "ENI ID", Path: "NetworkInterfaceId", Width: 26},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12},
-			{Key: "type", Title: "Type", Path: "InterfaceType", Width: 14},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
-			{Key: "private_ip", Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
+			{Key: "eni_id", Title: "ENI ID", Width: 26},
+			{Key: "status", Title: "Status", Width: 12},
+			{Key: "type", Title: "Type", Width: 14},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "private_ip", Title: "Private IP", Width: 16},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[ec2types.NetworkInterfaceStatus](),
@@ -662,6 +675,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "Transfer Family",
 		ShortName:      "transfer",
+		RowTypes:       []reflect.Type{reflect.TypeFor[*transfertypes.DescribedServer](), reflect.TypeFor[*transfertypes.ListedServer]()},
 		HumanizeFields: []string{"endpoint_type", "identity_provider_type", "domain", "status"},
 		Aliases:        []string{"transfer", "sftp", "as2", "ftps"},
 		Category:       "NETWORKING",
@@ -671,12 +685,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "transfer/home#/servers/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "server_id", Title: "Server Id", Path: "ServerId", Width: 32},
+			{Key: "server_id", Title: "Server Id", Width: 32},
 			{Key: "status", Title: "Status", Width: 32},
-			{Key: "domain", Title: "Domain", Path: "Domain", Width: 10},
-			{Key: "endpoint_type", Title: "Endpoint", Path: "EndpointType", Width: 14},
-			{Key: "identity_provider_type", Title: "Identity Provider", Path: "IdentityProviderType", Width: 20},
-			{Key: "user_count", Title: "Users", Path: "UserCount", Width: 8},
+			{Key: "domain", Title: "Domain", Width: 10},
+			{Key: "endpoint_type", Title: "Endpoint", Width: 14},
+			{Key: "identity_provider_type", Title: "Identity Provider", Width: 20},
+			{Key: "user_count", Title: "Users", Width: 8},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "transfer_agreements",
@@ -731,6 +745,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "VPC Peering",
 		ShortName:     "vpc-peer",
+		RowTypes:      []reflect.Type{reflect.TypeFor[*ec2types.VpcPeeringConnection]()},
+		ReplayKeys:    map[string]string{"Status.Code": "status"},
 		Aliases:       []string{"vpc-peer", "pcx", "peering"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -739,12 +755,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#PeeringConnectionDetails:VpcPeeringConnectionId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "pcx_id", Title: "Pcx Id", Path: "VpcPeeringConnectionId", Width: 24},
-			{Key: "status", Title: "Status", Path: "Status.Code", Width: 34},
-			{Key: "requester_vpc", Title: "Requester VPC", Path: "RequesterVpcInfo.VpcId", Width: 22},
-			{Key: "requester_owner", Title: "Requester Owner", Path: "RequesterVpcInfo.OwnerId", Width: 14},
-			{Key: "accepter_vpc", Title: "Accepter VPC", Path: "AccepterVpcInfo.VpcId", Width: 22},
-			{Key: "accepter_owner", Title: "Accepter Owner", Path: "AccepterVpcInfo.OwnerId", Width: 14},
+			{Key: "pcx_id", Title: "Pcx Id", Width: 24},
+			{Key: "status", Title: "Status", Width: 34},
+			{Key: "requester_vpc", Title: "Requester VPC", Width: 22},
+			{Key: "requester_owner", Title: "Requester Owner", Width: 14},
+			{Key: "accepter_vpc", Title: "Accepter VPC", Width: 22},
+			{Key: "accepter_owner", Title: "Accepter Owner", Width: 14},
 			{Key: "expires", Title: "Expires", Width: 17},
 		},
 		Color:          colorAnyFindingOrHealthy,
@@ -783,6 +799,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "ELB Listeners",
 		ShortName: "elb_listeners",
+		RowTypes:  []reflect.Type{reflect.TypeFor[elbv2types.Listener]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			if r.ID == "" {
 				return ""
@@ -811,6 +828,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Listener Rules",
 		ShortName: "elb_listener_rules",
+		RowTypes:  []reflect.Type{reflect.TypeFor[elbv2types.Rule]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			if r.ID == "" {
 				return ""
@@ -829,6 +847,11 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Target Health",
 		ShortName: "tg_health",
+		RowTypes:  []reflect.Type{reflect.TypeFor[elbv2types.TargetHealthDescription]()},
+		ReplayKeys: map[string]string{
+			"Target.Id": "target_id", "Target.Port": "port", "Target.AvailabilityZone": "az",
+			"TargetHealth.State": "health", "TargetHealth.Reason": "reason", "TargetHealth.Description": "description",
+		},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["target_group_arn"]
 			if arn == "" {
@@ -853,6 +876,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:         "Agreements",
 		ShortName:    "transfer_agreements",
+		RowTypes:     []reflect.Type{reflect.TypeFor[*transfertypes.DescribedAgreement](), reflect.TypeFor[*transfertypes.ListedAgreement]()},
 		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			sid := r.Fields["server_id"]

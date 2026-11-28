@@ -147,7 +147,7 @@ func captureECS(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	clusterArn := func(c ecstypes.Cluster) string { return aws.ToString(c.ClusterArn) }
-	rows := ecsDescribeClusters(ctx, client, arns, []ecstypes.ClusterField{ecstypes.ClusterFieldConfigurations, ecstypes.ClusterFieldTags}, clusterArn)
+	rows := ecsDescribeClusters(ctx, client, arns, []ecstypes.ClusterField{ecstypes.ClusterFieldConfigurations, ecstypes.ClusterFieldSettings, ecstypes.ClusterFieldTags}, clusterArn)
 	clusters := make([]ecsCluster, 0, len(rows))
 	var names []string
 	for _, row := range rows {
@@ -300,6 +300,25 @@ type ecsTaskTask struct {
 	Containers        []ecsTaskContainer `json:"containers,omitempty"`
 }
 
+// ecsListTasks lists the cluster's running tasks, then its stopped ones:
+// ListTasks answers one desired status, RUNNING when none is named, and the
+// app lists both.
+func ecsListTasks(ctx context.Context, client *ecs.Client, clusterArn string) ([]string, error) {
+	var arns []string
+	for _, status := range []ecstypes.DesiredStatus{ecstypes.DesiredStatusRunning, ecstypes.DesiredStatusStopped} {
+		page, err := pageAll(ctx, &ecs.ListTasksInput{Cluster: aws.String(clusterArn), DesiredStatus: status},
+			func(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
+				return client.ListTasks(ctx, in)
+			},
+			func(out *ecs.ListTasksOutput) []string { return out.TaskArns }, allPages)
+		arns = append(arns, page...)
+		if err != nil {
+			return arns, err
+		}
+	}
+	return arns, nil
+}
+
 // DescribeTasks takes at most 100 tasks per call. Wave 2 judges a stopped
 // essential container, and Essential is stated on the task definition only.
 func ecsTaskCluster(ctx context.Context, cfg aws.Config, clusterArn string, d *ecsTaskData) error {
@@ -307,11 +326,7 @@ func ecsTaskCluster(ctx context.Context, cfg aws.Config, clusterArn string, d *e
 	if d.definitions == nil {
 		d.definitions = map[string]*ecsTaskDefinition{}
 	}
-	taskArns, listErr := pageAll(ctx, &ecs.ListTasksInput{Cluster: aws.String(clusterArn)},
-		func(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
-			return client.ListTasks(ctx, in)
-		},
-		func(out *ecs.ListTasksOutput) []string { return out.TaskArns }, allPages)
+	taskArns, listErr := ecsListTasks(ctx, client, clusterArn)
 	rows := describeListed(taskArns, 100, func(batch []string) (map[string]ecstypes.Task, []string, error) {
 		out, err := client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 			Cluster: aws.String(clusterArn),
@@ -869,7 +884,7 @@ type ebEnvironment struct {
 func captureEB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticbeanstalk.NewFromConfig(cfg)
 
-	envs, err := pageAll(ctx, &elasticbeanstalk.DescribeEnvironmentsInput{},
+	envs, err := pageAll(ctx, &elasticbeanstalk.DescribeEnvironmentsInput{IncludeDeleted: aws.Bool(true)},
 		func(ctx context.Context, in *elasticbeanstalk.DescribeEnvironmentsInput) (*elasticbeanstalk.DescribeEnvironmentsOutput, error) {
 			return client.DescribeEnvironments(ctx, in)
 		},

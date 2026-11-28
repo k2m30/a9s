@@ -1,13 +1,13 @@
 generated: 12
 list_hashes:
-  Name: 69b7c3ce9beb801b
+  Name: 61bd1f26e94ffe26
   Status: 567ed47cf133ae50
-  Airflow: 869a82679621010c
-  Class: 2505f2b888188137
-  Workers: aa100637f11b7aca
-  Schedulers: d0268db42e8bd0a3
-  Access: a4d59ca52a1e4169
-  Created: 7db3e78a48e36bcf
+  Airflow: 879af59c34a9d513
+  Class: cba12223eb634f44
+  Workers: 0fd7ececf27355e8
+  Schedulers: 4133561af093df02
+  Access: 1bf1a8cf8b43113d
+  Created: 1454e9b1e5431ef2
 detail_hashes:
   Name: 1e4a1612672f42b2
   Status: 37925f95190b7a7e
@@ -34,34 +34,27 @@ detail_hashes:
   LastUpdate: 5abec777c4bced1b
 list:
   Name:
-    path: Name
     key: name
     width: 32
   Status:
     key: status
     width: 32
   Airflow:
-    path: AirflowVersion
     key: airflow_version
     width: 10
   Class:
-    path: EnvironmentClass
     key: environment_class
     width: 14
   Workers:
-    path: MaxWorkers
     key: max_workers
     width: 9
   Schedulers:
-    path: Schedulers
     key: schedulers
     width: 10
   Access:
-    path: WebserverAccessMode
     key: webserver_access_mode
     width: 16
   Created:
-    path: CreatedAt
     key: created_at
     width: 22
 

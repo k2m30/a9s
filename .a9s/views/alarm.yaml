@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Alarm Name: 8f3d27f29a2214f5
-  Status: b12fb81c07099228
+  Alarm Name: 2de4a2aff057aca2
+  Status: 516e63265dd02620
   Actions On: 96e7fac58e512fc5
-  Metric: 1efa6cd0ec2a72f7
-  Namespace: cc637ecb5a04564c
-  Threshold: f0ac4593c9d228f3
+  Metric: a1df2a3457694db2
+  Namespace: 1f4da6194dec1b80
+  Threshold: e1f3c700d2871208
 detail_hashes:
   AlarmName: cff9fed369f1aeb9
   AlarmArn: f16e734eddf978dc
@@ -30,26 +30,21 @@ detail_hashes:
   ActionsEnabled: f5685acd0f1f4056
 list:
   Alarm Name:
-    path: AlarmName
     key: alarm_name
     width: 36
   Status:
-    path: StateValue
     key: state
     width: 12
   Actions On:
     path: ActionsEnabled
     width: 10
   Metric:
-    path: MetricName
     key: metric_name
     width: 24
   Namespace:
-    path: Namespace
     key: namespace
     width: 24
   Threshold:
-    path: Threshold
     key: threshold
     width: 12
 

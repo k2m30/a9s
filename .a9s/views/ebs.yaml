@@ -1,15 +1,15 @@
 generated: 12
 list_hashes:
   Name: 825a9ede861cbc56
-  Volume ID: f6fc54dc378434cc
-  Status: 22256ac216898d4c
-  Size (GiB): d1f4d27985f8e209
-  Type: cf826c7989e703b0
-  IOPS: 9476b3dbb6a4eeb6
-  Encrypted: 956f4cdf07855f30
-  Attached To: ced1d7f24e16370b
-  AZ: 7509768e33ad401a
-  Created: f1231a85c4fbc755
+  Volume ID: 75a53bef9f643ff2
+  Status: 516e63265dd02620
+  Size (GiB): fc309308bf57cc25
+  Type: 81e85afad90f6b17
+  IOPS: 5fcbff0c669796a5
+  Encrypted: e73516e547dd83bf
+  Attached To: 1acc6eb991664c93
+  AZ: a14d641769ef95f0
+  Created: cf55830c0e061ed6
 detail_hashes:
   VolumeId: 2091fb42a68ac306
   State: a60d7692c7b3780c
@@ -29,39 +29,30 @@ list:
     key: name
     width: 24
   Volume ID:
-    path: VolumeId
     key: volume_id
     width: 22
   Status:
-    path: State
     key: state
     width: 12
   Size (GiB):
-    path: Size
     key: size
     width: 10
   Type:
-    path: VolumeType
     key: type
     width: 8
   IOPS:
-    path: Iops
     key: iops
     width: 8
   Encrypted:
-    path: Encrypted
     key: encrypted
     width: 10
   Attached To:
-    path: Attachments
     key: attached_to
     width: 40
   AZ:
-    path: AvailabilityZone
     key: az
     width: 16
   Created:
-    path: CreateTime
     key: created
     width: 18
 

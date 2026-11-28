@@ -1,14 +1,14 @@
 generated: 12
 list_hashes:
   Name: 825a9ede861cbc56
-  Status: 5527f63f4698b312
+  Status: 516e63265dd02620
   Health: de14f417bb18acf5
   Lifecycle: 2bf11cafccfc44aa
-  Type: 9ead0594bc41f465
-  Private IP: 290b8e0aa43d1dd5
-  Public IP: 70507575d9bbbbd0
-  Instance ID: bf665d8b044e27be
-  Launch Time: 863159acdb435de8
+  Type: 96cdd389f322fccc
+  Private IP: 7b4fe5a21cb395e9
+  Public IP: 7d434bffda298c4a
+  Instance ID: bca5009d12e255f5
+  Launch Time: 415e4a66b34a2fd7
 detail_hashes:
   InstanceId: eca2142cd16c4577
   State.Name: e3ebee2ebe2f6a70
@@ -38,7 +38,6 @@ list:
     key: name
     width: 24
   Status:
-    path: State.Name
     key: state
     width: 12
   Health:
@@ -48,23 +47,18 @@ list:
     key: lifecycle
     width: 12
   Type:
-    path: InstanceType
     key: type
     width: 14
   Private IP:
-    path: PrivateIpAddress
     key: private_ip
     width: 16
   Public IP:
-    path: PublicIpAddress
     key: public_ip
     width: 16
   Instance ID:
-    path: InstanceId
     key: instance_id
     width: 20
   Launch Time:
-    path: LaunchTime
     key: launch_time
     width: 22
 

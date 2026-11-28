@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
   Name: 825a9ede861cbc56
-  Allocation ID: b52377b08d35e201
-  Public IP: afbe6aac5a76a7e5
+  Allocation ID: 095c41eaeb59a308
+  Public IP: 7d434bffda298c4a
   Status: 168e38cf521a9b36
-  Association: 20af4c1c5891bfba
-  Instance: 8e1bbcb94f805b17
-  Domain: c0ee0ce78453eb78
+  Association: f4b397cc72c039cf
+  Instance: b8a9bb608f2ec32e
+  Domain: 8891a688702ab0de
 detail_hashes:
   AllocationId: c975f8e9fcaff796
   PublicIp: cd4892049861c034
@@ -23,26 +23,21 @@ list:
     key: name
     width: 24
   Allocation ID:
-    path: AllocationId
     key: allocation_id
     width: 26
   Public IP:
-    path: PublicIp
     key: public_ip
     width: 16
   Status:
     key: status
     width: 12
   Association:
-    path: AssociationId
     key: association_id
     width: 26
   Instance:
-    path: InstanceId
     key: instance_id
     width: 20
   Domain:
-    path: Domain
     key: domain
     width: 8
 

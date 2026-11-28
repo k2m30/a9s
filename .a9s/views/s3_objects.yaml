@@ -1,9 +1,9 @@
 generated: 12
 list_hashes:
-  Key: 42e79ca49c0e9ba7
+  Key: 690c2af3252425dd
   Size: 6d758d8df7ae2046
-  Storage Class: b49b5b529360f95c
-  Last Modified: 4f3fe753e3fcb2cb
+  Storage Class: 2977b95098f136df
+  Last Modified: f8051c8ba1a2c983
 detail_hashes:
   "key:key": aa6536764c40abdf
   "key:size": d3cf1535b3dc9c6c
@@ -12,11 +12,9 @@ detail_hashes:
   ETag: d5fd73721a7c5f90
   ChecksumAlgorithm: d1dbbb575bb21f49
   ChecksumType: 0ea75b380c10b5c9
-  Owner: 75f8ac264d4c1d5a
   RestoreStatus: 406a735d08e05b71
 list:
   Key:
-    path: Key
     key: key
     width: 36
   Size:
@@ -24,11 +22,9 @@ list:
     width: 12
     sort_key: size_raw
   Storage Class:
-    path: StorageClass
     key: storage_class
     width: 16
   Last Modified:
-    path: LastModified
     key: last_modified
     width: 22
 
@@ -40,5 +36,4 @@ detail:
   - ETag
   - ChecksumAlgorithm
   - ChecksumType
-  - Owner
   - RestoreStatus

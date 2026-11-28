@@ -1,9 +1,9 @@
 generated: 12
 list_hashes:
-  Topic ARN: 82bfbb1210fa57f2
+  Topic ARN: 83b05ec2dd817898
   Status: 516e63265dd02620
-  Protocol: 307b206951ae1f38
-  Endpoint: c88357e86510aac5
+  Protocol: a8dab65fb35df868
+  Endpoint: 01b528d66e153482
   Confirmed: 66e3f252584c18f0
   Subscription ARN: 2a39d77d2044250c
 detail_hashes:
@@ -14,18 +14,15 @@ detail_hashes:
   Owner: 75f8ac264d4c1d5a
 list:
   Topic ARN:
-    path: TopicArn
     key: topic_arn
     width: 48
   Status:
     key: state
     width: 12
   Protocol:
-    path: Protocol
     key: protocol
     width: 10
   Endpoint:
-    path: Endpoint
     key: endpoint
     width: 48
   Confirmed:

@@ -18,6 +18,12 @@ type IAMGetRoleAPI interface {
 	GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
 }
 
+// IAMGetUserAPI defines the interface for the IAM GetUser operation. It is
+// asserted, not part of IAMAPI, like IAMGetRoleAPI.
+type IAMGetUserAPI interface {
+	GetUser(ctx context.Context, params *iam.GetUserInput, optFns ...func(*iam.Options)) (*iam.GetUserOutput, error)
+}
+
 // IAMListPoliciesAPI defines the interface for the IAM ListPolicies operation.
 type IAMListPoliciesAPI interface {
 	ListPolicies(ctx context.Context, params *iam.ListPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListPoliciesOutput, error)

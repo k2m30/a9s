@@ -95,7 +95,13 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
 	var ids []string
 	var reads rowReads
-	ebList, capped := fanOut(ebList)
+	var live []resource.Resource
+	for _, ebRes := range ebList {
+		if rowLive("eb", ebRes) {
+			live = append(live, ebRes)
+		}
+	}
+	ebList, capped := fanOut(live)
 	truncated = truncated || capped
 	for _, ebRes := range ebList {
 		eb, ok := assertStruct[ebtypes.EnvironmentDescription](ebRes.RawStruct)

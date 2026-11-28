@@ -183,10 +183,13 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 		// calling ListObjectsV2("") (which surfaces a spurious NoSuchBucket).
 		return resource.FetchResult{}, nil
 	}
+	// An archived object's restore state is returned only when named in
+	// OptionalObjectAttributes.
 	input := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(bucket),
-		Prefix:    aws.String(prefix),
-		Delimiter: aws.String("/"),
+		Bucket:                   aws.String(bucket),
+		Prefix:                   aws.String(prefix),
+		Delimiter:                aws.String("/"),
+		OptionalObjectAttributes: []s3types.OptionalObjectAttributes{s3types.OptionalObjectAttributesRestoreStatus},
 	}
 	if continuationToken != "" {
 		input.ContinuationToken = &continuationToken

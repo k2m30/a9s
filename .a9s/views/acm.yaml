@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Domain Name: 71b1a428322b442d
-  Status: 78d294393c20d2aa
+  Domain Name: 39356e0c9ab65fba
+  Status: 70337a7b5ad55e3f
   Days Left: b83b75c001bdfd41
-  Type: d345ea75001d91ee
-  Expires: 2c9c1c439ba6c78e
-  In Use: 9094d0a5868edf7e
+  Type: 96cdd389f322fccc
+  Expires: e2778a88d6348559
+  In Use: f64e231815c78c65
 detail_hashes:
   DomainName: dce31d3d792a5d93
   CertificateArn: 0116d97aa9ad0cc8
@@ -22,26 +22,21 @@ detail_hashes:
   "key:key_algorithm": 0c2dcb2758ee6e76
 list:
   Domain Name:
-    path: DomainName
     key: domain_name
     width: 40
   Status:
-    path: Status
     key: status
     width: 14
   Days Left:
     key: days_left
     width: 10
   Type:
-    path: Type
     key: type
     width: 14
   Expires:
-    path: NotAfter
     key: not_after
     width: 22
   In Use:
-    path: InUse
     key: in_use
     width: 8
 

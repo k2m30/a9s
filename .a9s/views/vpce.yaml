@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Service Name: 0addb0ecd6aa8b1b
-  Endpoint ID: ac283c7455aa2d95
-  Type: 1b5efe88f345be3a
-  Status: 22256ac216898d4c
+  Service Name: 08d5c3e0e8244110
+  Endpoint ID: ad2afede026b9a90
+  Type: 1b4b084be73bba29
+  Status: 516e63265dd02620
   Last Error: c700bbb95741d780
-  VPC ID: 51b18126b8707aee
+  VPC ID: 8fd38a59c94f4eb1
 detail_hashes:
   VpcEndpointId: 9685f87028206e49
   ServiceName: 4f976f40ff44d688
@@ -23,26 +23,21 @@ detail_hashes:
   Tags: ee0396ef28e977b0
 list:
   Service Name:
-    path: ServiceName
     key: service_name
     width: 40
   Endpoint ID:
-    path: VpcEndpointId
     key: vpce_id
     width: 26
   Type:
-    path: VpcEndpointType
     key: type
     width: 12
   Status:
-    path: State
     key: state
     width: 12
   Last Error:
     path: LastError.Message
     width: 32
   VPC ID:
-    path: VpcId
     key: vpc_id
     width: 24
 

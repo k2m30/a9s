@@ -23,9 +23,7 @@ const (
 	attnSurvivalType    = "dbi"
 )
 
-// attnRawFixture is a minimal AWS-SDK-shaped struct satisfying dbi's real
-// default column Paths via fieldpath.ExtractScalar's case-insensitive
-// field-name fallback (mirrors s3RawFixture in qa_cache_lifecycle_test.go).
+// attnRawFixture stands in for the SDK struct a dbi row carries.
 type attnRawFixture struct {
 	Name string
 }

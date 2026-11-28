@@ -144,6 +144,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An IAM role's "Last Used" column shows when the role was last used. The
+  list call never returns that date, so the column was always blank; it is
+  now read with the role's other checks, for service-linked roles too.
+- The detail of an IAM role, user or policy shows its permissions boundary,
+  tags and description. The list calls leave these out, so the detail now
+  reads the item again, once per session (Ctrl+R reads it again).
+- A view file column whose path names no value of the row is reported when
+  the views load, with the type and the path, instead of staying blank.
+  `views_reference.yaml` lists the paths each type's row holds, for every
+  type, child views included.
+- The ECS task list includes stopped tasks ECS still keeps, an Elastic
+  Beanstalk list includes recently terminated environments, and the ECS
+  cluster detail shows the cluster settings.
+- Default detail fields that AWS never returns for the calls a9s makes are
+  removed (backup plan deletion date, S3 object owner, Step Functions map run
+  fields, target health anomaly detection).
+
 - An EventBridge rule's Targets list loads every page of targets, and a
   Lambda function's EventBridge Rules pivot finds a rule that targets it on a
   later page. Before, both read the first page only and reported it as the

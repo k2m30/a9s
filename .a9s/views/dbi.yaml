@@ -1,12 +1,12 @@
 generated: 12
 list_hashes:
-  DB Identifier: e54df3d28f835d93
-  Engine: d1392eb8994ac982
-  Version: 0d4effbddeed9778
+  DB Identifier: f18079819e09ceca
+  Engine: 3f201dc01532fd88
+  Version: 82273529d2f8ea4b
   Status: f5c60c907d4fccf7
-  Class: a6e9b53bc3f940e4
-  Endpoint: 5a9811ea9c3c3dd4
-  Multi-AZ: 6746efca01552f0c
+  Class: 1f374e65888d886f
+  Endpoint: 0ed3e1619470ac47
+  Multi-AZ: a7c665f7e8ba018b
 detail_hashes:
   DBInstanceIdentifier: 91a3aaf89ac3e398
   DBInstanceArn: 1731555b6f0cbf61
@@ -34,15 +34,12 @@ detail_hashes:
   TagList: f1965671df855d0a
 list:
   DB Identifier:
-    path: DBInstanceIdentifier
     key: db_identifier
     width: 28
   Engine:
-    path: Engine
     key: engine
     width: 12
   Version:
-    path: EngineVersion
     key: engine_version
     width: 10
   Status:
@@ -50,15 +47,12 @@ list:
     width: 28
     sort_key: status_raw
   Class:
-    path: DBInstanceClass
     key: class
     width: 16
   Endpoint:
-    path: Endpoint.Address
     key: endpoint
     width: 40
   Multi-AZ:
-    path: MultiAZ
     key: multi_az
     width: 10
 

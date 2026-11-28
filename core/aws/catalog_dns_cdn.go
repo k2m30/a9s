@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"reflect"
 	"strings"
 
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
@@ -12,6 +13,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	apigwv1types "github.com/aws/aws-sdk-go-v2/service/apigateway/types"
+	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
 // colorAPIGW classifies an API Gateway. All signals are Wave-2-only
@@ -28,6 +34,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:             "Route 53 Hosted Zones",
 		ShortName:        "r53",
+		RowTypes:         []reflect.Type{reflect.TypeFor[r53types.HostedZone]()},
 		RefToID:          r53RefToID,
 		Aliases:          []string{"r53", "route53", "dns", "hosted-zones"},
 		Category:         "DNS & CDN",
@@ -38,12 +45,12 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Global(region, "route53/v2/hostedzones#ListRecordSets/"+zone)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 36},
+			{Key: "name", Title: "Name", Width: 36},
 			{Key: "state", Title: "Status", Width: 12},
-			{Key: "zone_id", Title: "Zone ID", Path: "Id", Width: 30},
-			{Key: "record_count", Title: "Records", Path: "ResourceRecordSetCount", Width: 9},
-			{Key: "private_zone", Title: "Private", Path: "Config.PrivateZone", Width: 9},
-			{Key: "comment", Title: "Comment", Path: "Config.Comment", Width: 30},
+			{Key: "zone_id", Title: "Zone ID", Width: 30},
+			{Key: "record_count", Title: "Records", Width: 9},
+			{Key: "private_zone", Title: "Private", Width: 9},
+			{Key: "comment", Title: "Comment", Width: 30},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "r53_records",
@@ -78,6 +85,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:             "CloudFront Distributions",
 		ShortName:        "cf",
+		RowTypes:         []reflect.Type{reflect.TypeFor[cftypes.DistributionSummary]()},
+		ReplayKeys:       map[string]string{"Aliases.Items": "aliases"},
 		RefToID:          cfRefToID,
 		HumanizeFields:   []string{"status"},
 		Aliases:          []string{"cf", "cloudfront", "cdn"},
@@ -89,14 +98,14 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Global(region, "cloudfront/v4/home#/distributions/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "domain_name", Title: "Domain Name", Path: "DomainName", Width: 40},
-			{Key: "distribution_id", Title: "Distribution ID", Path: "Id", Width: 16},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12},
+			{Key: "domain_name", Title: "Domain Name", Width: 40},
+			{Key: "distribution_id", Title: "Distribution ID", Width: 16},
+			{Key: "status", Title: "Status", Width: 12},
 			{Title: "WAF", Path: "WebACLId", Width: 14},
 			{Title: "TLS", Path: "ViewerCertificate.MinimumProtocolVersion", Width: 14},
-			{Key: "enabled", Title: "Enabled", Path: "Enabled", Width: 9},
-			{Key: "aliases", Title: "Aliases", Path: "Aliases.Items", Width: 30},
-			{Key: "price_class", Title: "Price Class", Path: "PriceClass", Width: 16},
+			{Key: "enabled", Title: "Enabled", Width: 9},
+			{Key: "aliases", Title: "Aliases", Width: 30},
+			{Key: "price_class", Title: "Price Class", Width: 16},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      cfStatuses,
@@ -138,6 +147,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:           "ACM Certificates",
 		ShortName:      "acm",
+		RowTypes:       []reflect.Type{reflect.TypeFor[acmtypes.CertificateSummary]()},
 		RefToID:        acmRefToID,
 		HumanizeFields: []string{"Type", "RenewalEligibility", "Status"},
 		Aliases:        []string{"acm", "certificates", "certs"},
@@ -152,12 +162,12 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Regional(region, "acm/home?region="+region+"#/certificates/"+uuid)
 		},
 		Columns: []domain.Column{
-			{Key: "domain_name", Title: "Domain Name", Path: "DomainName", Width: 40},
-			{Key: "status", Title: "Status", Path: "Status", Width: 14},
+			{Key: "domain_name", Title: "Domain Name", Width: 40},
+			{Key: "status", Title: "Status", Width: 14},
 			{Key: "days_left", Title: "Days Left", Width: 10},
-			{Key: "type", Title: "Type", Path: "Type", Width: 14},
-			{Key: "not_after", Title: "Expires", Path: "NotAfter", Width: 22},
-			{Key: "in_use", Title: "In Use", Path: "InUse", Width: 8},
+			{Key: "type", Title: "Type", Width: 14},
+			{Key: "not_after", Title: "Expires", Width: 22},
+			{Key: "in_use", Title: "In Use", Width: 8},
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[acmtypes.CertificateStatus](),
@@ -190,6 +200,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:           "API Gateways",
 		ShortName:      "apigw",
+		RowTypes:       []reflect.Type{reflect.TypeFor[apigwv1types.RestApi](), reflect.TypeFor[apigwtypes.Api]()},
 		RefToID:        apigwRefToID,
 		HumanizeFields: []string{"protocol"},
 		Aliases:        []string{"apigw", "apigateway", "api-gateway"},
@@ -202,13 +213,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Regional(region, "apigateway/main/api-detail?api="+r.ID+"&region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 28},
+			{Key: "name", Title: "Name", Width: 28},
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "api_id", Title: "API ID", Width: 14},
 			{Key: "protocol", Title: "Protocol", Width: 12},
 			{Key: "stages_count", Title: "Stages", Width: 7},
 			{Key: "endpoint", Title: "Endpoint", Width: 50},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "description", Title: "Description", Width: 30},
 		},
 		Color:                  colorAPIGW,
 		Kind:                   apigwKind,
@@ -248,6 +259,7 @@ var dnsCdnChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 	{
 		Name:      "R53 Records",
 		ShortName: "r53_records",
+		RowTypes:  []reflect.Type{reflect.TypeFor[r53types.ResourceRecordSet]()},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			zoneID := r.Fields["zone_id"]
 			if zoneID == "" {

@@ -4,11 +4,14 @@ package aws
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 )
 
 // colorBackup classifies a Backup plan. All signals come from
@@ -24,6 +27,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:          "Backup Plans",
 		ShortName:     "backup",
+		RowTypes:      []reflect.Type{reflect.TypeFor[BackupPlanRow]()},
 		LifecycleKey:  "status",
 		Aliases:       []string{"backup", "backup-plans"},
 		Category:      "BACKUP",
@@ -32,11 +36,11 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Regional(region, "backup/home?region="+region+"#/backupplan/details/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "plan_name", Title: "Plan Name", Path: "BackupPlanName", Width: 32},
+			{Key: "plan_name", Title: "Plan Name", Width: 32},
 			{Key: "status", Title: "Status", Width: 40},
-			{Key: "plan_id", Title: "Plan ID", Path: "BackupPlanId", Width: 38},
-			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22},
-			{Key: "last_execution", Title: "Last Execution", Path: "LastExecutionDate", Width: 22},
+			{Key: "plan_id", Title: "Plan ID", Width: 38},
+			{Key: "creation_date", Title: "Created", Width: 22},
+			{Key: "last_execution", Title: "Last Execution", Width: 22},
 		},
 		// Wave 2 enricher surfaces plans whose recent backup jobs have
 		// failed — Wave 1 list is declarative config.
@@ -65,6 +69,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 	{
 		Name:         "Stack Events",
 		ShortName:    "cfn_events",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cfntypes.StackEvent]()},
 		LifecycleKey: "resource_status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["stack_arn"]
@@ -91,6 +96,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 	{
 		Name:         "Stack Resources",
 		ShortName:    "cfn_resources",
+		RowTypes:     []reflect.Type{reflect.TypeFor[cfntypes.StackResourceSummary]()},
 		LifecycleKey: "resource_status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["stack_arn"]

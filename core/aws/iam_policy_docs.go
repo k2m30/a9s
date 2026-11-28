@@ -22,13 +22,21 @@ func FetchManagedPolicyDocument(ctx context.Context, getPolAPI IAMGetPolicyAPI, 
 	if err != nil {
 		return nil, fmt.Errorf("GetPolicy: %w", err)
 	}
-	if polOut.Policy == nil || polOut.Policy.DefaultVersionId == nil {
+	if polOut.Policy == nil {
 		return nil, UnusableAnswerErr{Call: "GetPolicy", Field: "default version id"}
 	}
+	return fetchPolicyVersionDocument(ctx, getVerAPI, policyArn, polOut.Policy.DefaultVersionId)
+}
 
+// fetchPolicyVersionDocument fetches and decodes one version of a managed
+// policy, the default version GetPolicy names.
+func fetchPolicyVersionDocument(ctx context.Context, getVerAPI IAMGetPolicyVersionAPI, policyArn string, versionID *string) (any, error) {
+	if versionID == nil {
+		return nil, UnusableAnswerErr{Call: "GetPolicy", Field: "default version id"}
+	}
 	verOut, err := getVerAPI.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
 		PolicyArn: aws.String(policyArn),
-		VersionId: polOut.Policy.DefaultVersionId,
+		VersionId: versionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GetPolicyVersion: %w", err)
@@ -36,7 +44,6 @@ func FetchManagedPolicyDocument(ctx context.Context, getPolAPI IAMGetPolicyAPI, 
 	if verOut.PolicyVersion == nil || verOut.PolicyVersion.Document == nil {
 		return nil, UnusableAnswerErr{Call: "GetPolicyVersion", Field: "policy document"}
 	}
-
 	return decodePolicyDocument(*verOut.PolicyVersion.Document)
 }
 

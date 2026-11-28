@@ -1,11 +1,11 @@
 generated: 12
 list_hashes:
-  Name: 821963eee092fc8f
+  Name: 2a8d13cfe6ea5a6f
   Status: 516e63265dd02620
-  Zone ID: b34a6346f368bfd4
-  Records: 05e0ab01cea3f0f2
-  Private: 169eac52cd40f29c
-  Comment: b7b9503f295ec4f3
+  Zone ID: 4cffd41ddd70741a
+  Records: b572d17c34ccca2f
+  Private: f92ff37052a79240
+  Comment: 48b54ac978f3554f
 detail_hashes:
   Id: 75be4e070c3dd9b3
   Name: 1e4a1612672f42b2
@@ -15,26 +15,21 @@ detail_hashes:
   LinkedService: 9e9b600ca1dab336
 list:
   Name:
-    path: Name
     key: name
     width: 36
   Status:
     key: state
     width: 12
   Zone ID:
-    path: Id
     key: zone_id
     width: 30
   Records:
-    path: ResourceRecordSetCount
     key: record_count
     width: 9
   Private:
-    path: Config.PrivateZone
     key: private_zone
     width: 9
   Comment:
-    path: Config.Comment
     key: comment
     width: 30
 

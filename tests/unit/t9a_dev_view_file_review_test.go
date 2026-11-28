@@ -18,7 +18,7 @@ import (
 
 func t9aDevStale(def config.ViewDef) config.ViewDef {
 	stale := t9aCopyView(def)
-	stale.List = append(stale.List, t9aRetiredColumn())
+	stale.List = append(stale.List, t9aRetiredColumn("ec2"))
 	stale.Detail = def.Detail[:len(def.Detail)-1]
 	return stale
 }
@@ -98,7 +98,7 @@ func t9aDevMapping(pairs ...string) *yaml.Node {
 
 func TestT9aDev_ValuesThatNeedQuotingSurviveMergeAndReload(t *testing.T) {
 	def := t9aDefaults(t, "ec2")
-	col := config.ListColumn{Title: "team # note", Path: "*star", Key: "a: b", Width: 9, SortKey: "yes"}
+	col := config.ListColumn{Title: "team # note", Path: "KeyName", Key: "a: b", Width: 9, SortKey: "yes"}
 	field := config.DetailField{Key: "x # y, z", Label: "*l: [q]"}
 	pathField := config.DetailField{Path: "p # q", Label: "yes"}
 

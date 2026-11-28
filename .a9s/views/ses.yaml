@@ -1,6 +1,6 @@
 generated: 12
 list_hashes:
-  Identity: af54745c5642acdc
+  Identity: 18ebc39812112bd2
   Type: 8cbbdf5d61a19c31
   Status: 01663bd76ca187fc
 detail_hashes:
@@ -10,7 +10,6 @@ detail_hashes:
   VerificationStatus: 83bad1d2d5108f89
 list:
   Identity:
-    path: IdentityName
     key: identity_name
     width: 36
   Type:

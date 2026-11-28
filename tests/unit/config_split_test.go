@@ -262,7 +262,7 @@ func TestLoadFromDirs_SkipsNonYAML(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("not yaml"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "ec2.yaml"), []byte("list:\n  ID:\n    path: id\n    width: 10\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "ec2.yaml"), []byte("list:\n  Image:\n    path: ImageId\n    width: 10\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,7 +322,7 @@ func TestLoad_UsesViewsDirs(t *testing.T) {
 
 	ec2Data := []byte(`list:
   Custom Col:
-    path: custom
+    path: KeyName
     width: 42
 `)
 	if err := os.WriteFile(filepath.Join(viewsDir, "ec2.yaml"), ec2Data, 0644); err != nil {
@@ -356,7 +356,7 @@ func TestLoad_ProjectDirOverlaysGlobal(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(globalViewsDir, "ec2.yaml"),
-		[]byte("list:\n  ID:\n    path: id\n    width: 10\n"), 0644); err != nil {
+		[]byte("list:\n  Image:\n    path: ImageId\n    width: 10\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 

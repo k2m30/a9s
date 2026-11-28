@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Cluster ID: ff82512536d3c91a
-  Node Type: c3fef09b93b861cb
+  Cluster ID: 0ad8ec61ecfcb494
+  Node Type: f72ac4edb5d7de22
   Status: de81d4d25f6b3255
   Nodes: 0582efabbe3d1455
-  Endpoint: 73bf19ff7356f8ed
+  Endpoint: 0ed3e1619470ac47
 detail_hashes:
   ReplicationGroupId: 079c6026e586b971
   ARN: 55343400ae662083
@@ -24,11 +24,9 @@ detail_hashes:
   LogDeliveryConfigurations: 9f54ab9a96c6ed4b
 list:
   Cluster ID:
-    path: ReplicationGroupId
     key: cluster_id
     width: 28
   Node Type:
-    path: CacheNodeType
     key: node_type
     width: 18
   Status:
@@ -39,7 +37,6 @@ list:
     key: nodes
     width: 8
   Endpoint:
-    path: ConfigurationEndpoint.Address
     key: endpoint
     width: 40
 

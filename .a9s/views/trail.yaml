@@ -1,10 +1,10 @@
 generated: 12
 list_hashes:
-  Trail Name: d86e12ce1a3fb11e
+  Trail Name: d0b287487ad0f3ec
   Status: 516e63265dd02620
-  S3 Bucket: 84747f39c6a55b2f
-  Home Region: b9da25d849d8869a
-  Multi-Region: 3e4af4d1b978c589
+  S3 Bucket: 51214e781220972a
+  Home Region: 7a4dd5a24117273e
+  Multi-Region: af6864bf7089d1c9
 detail_hashes:
   Name: 1e4a1612672f42b2
   TrailARN: 50ce8454dd421165
@@ -22,22 +22,18 @@ detail_hashes:
   "key:latest_delivery_error": fd028eaec926c193
 list:
   Trail Name:
-    path: Name
     key: trail_name
     width: 28
   Status:
     key: state
     width: 12
   S3 Bucket:
-    path: S3BucketName
     key: s3_bucket
     width: 28
   Home Region:
-    path: HomeRegion
     key: home_region
     width: 16
   Multi-Region:
-    path: IsMultiRegionTrail
     key: multi_region
     width: 14
 

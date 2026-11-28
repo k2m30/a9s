@@ -151,8 +151,10 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			// TargetGroupARNs — required for tg→asg related-panel pivot
 			// (checkTGASG). acme-web-tg (elb.go fixtProdWebTGARN) already
 			// registers this ASG's instances as healthy targets.
-			TargetGroupARNs: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"},
-			CreatedTime:     aws.Time(mustTime("2025-01-15T10:00:00Z")),
+			TargetGroupARNs:     []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"},
+			LoadBalancerNames:   []string{"acme-web-classic"},
+			TerminationPolicies: []string{"OldestLaunchTemplate", "Default"},
+			CreatedTime:         aws.Time(mustTime("2025-01-15T10:00:00Z")),
 			// Instances — required for ami→asg (via ec2 cache image_id match) and
 			// ec2→asg related-panel pivots. Both instances launched from
 			// fixtProdAMIID1 (ec2.go), so checkAMIASG's ec2-cache cross-reference
@@ -466,13 +468,16 @@ export DB_PASSWORD=Pr0dWebLegacy2024
 func buildActivitiesFor(asgName string) []asgtypes.Activity {
 	return []asgtypes.Activity{
 		{
-			ActivityId:           aws.String("act-demo-001"),
-			AutoScalingGroupName: aws.String(asgName),
-			StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
-			Description:          aws.String("Launching a new EC2 instance"),
-			StartTime:            aws.Time(mustTime("2026-03-22T10:00:00Z")),
-			EndTime:              aws.Time(mustTime("2026-03-22T10:05:00Z")),
-			Progress:             aws.Int32(100),
+			ActivityId:            aws.String("act-demo-001"),
+			AutoScalingGroupName:  aws.String(asgName),
+			AutoScalingGroupARN:   aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:11111111-1111-1111-1111-111111111111:autoScalingGroupName/" + asgName),
+			AutoScalingGroupState: aws.String("InService"),
+			Details:               aws.String(`{"Subnet ID":"subnet-0a1b2c3d4e5f60001","Availability Zone":"us-east-1a"}`),
+			StatusCode:            asgtypes.ScalingActivityStatusCodeSuccessful,
+			Description:           aws.String("Launching a new EC2 instance"),
+			StartTime:             aws.Time(mustTime("2026-03-22T10:00:00Z")),
+			EndTime:               aws.Time(mustTime("2026-03-22T10:05:00Z")),
+			Progress:              aws.Int32(100),
 		},
 		{
 			ActivityId:           aws.String("act-demo-002"),
