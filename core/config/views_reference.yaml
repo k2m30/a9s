@@ -2133,6 +2133,8 @@ opensearch:  # opensearch/types.DomainStatus
   - AutomatedSnapshotPauseOptions.EndTime
   - AutomatedSnapshotPauseOptions.StartTime
   - AutomatedSnapshotPauseOptions.State
+  - CatalogOptions.Enabled
+  - CatalogOptions.Catalog
   - ChangeProgressDetails.ChangeId
   - ChangeProgressDetails.ConfigChangeStatus
   - ChangeProgressDetails.InitiatedBy
