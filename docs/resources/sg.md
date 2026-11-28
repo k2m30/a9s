@@ -92,7 +92,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: read `IpPermissions[]` on the SG, inspect each rule's `FromPort`/`ToPort`/`IpProtocol` against `IpRanges[].CidrIp` — the list API returns the full ingress rule set, no extra call. a9s-devops: port list is the standard "admin/database exposed to the internet" set. 8080 and 8443 are deliberately excluded — they front ordinary public applications far more often than anything worth paging on.
 
-- **Signal**: `GroupName == "default"` carrying any ingress rule, or egress beyond the single all-protocols rule to `0.0.0.0/0` AWS creates every group with.
+- **Signal**: `GroupName == "default"` carrying any ingress rule, or egress beyond the all-protocols rule AWS creates every group with: to `0.0.0.0/0`, and also to `::/0` in a VPC with an IPv6 block. `DescribeSecurityGroups` returns both ranges in one permission, so any other range, port or protocol in the egress is an added rule.
   - **Finding**: `sg.default-with-rules`, phrase `default group allows traffic`.
   - **State bucket**: Warning.
   - **How obtained**: read `GroupName`, `IpPermissions[]` and `IpPermissionsEgress[]` on the list response. AWS attaches this group to anything launched without an explicit one, so every rule on it applies to resources nobody chose to put there.

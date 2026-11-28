@@ -44,6 +44,8 @@ type IAMFixtures struct {
 	PolicyDocuments map[string]string
 	// InlinePolicyDocuments keyed by "roleName/policyName" — URL-encoded JSON document strings
 	InlinePolicyDocuments map[string]string
+	// InlineGroupPolicyDocuments keyed by "groupName/policyName" — URL-encoded JSON document strings
+	InlineGroupPolicyDocuments map[string]string
 	// InstanceProfiles keyed by instance-profile name — backs iam:GetInstanceProfile
 	// for the asg→role and eb→role related-panel pivots (checkASGRole /
 	// checkEbRole via asgInstanceProfileToRoles).
@@ -94,13 +96,18 @@ const (
 	// RoleUnreadableTrust carries a trust policy that does not parse, so its row
 	// reads "trust policy not inspected" and its Trust column reads unknown.
 	RoleUnreadableTrust = "acme-unreadable-trust-role"
-	// RoleAdminAttached carries the AWS-managed AdministratorAccess policy —
-	// role.admin-attached.
+	// RoleAdminAttached carries the customer-managed wildcard-allow-policy,
+	// whose document allows every action on every resource, ahead of the
+	// AWS-managed AdministratorAccess — role.admin-attached, decided from the
+	// customer document its Policy row names. It is the one administrator role.
 	RoleAdminAttached = "acme-break-glass-role"
-	// RolePowerUserAttached carries the AWS-managed PowerUserAccess policy —
-	// the role-policy broad-power finding, and the healthy control for
+	// RolePowerUserAttached carries PolicyPrivEsc and the AWS-managed
+	// PowerUserAccess policy — the role-policy broad-power finding and
+	// role.privilege-escalation, and the healthy control for
 	// role.admin-attached (PowerUserAccess withholds IAM, Organizations and
-	// Account, so the role is not an administrator).
+	// Account, so the role is not an administrator). Holding PolicyPrivEsc
+	// makes the escalation reachable, and keeps orphan-unattached-policy the
+	// only demo policy nothing attaches.
 	RolePowerUserAttached = "acme-platform-engineer-role"
 	// RoleInlinePrivEsc has an inline policy granting iam:PassRole plus
 	// lambda:CreateFunction plus lambda:InvokeFunction —
@@ -122,8 +129,13 @@ const (
 	// where the aggregate reports the failure instead of returning the role's
 	// attachments one row short with no sign anything is missing.
 	RetiredManagedPolicyName = "AmazonElasticTranscoder_FullAccess"
-	// IAMUserAdminAttached carries AdministratorAccess — iam-user.admin-attached.
-	IAMUserAdminAttached = "break-glass-admin"
+	// PolicyBoundaryOnly is attached to nothing and is ci-runner's permissions
+	// boundary: the healthy counterpart of iam-policy.orphan-unattached.
+	PolicyBoundaryOnly = "acme-ssm-read"
+	// IAMUserAdminAttached is a member of IAMGroupAdminAttached, whose
+	// AdministratorAccess it holds through the group — iam-user.admin-attached.
+	// It is the one administrator user.
+	IAMUserAdminAttached = "alice.johnson"
 	// IAMUserConsoleNeverUsed has a console password created long ago and
 	// never used — iam-user.console-never-used.
 	IAMUserConsoleNeverUsed = "dormant-console-user"
@@ -166,6 +178,11 @@ var sharedIAMFixtures = shared(func() *IAMFixtures {
 		EntitiesForPolicy:     make(map[string]*PolicyEntities),
 		PolicyDocuments:       make(map[string]string),
 		InlinePolicyDocuments: make(map[string]string),
+		InlineGroupPolicyDocuments: map[string]string{
+			"developers/AllowAssumeRole":        url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"sts:AssumeRole","Resource":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"}]}`),
+			"developers/AllowChangeOwnPassword": url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["iam:ChangePassword","iam:GetAccountPasswordPolicy"],"Resource":"arn:aws:iam::123456789012:user/${aws:username}"}]}`),
+			"readonly/DenyS3Delete":             url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":["s3:DeleteObject","s3:DeleteBucket"],"Resource":"*"}]}`),
+		},
 	}
 	f.Roles = buildIAMRoles()
 	f.Policies = buildIAMPolicies()
@@ -174,6 +191,8 @@ var sharedIAMFixtures = shared(func() *IAMFixtures {
 	buildIAMRelations(f)
 	f.InstanceProfiles = buildIAMInstanceProfiles(f.Roles)
 	f.AccountAliases = []string{"acme-corp"}
+	// Every name ListGroupPolicies returns has a document in
+	// InlineGroupPolicyDocuments: the group verdict reads each one.
 	f.InlineGroupPolicies["developers"] = []string{"AllowAssumeRole", "AllowChangeOwnPassword"}
 	f.InlineGroupPolicies["readonly"] = []string{"DenyS3Delete"}
 	// ConsoleUsers / MFADevicesByUser / AccessKeysByUser — required for
@@ -323,6 +342,10 @@ func buildIAMRoles() []iamtypes.Role {
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2025, 5, 10, 11, 0, 0, 0, time.UTC)),
 			Description: aws.String("Automation role used by CI runner sessions"),
+			PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+				PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				PermissionsBoundaryArn:  aws.String("arn:aws:iam::123456789012:policy/" + PolicyBoundaryOnly),
+			},
 		},
 		{
 			RoleName:    aws.String("acme-glue-role"),
@@ -714,7 +737,7 @@ func buildIAMPolicies() []iamtypes.Policy {
 			PolicyId:        aws.String("ANPAEXAMPLE111111111"),
 			Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
 			AttachmentCount: aws.Int32(5),
-			// alice.johnson's permissions boundary.
+			// ci-service-account's permissions boundary.
 			PermissionsBoundaryUsageCount: aws.Int32(1),
 			Path:                          aws.String("/"),
 			CreateDate:                    aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
@@ -848,14 +871,17 @@ func buildIAMPolicies() []iamtypes.Policy {
 
 	// Issue: wildcard Action+Resource → Broken (overly permissive policy)
 	policies = append(policies, iamtypes.Policy{
-		PolicyName:       aws.String("wildcard-allow-policy"),
-		PolicyId:         aws.String("ANPAEXAMPLE666666666"),
-		Arn:              aws.String("arn:aws:iam::123456789012:policy/wildcard-allow-policy"),
-		AttachmentCount:  aws.Int32(1),
-		Path:             aws.String("/"),
-		CreateDate:       aws.Time(time.Date(2024, 3, 20, 9, 0, 0, 0, time.UTC)),
-		DefaultVersionId: aws.String("v1"),
-		Description:      aws.String("Legacy admin policy with wildcard actions — should be replaced with least-privilege"),
+		PolicyName:      aws.String("wildcard-allow-policy"),
+		PolicyId:        aws.String("ANPAEXAMPLE666666666"),
+		Arn:             aws.String("arn:aws:iam::123456789012:policy/wildcard-allow-policy"),
+		AttachmentCount: aws.Int32(1),
+		IsAttachable:    true,
+		// bob.smith's permissions boundary.
+		PermissionsBoundaryUsageCount: aws.Int32(1),
+		Path:                          aws.String("/"),
+		CreateDate:                    aws.Time(time.Date(2024, 3, 20, 9, 0, 0, 0, time.UTC)),
+		DefaultVersionId:              aws.String("v1"),
+		Description:                   aws.String("Legacy admin policy with wildcard actions — should be replaced with least-privilege"),
 	})
 
 	// Generate 18 more policies
@@ -884,6 +910,12 @@ func buildIAMPolicies() []iamtypes.Policy {
 			DefaultVersionId: aws.String("v1"),
 		})
 	}
+	for i := range policies {
+		if aws.ToString(policies[i].PolicyName) == PolicyBoundaryOnly {
+			policies[i].IsAttachable = true
+			policies[i].PermissionsBoundaryUsageCount = aws.Int32(1)
+		}
+	}
 	return policies
 }
 
@@ -896,11 +928,7 @@ func buildIAMUsers() []iamtypes.User {
 			Path:             aws.String("/"),
 			CreateDate:       aws.Time(time.Date(2024, 6, 15, 9, 0, 0, 0, time.UTC)),
 			PasswordLastUsed: aws.Time(time.Now().AddDate(0, 0, -10)),
-			PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
-				PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
-				PermissionsBoundaryArn:  aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
-			},
-			Tags: []iamtypes.Tag{{Key: aws.String("department"), Value: aws.String("engineering")}},
+			Tags:             []iamtypes.Tag{{Key: aws.String("department"), Value: aws.String("engineering")}},
 		},
 		{
 			UserName:         aws.String("bob.smith"),
@@ -909,6 +937,12 @@ func buildIAMUsers() []iamtypes.User {
 			Path:             aws.String("/"),
 			CreateDate:       aws.Time(time.Date(2024, 9, 1, 10, 30, 0, 0, time.UTC)),
 			PasswordLastUsed: aws.Time(time.Now().AddDate(0, 0, -36)),
+			// A boundary that allows every action caps nothing, so the
+			// escalation bob.smith holds through IAMGroupPowerUser stands.
+			PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+				PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				PermissionsBoundaryArn:  aws.String("arn:aws:iam::123456789012:policy/wildcard-allow-policy"),
+			},
 		},
 		{
 			UserName:   aws.String("ci-service-account"),
@@ -916,6 +950,10 @@ func buildIAMUsers() []iamtypes.User {
 			Arn:        aws.String("arn:aws:iam::123456789012:user/service-accounts/ci-service-account"),
 			Path:       aws.String("/service-accounts/"),
 			CreateDate: aws.Time(time.Date(2025, 1, 10, 12, 0, 0, 0, time.UTC)),
+			PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+				PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				PermissionsBoundaryArn:  aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
+			},
 		},
 		// CT-event cross-reference users
 		{
@@ -975,11 +1013,10 @@ func buildIAMUsers() []iamtypes.User {
 			Path:       aws.String("/service-accounts/"),
 			CreateDate: aws.Time(time.Date(2025, 11, 3, 9, 0, 0, 0, time.UTC)),
 		},
-		// AdministratorAccess attached directly to a user.
 		{
-			UserName:   aws.String(IAMUserAdminAttached),
-			UserId:     aws.String("AIDAEXAMPLEADMINUSR1"),
-			Arn:        aws.String("arn:aws:iam::123456789012:user/" + IAMUserAdminAttached),
+			UserName:   aws.String("acme-release-bot"),
+			UserId:     aws.String("AIDAEXAMPLERELBOT01"),
+			Arn:        aws.String("arn:aws:iam::123456789012:user/acme-release-bot"),
 			Path:       aws.String("/"),
 			CreateDate: aws.Time(time.Date(2024, 10, 4, 9, 0, 0, 0, time.UTC)),
 		},
@@ -1063,26 +1100,22 @@ func buildIAMRelations(f *IAMFixtures) {
 		{PolicyName: aws.String(RetiredManagedPolicyName), PolicyArn: aws.String("arn:aws:iam::aws:policy/" + RetiredManagedPolicyName)},
 	}
 
-	// The build pipeline role PolicyPrivEsc's document is written for. It is
-	// what makes the escalation reachable, and it keeps
-	// orphan-unattached-policy the only demo policy nothing attaches.
 	f.AttachedRolePolicies["acme-ci-deploy-role"] = []iamtypes.AttachedPolicy{
-		{PolicyName: aws.String(PolicyPrivEsc), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/" + PolicyPrivEsc)},
+		{PolicyName: aws.String("acme-deploy-policy"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy")},
 	}
 
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("acme-s3-read-only"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only")},
 		{PolicyName: aws.String(PolicyNameAlsoAWSManaged), PolicyArn: aws.String(LocalPowerUserAccessARN)},
 	}
-	f.AttachedUserPolicies[IAMUserAdminAttached] = []iamtypes.AttachedPolicy{
-		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
-	}
 
 	// Attachments and inline documents behind the escalation findings.
 	f.AttachedRolePolicies[RoleAdminAttached] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("wildcard-allow-policy"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/wildcard-allow-policy")},
 		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
 	}
 	f.AttachedRolePolicies[RolePowerUserAttached] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String(PolicyPrivEsc), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/" + PolicyPrivEsc)},
 		{PolicyName: aws.String("PowerUserAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/PowerUserAccess")},
 	}
 	f.InlineRolePolicies[RoleInlinePrivEsc] = []string{"pipeline-deploy"}
@@ -1189,10 +1222,10 @@ func buildIAMRelations(f *IAMFixtures) {
 }
 
 func init() {
-	Register(Pin{ShortName: "role", Rows: 56, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "role", Rows: 56, Issues: 4, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "policy", Rows: 29, Issues: 1, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-user", Rows: 12, Issues: 0, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "iam-group", Rows: 5, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "iam-group", Rows: 5, Issues: 0, CoverageGaps: []string{"dim"}})
 }
 
 // buildEntitiesForPolicy answers ListEntitiesForPolicy out of the attachments

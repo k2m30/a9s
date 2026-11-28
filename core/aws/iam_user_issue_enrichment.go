@@ -24,6 +24,7 @@ const (
 	iamUserCodeNoMFA            domain.FindingCode = "iam-user.no-mfa"
 	iamUserCodeOldKey           domain.FindingCode = "iam-user.old-key"
 	iamUserCodeAdminAttached    domain.FindingCode = "iam-user.admin-attached"
+	iamUserCodePrivEsc          domain.FindingCode = "iam-user.privilege-escalation"
 	iamUserCodeConsoleNeverUsed domain.FindingCode = "iam-user.console-never-used"
 	iamUserCodeKeyUnused        domain.FindingCode = "iam-user.access-key-unused"
 	iamUserCodeTwoActiveKeys    domain.FindingCode = "iam-user.two-active-keys"
@@ -67,8 +68,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			return
 		}
 
-		// The login profile, the MFA devices, the access keys and the attached
-		// policies are separate reads: one that fails leaves its own signals
+		// The login profile, the MFA devices, the access keys and the policy
+		// documents are separate reads: one that fails leaves its own signals
 		// unread and the others evaluated.
 		var rowErrs []error
 		consoleKnown, hasConsolePassword := true, false
@@ -123,8 +124,10 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			rowErrs = append(rowErrs, keysErr)
 		}
 
-		attachedUser, _, aerr := listAttachedUserPolicies(ctx, clients.IAM, userName)
-		adminPolicy := adminAttachedPolicyName(attachedUser)
+		boundaryARN, boundaryErr := userBoundary(ctx, clients.IAM, r, userName)
+		sets, listErrs := userPolicySets(ctx, clients, userName)
+		verdict := principalPolicyVerdict(ctx, clients, sets, boundaryARN, len(listErrs) > 0 || boundaryErr != nil)
+		rowErrs = append(append(append(rowErrs, listErrs...), verdict.errs...), boundaryErr)
 
 		activeKeys := activeAccessKeys(keys)
 		unusedKeys, keyUseErr := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
@@ -132,7 +135,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		defer mu.Unlock()
 
-		for _, err := range append(rowErrs, aerr, keyUseErr) {
+		for _, err := range append(rowErrs, keyUseErr) {
 			if err != nil {
 				MarkSkipped(&result, r.ID, &failures, err)
 			}
@@ -210,12 +213,17 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 		}
 
-		if adminPolicy != "" {
+		if verdict.admin != nil {
 			if riskLabel == "" {
 				riskLabel = riskAdminPolicy
 			}
-			setWave2Finding(&result, r.ID, iamUserCodeAdminAttached, adminAttachedRows(adminPolicy))
-
+			setWave2Finding(&result, r.ID, iamUserCodeAdminAttached, verdict.adminRows())
+		}
+		if len(verdict.privEsc) > 0 {
+			if riskLabel == "" {
+				riskLabel = riskPrivEsc
+			}
+			setWave2Finding(&result, r.ID, iamUserCodePrivEsc, verdict.privEscRows())
 		}
 
 		fields := map[string]string{"risk": riskLabel}
@@ -228,6 +236,27 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		result.FieldUpdates[r.ID] = fields
 	})
 	return result, errors.Join(loopErr, AggregateFailures("user credentials", failures, n))
+}
+
+// userBoundary is the ARN of the user's permissions boundary, "" when it has
+// none. ListUsers does not return the boundary, so it is read from GetUser; a
+// client that does not serve GetUser leaves the boundary the row carries.
+func userBoundary(ctx context.Context, api IAMAPI, r resource.Resource, userName string) (string, error) {
+	user, _ := assertStruct[iamtypes.User](r.RawStruct)
+	if getAPI, ok := api.(IAMGetUserAPI); ok {
+		out, err := getAPI.GetUser(ctx, &iam.GetUserInput{UserName: aws.String(userName)})
+		if err != nil {
+			return "", err
+		}
+		if out.User == nil {
+			return "", UnusableAnswerErr{Call: "GetUser", Field: "user"}
+		}
+		user = *out.User
+	}
+	if user.PermissionsBoundary == nil {
+		return "", nil
+	}
+	return aws.ToString(user.PermissionsBoundary.PermissionsBoundaryArn), nil
 }
 
 // isNoSuchEntity reports the IAM "this entity does not exist" error, which

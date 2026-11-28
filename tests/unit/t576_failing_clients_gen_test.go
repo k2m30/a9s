@@ -1451,6 +1451,17 @@ func (w t576IAM) GetGroup(ctx context.Context, in *iam.GetGroupInput, o ...func(
 	return res, err
 }
 
+func (w t576IAM) GetGroupPolicy(ctx context.Context, in *iam.GetGroupPolicyInput, o ...func(*iam.Options)) (*iam.GetGroupPolicyOutput, error) {
+	if err := w.inj.before("IAM", "GetGroupPolicy", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetGroupPolicy(context.Context, *iam.GetGroupPolicyInput, ...func(*iam.Options)) (*iam.GetGroupPolicyOutput, error)
+	}).GetGroupPolicy(ctx, in, o...)
+	w.inj.after("IAM", "GetGroupPolicy", in, res)
+	return res, err
+}
+
 func (w t576IAM) GetInstanceProfile(ctx context.Context, in *iam.GetInstanceProfileInput, o ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
 	if err := w.inj.before("IAM", "GetInstanceProfile", in); err != nil {
 		return nil, err
@@ -1525,6 +1536,17 @@ func (w t576IAM) GetUser(ctx context.Context, in *iam.GetUserInput, o ...func(*i
 		GetUser(context.Context, *iam.GetUserInput, ...func(*iam.Options)) (*iam.GetUserOutput, error)
 	}).GetUser(ctx, in, o...)
 	w.inj.after("IAM", "GetUser", in, res)
+	return res, err
+}
+
+func (w t576IAM) GetUserPolicy(ctx context.Context, in *iam.GetUserPolicyInput, o ...func(*iam.Options)) (*iam.GetUserPolicyOutput, error) {
+	if err := w.inj.before("IAM", "GetUserPolicy", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetUserPolicy(context.Context, *iam.GetUserPolicyInput, ...func(*iam.Options)) (*iam.GetUserPolicyOutput, error)
+	}).GetUserPolicy(ctx, in, o...)
+	w.inj.after("IAM", "GetUserPolicy", in, res)
 	return res, err
 }
 
@@ -1679,6 +1701,17 @@ func (w t576IAM) ListRoles(ctx context.Context, in *iam.ListRolesInput, o ...fun
 		ListRoles(context.Context, *iam.ListRolesInput, ...func(*iam.Options)) (*iam.ListRolesOutput, error)
 	}).ListRoles(ctx, in, o...)
 	w.inj.after("IAM", "ListRoles", in, res)
+	return res, err
+}
+
+func (w t576IAM) ListUserPolicies(ctx context.Context, in *iam.ListUserPoliciesInput, o ...func(*iam.Options)) (*iam.ListUserPoliciesOutput, error) {
+	if err := w.inj.before("IAM", "ListUserPolicies", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		ListUserPolicies(context.Context, *iam.ListUserPoliciesInput, ...func(*iam.Options)) (*iam.ListUserPoliciesOutput, error)
+	}).ListUserPolicies(ctx, in, o...)
+	w.inj.after("IAM", "ListUserPolicies", in, res)
 	return res, err
 }
 

@@ -131,7 +131,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		// Compute rules_summary by fetching the full WebACL when the client
 		// implements WAFv2GetWebACLAPI.
 		rulesSummary := "0 rules"
-		noRules := false
+		unprotected := false
 		var gerr error
 		if getACLAPI, ok := api.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {
 			var getOut *wafv2svc.GetWebACLOutput
@@ -152,7 +152,10 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				ruleCount := len(getOut.WebACL.Rules)
 				if ruleCount == 0 {
 					rulesSummary = "0 rules"
-					noRules = true
+					// WAF applies the default action to every request no rule
+					// matches: with no rules, Block stops everything and only
+					// Allow leaves the resource unprotected.
+					unprotected = getOut.WebACL.DefaultAction != nil && getOut.WebACL.DefaultAction.Allow != nil
 				} else {
 					rulesSummary = fmt.Sprintf("%d/%d BLOCK", blockCount, ruleCount)
 				}
@@ -170,7 +173,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			}
 		}
 
-		if noRules {
+		if unprotected {
 			setWave2Finding(&result, r.ID, wafCodeNoRules, []domain.DetailRow{{Label: "Rules", Value: "0", Tier: tierOf(wafCodeNoRules)}})
 
 		}

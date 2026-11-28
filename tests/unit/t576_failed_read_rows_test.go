@@ -201,10 +201,10 @@ func TestT576_TrailStatusFailureMarksTheTrail(t *testing.T) {
 	}
 }
 
-// A group's three walks answer three different questions. One refused walk
-// leaves its own question open; membership still counts and an attached
-// AdministratorAccess is still an administrator group.
-func TestT576_IAMGroupDeniedInlineWalkKeepsMembersAndAdmin(t *testing.T) {
+// A group's membership walk and its policy walks answer different questions:
+// a refused inline walk leaves membership counted, but the administrator
+// verdict open, since an unread inline policy may hold the Deny that decides.
+func TestT576_IAMGroupDeniedInlineWalkKeepsMembersAndWithholdsAdmin(t *testing.T) {
 	_, rows, cache := t576Bench(t, "iam-group")
 	clean := t576EnrichType(t, "iam-group", rows, cache, nil)
 	if !t576HasCode(clean.res.Findings[fixtures.IAMGroupAdminAttached], "iam-group.admin-attached") {
@@ -224,11 +224,8 @@ func TestT576_IAMGroupDeniedInlineWalkKeepsMembersAndAdmin(t *testing.T) {
 			t.Errorf("%s: not-inspected check = %q, want %q", r.ID, check, "ListGroupPolicies")
 		}
 	}
-	if !t576HasCode(got.res.Findings[fixtures.IAMGroupAdminAttached], "iam-group.admin-attached") {
-		t.Errorf("%s: admin finding lost when only the inline-policy walk was refused; findings %v", fixtures.IAMGroupAdminAttached, got.res.Findings[fixtures.IAMGroupAdminAttached])
-	}
-	if t576HasCode(got.res.Findings[fixtures.IAMGroupPowerUser], "iam-group.admin-attached") {
-		t.Errorf("%s holds PowerUserAccess only, yet carries the admin finding", fixtures.IAMGroupPowerUser)
+	if t576HasCode(got.res.Findings[fixtures.IAMGroupAdminAttached], "iam-group.admin-attached") {
+		t.Errorf("%s: admin finding stands although its inline policies were never read; findings %v", fixtures.IAMGroupAdminAttached, got.res.Findings[fixtures.IAMGroupAdminAttached])
 	}
 }
 

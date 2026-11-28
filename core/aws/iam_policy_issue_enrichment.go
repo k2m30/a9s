@@ -39,11 +39,6 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 	if clients.IAM == nil {
 		return result, nil
 	}
-	getPolicyAPI, ok1 := clients.IAM.(IAMGetPolicyAPI)
-	getPolicyVersionAPI, ok2 := clients.IAM.(IAMGetPolicyVersionAPI)
-	if !ok1 || !ok2 {
-		return result, nil
-	}
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -67,7 +62,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		if _, awsOwned := awsManagedPolicy(policyARN); awsOwned {
 			return
 		}
-		doc, err := FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, policyARN)
+		doc, err := managedPolicyDocument(ctx, clients, policyARN)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -76,8 +71,8 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 		riskVal := ""
 		// The orphan finding itself is wave1 (orphanUnattachedPolicyFinding);
-		// only the Risk column value is decided here.
-		if r.Fields["attachment_count"] == "0" {
+		// only the Risk column value is decided here, by the same predicate.
+		if p, ok := policyStructOf(r); ok && policyUnused(p) {
 			riskVal = riskUnattached
 		}
 		if isAdminStarPolicy(doc) {
@@ -104,17 +99,23 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy
 // or a PolicyEnriched wrapper. Returns ("", false) if the type is unrecognized or ARN is nil.
 func extractIAMPolicyARN(r resource.Resource) (string, bool) {
+	p, ok := policyStructOf(r)
+	if !ok || p.Arn == nil {
+		return "", false
+	}
+	return *p.Arn, true
+}
+
+// policyStructOf returns the IAM Policy a policy row carries, bare or wrapped
+// with its document.
+func policyStructOf(r resource.Resource) (iamtypes.Policy, bool) {
 	switch p := r.RawStruct.(type) {
 	case iamtypes.Policy:
-		if p.Arn != nil {
-			return *p.Arn, true
-		}
+		return p, true
 	case PolicyEnriched:
-		if p.Arn != nil {
-			return *p.Arn, true
-		}
+		return p.Policy, true
 	}
-	return "", false
+	return iamtypes.Policy{}, false
 }
 
 // parsePolicyDoc runs a decoded policy document through the one policy

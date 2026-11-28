@@ -17,6 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 const (
@@ -31,7 +32,7 @@ const (
 // no MFA device unless said otherwise, so the rows under test are reachable
 // without also arranging a second condition.
 type d3UserFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	keys map[string][]iamtypes.AccessKeyMetadata
 	// lastUsedErr maps AccessKeyId → error from GetAccessKeyLastUsed.
 	lastUsedErr map[string]error
@@ -329,6 +330,12 @@ func (f *d3RoleFake) GetRolePolicy(
 	}, nil
 }
 
+func (f *d3RoleFake) ListAttachedRolePolicies(
+	_ context.Context, _ *iam.ListAttachedRolePoliciesInput, _ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{}, nil
+}
+
 var _ awsclient.IAMAPI = (*d3RoleFake)(nil)
 
 // TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne: the same role must
@@ -359,11 +366,6 @@ func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 	if len(listed.Resources) != 1 {
 		t.Fatalf("listed %d roles, want 1", len(listed.Resources))
 	}
-	// The combos are Combo rows, so no combo on the inline policy is left
-	// unsayable behind a phrase that names only the first match.
-	w4AssertFinding(t, listed.Resources[0].Findings, d3CodeRoleInline,
-		catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave1")
-
 	drilled, err := awsclient.FetchRolesByIDs(context.Background(), fake, []string{name})
 	if err != nil {
 		t.Fatalf("FetchRolesByIDs: %v", err)
@@ -371,8 +373,16 @@ func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 	if len(drilled) != 1 {
 		t.Fatalf("drilled %d roles, want 1", len(drilled))
 	}
-	w4AssertFinding(t, drilled[0].Findings, d3CodeRoleInline,
-		catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave1")
+	for path, rows := range map[string][]resource.Resource{"listed": listed.Resources, "drilled": drilled} {
+		clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
+		session.New().WireStores(clients)
+		res, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, rows, nil)
+		if err != nil {
+			t.Fatalf("%s: EnrichIAMRoleLastUsed: %v", path, err)
+		}
+		w4AssertFinding(t, res.Findings[rows[0].ID], d3CodeRoleInline,
+			catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave2")
+	}
 }
 
 // d3PlusDoc carries a literal '+' inside a resource ARN. Path-style

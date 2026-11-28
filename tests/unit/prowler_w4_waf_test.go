@@ -63,10 +63,11 @@ func (f *w4WAFFake) GetWebACL(
 		return nil, err
 	}
 	return &wafv2.GetWebACLOutput{WebACL: &wafv2types.WebACL{
-		Name:  in.Name,
-		Id:    in.Id,
-		ARN:   aws.String(w4WAFARN(name)),
-		Rules: f.rules[name],
+		Name:          in.Name,
+		Id:            in.Id,
+		ARN:           aws.String(w4WAFARN(name)),
+		Rules:         f.rules[name],
+		DefaultAction: &wafv2types.DefaultAction{Allow: &wafv2types.AllowAction{}},
 	}}, nil
 }
 

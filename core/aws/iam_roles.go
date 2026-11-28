@@ -118,11 +118,8 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 	}
 
 	var resources []resource.Resource
-	var failures []Failure
 	for _, role := range output.Roles {
-		r, roleFailures := roleToResource(ctx, api, role)
-		resources = append(resources, r)
-		failures = append(failures, roleFailures...)
+		resources = append(resources, roleToResource(role))
 	}
 
 	nextToken := ""
@@ -144,7 +141,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, AggregateFailures("role: inline policy scan", failures, len(output.Roles))
+	}, nil
 }
 
 // FetchRolesByIDs resolves a batch of IAM role names to resource.Resource
@@ -192,21 +189,15 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 			failures = append(failures, FailedCall(id, err))
 			continue
 		}
-		r, roleFailures := roleToResource(ctx, api, *output.Role)
-		resources = append(resources, r)
-		failures = append(failures, roleFailures...)
+		resources = append(resources, roleToResource(*output.Role))
 	}
 	return resources, AggregateFailures("role FetchByIDs", failures, len(seen))
 }
 
 // roleToResource converts a single iam.Role (as returned by GetRole) into the
 // same resource.Resource shape FetchIAMRolesPage produces from ListRoles, so
-// a lazily-fetched role is indistinguishable from a paginated one — including
-// its inline policies, which GetRole does not return and which api is walked
-// for when it serves the two inline-policy operations. The returned failures
-// are that walk's own: the caller aggregates them onto its lane, because a
-// role whose policies were refused must not be handed back as inspected.
-func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.Resource, []Failure) {
+// a lazily-fetched role is indistinguishable from a paginated one.
+func roleToResource(role iamtypes.Role) resource.Resource {
 	roleName := ""
 	if role.RoleName != nil {
 		roleName = *role.RoleName
@@ -245,15 +236,6 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 	trust := analyseRoleTrust(assumeRolePolicyDoc)
 	findings, details := trust.findings, trust.details
 
-	listPoliciesAPI, okList := api.(IAMListRolePoliciesAPI)
-	getPolicyAPI, okGet := api.(IAMGetRolePolicyAPI)
-	var failures []Failure
-	if okList && okGet && roleName != "" {
-		inline := scanRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
-		findings, details = addInlinePrivEsc(findings, details, inline)
-		failures = inline.failures
-	}
-
 	return withWave1(resource.Resource{
 		ID:   roleName,
 		Name: roleName,
@@ -269,102 +251,5 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 		},
 		AttentionDetails: details,
 		RawStruct:        role,
-	}, findings...), failures
-}
-
-// inlinePolicyScan carries the privilege-escalation verdict of a role's
-// inline policies: at most one finding, whichever inline policy tripped
-// first, with the offending policy name and combination as its rows.
-//
-// failures is what the scan could not read. A non-empty failures means the
-// verdict is not a verdict: the absence of a finding says nothing about the
-// role, so the caller must surface the failures on its own lane and render
-// the role's policy-derived facts unknown rather than clean.
-type inlinePolicyScan struct {
-	finding  *domain.Finding
-	rows     []domain.DetailRow
-	failures []Failure
-}
-
-// scanRoleInlinePolicies walks a role's inline policies once for the
-// privilege-escalation verdict.
-// Cost: 1 ListRolePolicies + N GetRolePolicy per role.
-func scanRoleInlinePolicies(
-	ctx context.Context,
-	listAPI IAMListRolePoliciesAPI,
-	getAPI IAMGetRolePolicyAPI,
-	roleName string,
-) inlinePolicyScan {
-	var scan inlinePolicyScan
-	// ListRolePolicies pages by IsTruncated and Marker
-	// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListRolePolicies.html).
-	policyNames, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]string, *string, error) {
-		out, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{RoleName: aws.String(roleName), Marker: marker})
-		if err != nil {
-			return nil, nil, err
-		}
-		if out == nil {
-			return nil, nil, UnusableAnswerErr{Call: "ListRolePolicies", Field: "policy names"}
-		}
-		return out.PolicyNames, iamNextMarker(out.IsTruncated, out.Marker), nil
-	})
-	switch {
-	case err != nil:
-		scan.failures = append(scan.failures, FailedCall(roleName, err))
-		return scan
-	case !complete:
-		scan.failures = append(scan.failures, UnusableAnswer(roleName, fmt.Sprintf("ListRolePolicies: more than %d pages", PerParentPageCap)))
-	}
-	for _, policyName := range policyNames {
-		getOut, getErr := getAPI.GetRolePolicy(ctx, &iam.GetRolePolicyInput{
-			RoleName:   aws.String(roleName),
-			PolicyName: aws.String(policyName),
-		})
-		switch {
-		case getErr != nil:
-			scan.failures = append(scan.failures, FailedCall(roleName, getErr))
-			continue
-		case getOut == nil || getOut.PolicyDocument == nil:
-			scan.failures = append(scan.failures,
-				UnusableAnswer(roleName, "GetRolePolicy returned no document for "+policyName))
-			continue
-		}
-		parsed, perr := parsePolicy(*getOut.PolicyDocument)
-		if perr != nil {
-			scan.failures = append(scan.failures, UnusableAnswer(roleName, "unreadable inline policy "+policyName))
-			continue
-		}
-		if scan.finding != nil {
-			continue
-		}
-		if combos := parsed.PrivilegeEscalation(); len(combos) > 0 {
-			f := wave1Finding(roleCodeInlinePrivEsc)
-			scan.finding = &f
-			scan.rows = append(
-				[]domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "!"}},
-				privEscComboRows(combos)...)
-		}
-	}
-	return scan
-}
-
-// addInlinePrivEsc folds an inline-policy scan into the finding list and
-// detail map a role is about to be built from. The rows go through capRows,
-// the same bound setWave2Finding and addWave1Rows apply, because a role's
-// combo list is as unbounded as any other emitter's: the role is assembled
-// before its resource.Resource exists, so this is the sink for that path.
-func addInlinePrivEsc(
-	findings []domain.Finding,
-	details map[domain.FindingCode]domain.AttentionDetail,
-	inline inlinePolicyScan,
-) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
-	if inline.finding == nil {
-		return findings, details
-	}
-	findings = append(findings, *inline.finding)
-	if details == nil {
-		details = map[domain.FindingCode]domain.AttentionDetail{}
-	}
-	details[roleCodeInlinePrivEsc] = domain.AttentionDetail{Rows: capRows(nil, inline.rows)}
-	return findings, details
+	}, findings...)
 }

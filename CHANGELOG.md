@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- IAM roles, users and groups are judged "administrator" from the policy
+  documents they hold, not from the name of one AWS-managed policy:
+  - A role, user or group holding a customer-managed or inline policy that
+    allows every action on every resource now reports "has an administrator
+    policy", as the policy list already did for that policy. A user also
+    reports it when one of its groups holds such a policy, and the detail
+    names the group. `PowerUserAccess` still does not count.
+  - A user or group whose policies grant a privilege-escalation combination
+    now reports "policy allows privilege escalation", and a role reports
+    "attached policy allows privilege escalation" for an attached managed
+    policy (an inline one is still "inline policy allows privilege
+    escalation"). `PowerUserAccess` grants `lambda:UpdateFunctionCode`, one
+    of those combinations, so its holders now show it.
+  - The policies of a role, user or group are read together, as IAM reads
+    them: a combination split across a user's own policy and one of its
+    groups' is reported, and `AdministratorAccess` beside a policy that
+    denies `iam:*` is no longer "administrator".
+  - A permissions boundary caps the verdict: "administrator" needs the
+    boundary to allow everything too, and a privilege-escalation combination
+    counts only when the boundary allows each of its actions.
+  - A role shows one privilege-escalation finding: "inline policy allows
+    privilege escalation" when the combination needs an inline policy,
+    "attached policy allows privilege escalation" otherwise, and neither
+    beside "has an administrator policy".
+  - The role's policy list judges each policy from its document, whoever
+    owns it: a customer-managed `Allow * on *` reads "administrator
+    access", and a policy granting an escalation combination reads "broad
+    power access".
+  - A policy document, a policy list or a permissions boundary that cannot be
+    read marks the role, user or group not inspected and names the refused
+    call, instead of reading as clean.
+  - Each policy document is read once per session, however many principals
+    hold it, and the policy list reads the same copy. A group's policy lists
+    are read once per session for the group and all its members.
+- A web ACL with no rules reports "web ACL has no rules" only when its
+  default action is Allow; with Block it stops every request and reports
+  nothing.
+- A VPC shared into the account from another account (AWS RAM) no longer
+  reports "no active VPC flow logs": only its owner can create one.
+- A policy used only as a permissions boundary no longer reports
+  "unattached, no roles/users/groups use it".
+- A default security group whose only rule is the egress AWS creates in a
+  dual-stack VPC (all traffic to `0.0.0.0/0` and `::/0`) no longer reports
+  "default group allows traffic".
 - A finding now shows only on the kinds of resource that can have its defect,
   and each resource page lists the kinds a finding applies to:
   - Glue: a Ray job no longer reports "no security configuration" (AWS Glue

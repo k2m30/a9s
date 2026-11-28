@@ -209,6 +209,30 @@ func (f *IAMFake) ListGroupPolicies(_ context.Context, input *iam.ListGroupPolic
 	return &iam.ListGroupPoliciesOutput{PolicyNames: f.fix.InlineGroupPolicies[name]}, nil
 }
 
+func (f *IAMFake) GetGroupPolicy(_ context.Context, input *iam.GetGroupPolicyInput, _ ...func(*iam.Options)) (*iam.GetGroupPolicyOutput, error) {
+	group, name := aws.ToString(input.GroupName), aws.ToString(input.PolicyName)
+	doc, ok := f.fix.InlineGroupPolicyDocuments[group+"/"+name]
+	if !ok {
+		return nil, noSuchEntity("The group policy with name", name)
+	}
+	return &iam.GetGroupPolicyOutput{GroupName: input.GroupName, PolicyName: input.PolicyName, PolicyDocument: aws.String(doc)}, nil
+}
+
+// ListUserPolicies answers that no demo user holds an inline policy.
+func (f *IAMFake) ListUserPolicies(_ context.Context, input *iam.ListUserPoliciesInput, _ ...func(*iam.Options)) (*iam.ListUserPoliciesOutput, error) {
+	name := aws.ToString(input.UserName)
+	if !f.hasUser(name) {
+		return nil, noSuchEntity("User with name", name)
+	}
+	return &iam.ListUserPoliciesOutput{}, nil
+}
+
+// GetUserPolicy answers NoSuchEntity: ListUserPolicies lists no demo user
+// policy to read.
+func (f *IAMFake) GetUserPolicy(_ context.Context, input *iam.GetUserPolicyInput, _ ...func(*iam.Options)) (*iam.GetUserPolicyOutput, error) {
+	return nil, noSuchEntity("The user policy with name", aws.ToString(input.PolicyName))
+}
+
 func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...func(*iam.Options)) (*iam.GetPolicyOutput, error) {
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("GetPolicy: policy ARN is required")

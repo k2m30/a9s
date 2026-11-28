@@ -187,17 +187,16 @@ func TestD4Row18_ELBBadgeCountsEachBalancerOnce(t *testing.T) {
 // TestD4Row19_DrilledRoleCarriesTheSameFindingsAsTheListedRole pins both
 // surfaces of the same role.
 //
-// The list path and the by-ID path are different fetchers, and both read
-// inline policies. A role that showed an escalation finding when listed and
-// none when drilled into would tell the operator the problem went away
-// because they clicked on it.
+// The list path and the by-ID path are different fetchers, and the Wave 2
+// pass judges the policies of the rows either one returns. A role that showed
+// an escalation finding when listed and none when drilled into would tell the
+// operator the problem went away because they clicked on it.
 func TestD4Row19_DrilledRoleCarriesTheSameFindingsAsTheListedRole(t *testing.T) {
 	const code domain.FindingCode = "role.inline-privilege-escalation"
 	clients := demo.NewServiceClients()
 
-	listed := d4RowByID(t, DrainPages(t, "role", func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchIAMRolesPage(context.Background(), clients.IAM, token)
-	}), fixtures.RoleInlinePrivEsc)
+	folded, _ := d4FoldedRows(t, "role")
+	listed := d4RowByID(t, folded, fixtures.RoleInlinePrivEsc)
 	listedFinding := d4FindingByCode(t, listed, code)
 
 	// Through the catalog's own FetchByIDs, which is the path a drill takes.
@@ -212,6 +211,8 @@ func TestD4Row19_DrilledRoleCarriesTheSameFindingsAsTheListedRole(t *testing.T) 
 	if len(drilled) == 0 {
 		t.Fatalf("drilling to %s resolved no role", fixtures.RoleInlinePrivEsc)
 	}
+	res := Wave2Result(t, "role", clients, drilled)
+	a9sruntime.ApplyWave2ToRow(&drilled[0], *td, res.Findings, res.AttentionDetails)
 	drilledFinding := d4FindingByCode(t, drilled[0], code)
 
 	if drilledFinding.Phrase != listedFinding.Phrase {

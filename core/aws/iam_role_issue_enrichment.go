@@ -22,6 +22,7 @@ import (
 const (
 	iamRoleCodeDormant       domain.FindingCode = "iam-role.dormant"
 	iamRoleCodeAdminAttached domain.FindingCode = "role.admin-attached"
+	iamRoleCodePrivEsc       domain.FindingCode = "role.privilege-escalation"
 )
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles,
@@ -47,13 +48,13 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 	}
 	var fieldOnly []resource.Resource
 	for _, r := range resources {
-		if !rowAppliesAny("role", r, iamRoleCodeDormant, iamRoleCodeAdminAttached) {
+		if !rowAppliesAny("role", r, iamRoleCodeDormant, iamRoleCodeAdminAttached, iamRoleCodePrivEsc, roleCodeInlinePrivEsc) {
 			fieldOnly = append(fieldOnly, r)
 		}
 	}
 	fieldOnly = fieldOnlyCap(&result, fieldOnly, resourceIDsOf)
 	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		return rowAppliesAny("role", r, iamRoleCodeDormant, iamRoleCodeAdminAttached)
+		return rowAppliesAny("role", r, iamRoleCodeDormant, iamRoleCodeAdminAttached, iamRoleCodePrivEsc, roleCodeInlinePrivEsc)
 	}, resourceIDsOf)
 	n := len(resources) + len(fieldOnly)
 	var failures []Failure
@@ -75,28 +76,35 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		if roleName == "" {
 			return
 		}
-		attachedRole, _, aerr := listAttachedRolePolicies(ctx, clients.IAM, roleName)
-		adminPolicy := adminAttachedPolicyName(attachedRole)
-		if aerr != nil {
-			mu.Lock()
-			MarkSkipped(&result, r.ID, &failures, aerr)
-			mu.Unlock()
-		}
 		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String(roleName),
 		})
+		if err == nil && out.Role == nil {
+			err = UnusableAnswerErr{Call: "GetRole", Field: "role"}
+		}
+		// The boundary is on the GetRole answer; without it the role's
+		// effective permissions are unknown.
+		boundaryARN := ""
+		if err == nil && out.Role.PermissionsBoundary != nil {
+			boundaryARN = aws.ToString(out.Role.PermissionsBoundary.PermissionsBoundaryArn)
+		}
+		set, listErrs := rolePolicySet(ctx, clients.IAM, roleName)
+		verdict := principalPolicyVerdict(ctx, clients, []policySet{set}, boundaryARN, len(listErrs) > 0 || err != nil)
 		mu.Lock()
 		defer mu.Unlock()
-		if adminPolicy != "" {
-			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, adminAttachedRows(adminPolicy))
-
+		for _, e := range append(listErrs, verdict.errs...) {
+			MarkSkipped(&result, r.ID, &failures, e)
+		}
+		switch {
+		case verdict.admin != nil:
+			setWave2Finding(&result, r.ID, iamRoleCodeAdminAttached, verdict.adminRows())
+		case len(verdict.privEsc) > 0 && verdict.inlineNeeded:
+			setWave2Finding(&result, r.ID, roleCodeInlinePrivEsc, verdict.privEscRows())
+		case len(verdict.privEsc) > 0:
+			setWave2Finding(&result, r.ID, iamRoleCodePrivEsc, verdict.privEscRows())
 		}
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			return
-		}
-		if out.Role == nil {
-			MarkSkipped(&result, r.ID, &failures, UnusableAnswerErr{Call: "GetRole", Field: "role"})
 			return
 		}
 		setRoleLastUsed(&result, r.ID, out.Role)

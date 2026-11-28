@@ -35,7 +35,7 @@ const (
 // w4UserFake serves the five calls the user enricher makes. Every map is
 // keyed by user name so one batch can carry a flagged user and a healthy one.
 type w4UserFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	consoleUsers map[string]bool
 	mfaUsers     map[string]bool
 	keys         map[string][]iamtypes.AccessKeyMetadata

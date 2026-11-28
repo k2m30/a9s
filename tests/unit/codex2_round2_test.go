@@ -12,11 +12,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
+// codex2RolePolicyFake is one role's policy lists over an account whose
+// documents are t5EmptyIAM's: AWS-managed ones as AWS publishes them, every
+// other one scoped.
 type codex2RolePolicyFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	attached []iamtypes.AttachedPolicy
+	inline   []string
 }
 
 func (f *codex2RolePolicyFake) ListAttachedRolePolicies(_ context.Context, _ *iam.ListAttachedRolePoliciesInput, _ ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error) {
@@ -24,29 +29,41 @@ func (f *codex2RolePolicyFake) ListAttachedRolePolicies(_ context.Context, _ *ia
 }
 
 func (f *codex2RolePolicyFake) ListRolePolicies(_ context.Context, _ *iam.ListRolePoliciesInput, _ ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
-	return &iam.ListRolePoliciesOutput{}, nil
+	return &iam.ListRolePoliciesOutput{PolicyNames: f.inline}, nil
+}
+
+// codex2DrillRolePolicies opens the role's policy list through the
+// role_policies child fetcher, the path the drill from a role takes.
+func codex2DrillRolePolicies(t *testing.T, fake *codex2RolePolicyFake) []resource.Resource {
+	t.Helper()
+	td := resource.GetChildType("role_policies")
+	if td == nil || td.ChildFetcher == nil {
+		t.Fatal("role_policies child type has no fetcher")
+	}
+	clients := &awsclient.ServiceClients{IAM: fake}
+	session.New().WireStores(clients)
+	res, err := td.ChildFetcher(context.Background(), clients, map[string]string{"role_name": "acme-deploy-role"}, "")
+	if err != nil {
+		t.Fatalf("role_policies ChildFetcher: %v", err)
+	}
+	return res.Resources
 }
 
 func codex2FetchRolePolicy(t *testing.T, name, arn string) resource.Resource {
 	t.Helper()
-	fake := &codex2RolePolicyFake{attached: []iamtypes.AttachedPolicy{
+	rows := codex2DrillRolePolicies(t, &codex2RolePolicyFake{attached: []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String(name), PolicyArn: aws.String(arn)},
-	}}
-	res, err := awsclient.FetchRolePolicies(context.Background(), fake, fake,
-		map[string]string{"role_name": "acme-deploy-role"}, "")
-	if err != nil {
-		t.Fatalf("FetchRolePolicies: %v", err)
+	}})
+	if len(rows) != 1 {
+		t.Fatalf("got %d policy rows, want 1", len(rows))
 	}
-	if len(res.Resources) != 1 {
-		t.Fatalf("got %d policy rows, want 1", len(res.Resources))
-	}
-	return res.Resources[0]
+	return rows[0]
 }
 
-// A customer-managed policy can be named AdministratorAccess and carry
-// whatever permissions its account gives it; only the AWS-owned ARN identifies
-// the AWS-managed policy.
-func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
+// A row is judged from the document its ARN resolves to. A customer-managed
+// policy can be named AdministratorAccess and carry whatever its account
+// gives it; AWS's AdministratorAccess, in any partition, allows everything.
+func TestRolePolicy_RowIsJudgedFromTheDocumentItsARNResolvesTo(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		policy string
@@ -67,9 +84,8 @@ func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
 				got = r.Findings[0].Code
 			}
 			if got != tc.code {
-				t.Errorf("finding code = %q, want %q (findings=%+v)\n"+
-					"the dangerous-policy sets are the ones in policy_findings.go, matched by the "+
-					"AWS-owned ARN — never by the policy's bare name", got, tc.code, r.Findings)
+				t.Errorf("finding code = %q, want %q (findings=%+v): the verdict comes from the document, never the policy's name",
+					got, tc.code, r.Findings)
 			}
 		})
 	}
@@ -79,17 +95,13 @@ func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
 // the privilege-escalation check reads it as a one-statement list.
 func TestIAMRoles_InlineBareStatementObjectIsRead(t *testing.T) {
 	const doc = `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"iam:CreatePolicyVersion","Resource":"*"}}`
-	fake := &codex2RoleFake{
-		roles:    []iamtypes.Role{codex2Role("acme-deploy-role")},
-		policies: []string{"escalate"},
-		docs:     map[string]string{"escalate": doc},
-	}
-	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
-	if err != nil {
-		t.Fatalf("FetchIAMRolesPage: %v", err)
-	}
-	if !codex2HasCode(res.Resources[0].Findings, "role.inline-privilege-escalation") {
-		t.Errorf("no privilege-escalation finding on a single-object Statement; findings=%+v", res.Resources[0].Findings)
+	res, _ := w4EnrichRoles(t, &w4RoleListFake{
+		roles:  []iamtypes.Role{w4Role("acme-deploy-role", "/", w4TrustEC2Only)},
+		inline: map[string]map[string]string{"acme-deploy-role": {"escalate": doc}},
+	})
+	if !codex2HasCode(res.Findings["acme-deploy-role"], "role.inline-privilege-escalation") {
+		t.Errorf("no privilege-escalation finding on a single-object Statement; findings=%+v truncated=%q",
+			res.Findings["acme-deploy-role"], res.TruncatedIDs["acme-deploy-role"])
 	}
 }
 

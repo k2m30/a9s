@@ -66,6 +66,31 @@ var t576FailureAllowed = map[string]string{
 	"cf/S3.HeadBucket": "HeadBucket answers 403 for a bucket that exists and is not the caller's, and 404 for one that does not exist, so an AccessDenied is an answer (the origin bucket exists), not a failed read",
 }
 
+// t576DocumentVerdicts are findings decided by reading a principal's policy
+// documents. The document read is their evidence, reached through the list
+// reads that name each document and the principal read that names its
+// permissions boundary; a supporting row naming a policy or a group
+// is not. A refused read anywhere on that chain may cost the verdict, and then
+// the row is marked; a document that was read and decides the verdict alone
+// (an administrator grant) keeps it standing.
+var t576DocumentVerdicts = map[string]struct {
+	chain []string
+	codes []domain.FindingCode
+}{
+	"role": {
+		[]string{"IAM.GetRole", "IAM.ListAttachedRolePolicies", "IAM.ListRolePolicies", "IAM.GetPolicy", "IAM.GetPolicyVersion", "IAM.GetRolePolicy"},
+		[]domain.FindingCode{"role.admin-attached", "role.privilege-escalation", "role.inline-privilege-escalation"},
+	},
+	"iam-user": {
+		[]string{"IAM.GetUser", "IAM.ListAttachedUserPolicies", "IAM.ListUserPolicies", "IAM.ListGroupsForUser", "IAM.ListAttachedGroupPolicies", "IAM.ListGroupPolicies", "IAM.GetPolicy", "IAM.GetPolicyVersion", "IAM.GetUserPolicy", "IAM.GetGroupPolicy"},
+		[]domain.FindingCode{"iam-user.admin-attached", "iam-user.privilege-escalation"},
+	},
+	"iam-group": {
+		[]string{"IAM.ListAttachedGroupPolicies", "IAM.ListGroupPolicies", "IAM.GetPolicy", "IAM.GetPolicyVersion", "IAM.GetGroupPolicy"},
+		[]domain.FindingCode{"iam-group.admin-attached", "iam-group.privilege-escalation"},
+	},
+}
+
 // A failed read is one of two things on a row: data the row still gets from
 // another read, or a row marked not inspected. Never a silent blank, and never
 // the end of signals that come from reads that did not fail. Each registered
@@ -220,6 +245,26 @@ func TestT576_FailedEnricherReadIsMarkedAndHidesNoOtherSignal(t *testing.T) {
 					}
 				}
 			}
+			// A document's request carries what the list reads before it
+			// returned, so on the chain whatever a derived name led to is
+			// derived too.
+			docs := t576DocumentVerdicts[w.ShortName]
+			onChain := slices.Contains(docs.chain, o.service+"."+o.name)
+			for grew := onChain; grew; {
+				grew = false
+				for _, c := range base.calls {
+					if !slices.Contains(docs.chain, c.Service+"."+c.Op) || !slices.ContainsFunc(t576Leaves(c.In), func(l string) bool { return derived[l] }) {
+						continue
+					}
+					in := t576Leaves(c.In)
+					for _, l := range t576Leaves(c.Out) {
+						if !derived[l] && !slices.Contains(in, l) {
+							derived[l] = true
+							grew = true
+						}
+					}
+				}
+			}
 			otherAnswers := map[string]string{}
 			for _, c := range got.calls {
 				if !c.Failed {
@@ -231,13 +276,20 @@ func TestT576_FailedEnricherReadIsMarkedAndHidesNoOtherSignal(t *testing.T) {
 
 			for id, findings := range base.res.Findings {
 				for _, f := range findings {
+					byDocument := slices.Contains(docs.codes, f.Code)
 					if slices.ContainsFunc(got.res.Findings[id], func(g domain.Finding) bool { return g.Code == f.Code }) {
 						continue
 					}
 					// A supporting row quoting a value only another read
 					// returned names the read that raised the finding.
 					evidence := ""
+					if byDocument && !onChain {
+						evidence = "its policy documents"
+					}
 					for _, dr := range base.res.AttentionDetails[id][f.Code].Rows {
+						if byDocument {
+							break
+						}
 						if from, ok := otherAnswers[dr.Value]; ok && len(dr.Value) >= 4 && !answered[dr.Value] {
 							evidence = fmt.Sprintf("%q from %s", dr.Value, from)
 						}

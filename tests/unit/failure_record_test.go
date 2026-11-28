@@ -310,7 +310,7 @@ func TestAggregateFailures_RegionGap_NamesTheRegionOnce(t *testing.T) {
 // leaves the other calls healthy, so the enricher's only failure is the one
 // call it could not make.
 type iamDeniedKeysFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 }
 
 func (f *iamDeniedKeysFake) GetLoginProfile(

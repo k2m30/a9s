@@ -2,7 +2,6 @@ package unit
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -77,120 +76,28 @@ func TestLoadDirIn_TransformedPairNeverInheritsALegacyDirectory(t *testing.T) {
 	}
 }
 
-type codex2RoleFake struct {
-	roles     []iamtypes.Role
-	listErr   error
-	policies  []string
-	getErrFor map[string]error
-	docs      map[string]string
-}
-
-func (f *codex2RoleFake) ListRoles(_ context.Context, _ *iam.ListRolesInput, _ ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
-	return &iam.ListRolesOutput{Roles: f.roles}, nil
-}
-
-func (f *codex2RoleFake) ListRolePolicies(_ context.Context, _ *iam.ListRolePoliciesInput, _ ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
-	if f.listErr != nil {
-		return nil, f.listErr
-	}
-	return &iam.ListRolePoliciesOutput{PolicyNames: f.policies}, nil
-}
-
-func (f *codex2RoleFake) GetRolePolicy(_ context.Context, in *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
-	name := aws.ToString(in.PolicyName)
-	if err, ok := f.getErrFor[name]; ok {
-		return nil, err
-	}
-	doc, ok := f.docs[name]
-	if !ok {
-		return nil, errors.New("no such policy")
-	}
-	return &iam.GetRolePolicyOutput{
-		RoleName:       in.RoleName,
-		PolicyName:     in.PolicyName,
-		PolicyDocument: aws.String(doc),
-	}, nil
-}
-
-func codex2Denied(op string) error {
-	return &smithy.OperationError{
-		ServiceID:     "IAM",
-		OperationName: op,
-		Err: &smithy.GenericAPIError{
-			Code:    "AccessDenied",
-			Message: "User: arn:aws:iam::123456789012:user/example is not authorized to perform: iam:" + op,
-		},
-	}
-}
-
-const codex2PrivEscDoc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["iam:CreatePolicyVersion"],"Resource":"*"}]}`
-
-const codex2ReadDoc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::acme-reports/*"}]}`
-
-func codex2Role(name string) iamtypes.Role {
-	return iamtypes.Role{
-		RoleName: aws.String(name),
-		RoleId:   aws.String("AROA00000000000EXAMPLE"),
-		Path:     aws.String("/"),
-		Arn:      aws.String("arn:aws:iam::123456789012:role/" + name),
-		AssumeRolePolicyDocument: aws.String(
-			`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
-	}
-}
-
-// A refused ListRolePolicies leaves the role's policy-derived facts unknown, so
-// the page carries a partial error instead of an empty scan that renders the
-// role inspected and clean.
-func TestIAMRoles_DeniedListRolePoliciesIsNotAnEmptyScan(t *testing.T) {
-	fake := &codex2RoleFake{
-		roles:   []iamtypes.Role{codex2Role("acme-deploy-role")},
-		listErr: codex2Denied("ListRolePolicies"),
-	}
-	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
-	if err == nil {
-		t.Errorf("FetchIAMRolesPage returned no error for a denied ListRolePolicies; " +
-			"the list lane must carry the partial failure")
-	} else if !awsclient.IsAccessDenied(err) {
-		t.Errorf("partial error class = %q, want %q", awsclient.ErrClass(err), awsclient.ClassAccessDenied)
-	}
-	if len(res.Resources) != 1 {
-		t.Fatalf("got %d rows, want the role itself to survive the partial failure", len(res.Resources))
-	}
-}
-
-// One of two GetRolePolicy calls refused leaves the resource list incomplete;
-// it must not read as the role's whole policy surface.
+// One of two inline documents refused leaves the role's policies partly
+// unread; the read half is not the role's whole policy surface, since the
+// unread one may hold the Deny that decides. The role is not inspected and
+// carries no verdict from the escalating half it read.
 func TestIAMRoles_DeniedGetRolePolicyIsNotAPartialScan(t *testing.T) {
-	fake := &codex2RoleFake{
-		roles:    []iamtypes.Role{codex2Role("acme-deploy-role")},
-		policies: []string{"readable", "denied"},
-		docs:     map[string]string{"readable": codex2ReadDoc},
-		getErrFor: map[string]error{
-			"denied": codex2Denied("GetRolePolicy"),
-		},
-	}
-	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
+	const role = "acme-deploy-role"
+	res, err := w4EnrichRoles(t, &w4RoleListFake{
+		roles: []iamtypes.Role{w4Role(role, "/", w4TrustEC2Only)},
+		inline: map[string]map[string]string{role: {
+			"readable": w4InlinePrivEscDoc,
+			"denied":   w4InlineBenignDoc,
+		}},
+		getErr: map[string]error{"denied": t5Denied("GetRolePolicy")},
+	})
 	if err == nil {
-		t.Errorf("FetchIAMRolesPage returned no error for a denied GetRolePolicy")
+		t.Error("EnrichIAMRoleLastUsed returned no error for a denied GetRolePolicy")
 	}
-	if len(res.Resources) != 1 {
-		t.Fatalf("got %d rows, want 1", len(res.Resources))
+	if check := res.TruncatedIDs[role]; check != "GetRolePolicy" {
+		t.Errorf("%s not-inspected check = %q, want %q", role, check, "GetRolePolicy")
 	}
-}
-
-func TestIAMRoles_ReadableInlinePoliciesStillReportPrivEsc(t *testing.T) {
-	fake := &codex2RoleFake{
-		roles:    []iamtypes.Role{codex2Role("acme-deploy-role")},
-		policies: []string{"escalate"},
-		docs:     map[string]string{"escalate": codex2PrivEscDoc},
-	}
-	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
-	if err != nil {
-		t.Fatalf("FetchIAMRolesPage: unexpected error on a fully readable role: %v", err)
-	}
-	if !codex2HasCode(res.Resources[0].Findings, "role.inline-privilege-escalation") {
-		t.Errorf("no privilege-escalation finding on a readable escalating policy; findings=%+v",
-			res.Resources[0].Findings)
+	if fs := res.Findings[role]; codex2HasCode(fs, "role.inline-privilege-escalation") || codex2HasCode(fs, "role.privilege-escalation") || codex2HasCode(fs, "role.admin-attached") {
+		t.Errorf("%s carries a policy verdict from a partly read set; findings=%+v", role, fs)
 	}
 }
 
@@ -366,22 +273,15 @@ func TestVPCEPolicyOpen_BucketScopedWildcardIsNotFullAccess(t *testing.T) {
 // AWS's own definition of PowerUserAccess excludes IAM, Organizations and
 // Account management, so a principal holding only it is not an administrator.
 func TestAdminManagedPolicySet_ExcludesPowerUserAccess(t *testing.T) {
-	powerUser := []iamtypes.AttachedPolicy{{
-		PolicyName: aws.String("PowerUserAccess"),
-		PolicyArn:  aws.String("arn:aws:iam::aws:policy/PowerUserAccess"),
-	}}
-	if got := awsclient.AdminAttachedPolicyNameForTest(powerUser); got != "" {
-		t.Errorf("PowerUserAccess reported as the admin policy %q, want no admin attachment\n"+
-			"finding 8: PowerUserAccess grants no IAM, Organizations or Account access", got)
+	f := newT5IAM()
+	f.users = []string{"acme-power", "acme-admin"}
+	f.attached["user/acme-power"] = []string{t5PowerARN}
+	f.attached["user/acme-admin"] = []string{t5AdminARN}
+	v := t5Run(t, f, "iam-user")
+	if t5Has(v.findings["acme-power"], t5UserAdmin) {
+		t.Errorf("PowerUserAccess reported as an administrator policy, want no admin finding; findings=%+v", v.findings["acme-power"])
 	}
-
-	admin := []iamtypes.AttachedPolicy{{
-		PolicyName: aws.String("AdministratorAccess"),
-		PolicyArn:  aws.String("arn:aws:iam::aws:policy/AdministratorAccess"),
-	}}
-	if got := awsclient.AdminAttachedPolicyNameForTest(admin); got != "AdministratorAccess" {
-		t.Errorf("AdminAttachedPolicyNameForTest(AdministratorAccess) = %q, want %q", got, "AdministratorAccess")
-	}
+	t5AssertAdmin(t, v, "acme-admin", t5UserAdmin)
 }
 
 func codex2APIErr(code string) error {

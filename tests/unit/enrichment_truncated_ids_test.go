@@ -27,7 +27,7 @@ import (
 // iamGroupErrorOnSecondFake returns a successful GetGroup for the first group
 // and an error for the second. Used to trigger per-resource truncation.
 type iamGroupErrorOnSecondFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 
 	// mu guards callOrder, which is written concurrently: EnrichIAMGroup fans
 	// out GetGroup calls per resource via core/aws.ForEachParallel

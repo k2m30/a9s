@@ -100,11 +100,6 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: an inline policy grants a known privilege-escalation action combination.
-  - **Explicit Deny**: an action an unconditional Deny covers is not granted; a Deny with `NotAction` covers every action no listed entry overlaps, so Deny NotAction [`s3:*`, `logs:*`] removes every `iam:` action. A conditioned Deny removes nothing.
-  - **State bucket**: Broken.
-  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
-
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `RoleLastUsed.LastUsedDate` missing or >90d (dormant; field is region-scoped — may false-warn in multi-region accounts).
@@ -112,13 +107,23 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
   - **API call**: `GetRole` per role (one per resource).
   - **Cost shape**: per-resource.
 
-- **Signal**: `AdministratorAccess` attached. `PowerUserAccess` does not count: it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
+- **Signal**: the role's policies, read together as IAM reads them, allow every action on every resource, and its permissions boundary, when it has one, does too. The statements of every attached (AWS-managed or customer-managed) and inline policy are joined into one document, so an unconditional Deny in any of them leaves less than every action. The document decides, not the policy's name: `AdministratorAccess` counts because its document is `Allow * on *`; `PowerUserAccess` does not, because its document withholds IAM, Organizations and Account.
   - **State bucket**: Warning.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type: `GetRole` (whose answer carries the permissions boundary), `ListAttachedRolePolicies` and `ListRolePolicies`, then each document and the boundary's through the session's policy document cache (`GetPolicy` + `GetPolicyVersion` once per managed policy, `GetRolePolicy` once per inline policy). A list, a document or a boundary that cannot be read marks the role not inspected with the refused call, and raises neither this signal nor the two below: the document nobody read may hold the Deny or the boundary that decides.
+  - **Cost shape**: per-resource, with documents shared across roles.
+
+- **Signal**: the joined policies grant a known privilege-escalation action combination that the attached policies alone grant, the boundary allows every action of it too, and the role is not an administrator. The rows name each policy that grants an action of the combination.
+  - **Explicit Deny**: an action an unconditional Deny in any of the role's policies covers is not granted; a Deny with `NotAction` covers every action no listed entry overlaps. A conditioned Deny removes nothing.
+  - **State bucket**: Broken.
+  - **How obtained**: the same Wave 2 reads as the administrator signal.
+
+- **Signal**: the joined policies grant a known privilege-escalation action combination, the boundary allows every action of it too, the role is not an administrator, and no combination is granted without an inline policy. A role shows this signal or the one above, never both.
+  - **Explicit Deny**: as above.
+  - **State bucket**: Broken.
+  - **How obtained**: the same Wave 2 reads as the administrator signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-- OUT OF SCOPE: `ListAttachedRolePolicies` per role (admin-access detection).
 - OUT OF SCOPE: `GenerateServiceLastAccessedDetails` async permission-usage audit.
 
 ## 4. Issue Visualization
@@ -136,9 +141,10 @@ One row per signal from §3:
 | trust policy allows a wildcard principal with no restrictive condition | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `trust policy open to anyone` |
 | the trust policy does not parse | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `trust policy not inspected` |
 | an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping compared against a concrete value | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `service can assume without source scoping` |
-| an inline policy grants a known privilege-escalation action combination | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inline policy allows privilege escalation` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Warning | `~` | S2, S3, S4, S5 | `dormant role (><N>d)` |
-| `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| the role's policies together, within its boundary, allow every action on every resource (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| the role's attached policies together, within its boundary, grant a known privilege-escalation action combination | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `attached policy allows privilege escalation` |
+| the role's policies together, within its boundary, grant a known privilege-escalation action combination only with an inline policy's grant | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `inline policy allows privilege escalation` |
 
 A trust policy that does not parse raises neither trust signal: the row reads `trust policy not inspected` in yellow, and the Trust column reads `unknown` rather than claiming no wildcard.
 
@@ -184,9 +190,10 @@ role — SECURITY & IAM. Status key: `state` — the column naming it is the sta
 | Code | Phrase | Severity | Source | Applies to | Detail |
 | --- | --- | --- | --- | --- | --- |
 | role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | standard | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition that requires the key to equal the account or ARN you expect; a condition that only says whether the key is set, or that lists what it must not be, scopes nothing. |
-| role.inline-privilege-escalation | inline policy allows privilege escalation | broken | wave1 | all | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
+| role.inline-privilege-escalation | inline policy allows privilege escalation | broken | wave2 | standard | The policies of this role, read together within its permissions boundary, grant a combination of actions that lets its holder grant itself full administrator, and an inline policy supplies part of it. Remove the escalation actions from the inline policy, or scope them to resources that cannot be used to escalate. |
 | iam-role.dormant | dormant role (><N>d) | warn | wave2 | standard | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |
-| role.admin-attached | has an administrator policy | warn | wave2 | standard | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
+| role.admin-attached | has an administrator policy | warn | wave2 | standard | A policy that applies to this principal allows every action on every resource, so anything it can be used for it can be used for everything. Replace that policy with a scoped policy covering only the actions this principal needs. |
+| role.privilege-escalation | attached policy allows privilege escalation | broken | wave2 | standard | The managed policies attached to this role, read together within its permissions boundary, grant a combination of actions that lets its holder grant itself full administrator. Replace an AWS-managed policy among them with a narrower one, and remove the escalation actions from the policies the account owns, or scope them to resources that cannot be used to escalate. |
 | role.trust.wildcard-principal | trust policy open to anyone | broken | wave1 | all | The trust policy allows any principal, so anyone can use this role, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | role.trust.policy-not-inspected | trust policy not inspected | warn | wave1 | all | The trust policy document AWS returned does not parse, so a9s cannot say whether it opens this role to anyone. Read the document in the detail view and judge its grants by hand. |
 <!-- END GENERATED: findings -->

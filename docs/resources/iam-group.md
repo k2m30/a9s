@@ -62,13 +62,17 @@ One bullet per distinct signal.
   - **API call**: `GetGroup` — one call per group.
   - **Cost shape**: per-resource.
 
-- **Signal**: `AdministratorAccess` attached. `PowerUserAccess` does not count: it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
+- **Signal**: the policies the group holds, attached (AWS-managed or customer-managed) and inline, read together as IAM reads them, allow every action on every resource. Their statements are joined into one document, so an unconditional Deny in any of them leaves less than every action. The document decides, not the policy's name: `AdministratorAccess` counts because its document is `Allow * on *`; `PowerUserAccess` does not, because its document withholds IAM, Organizations and Account.
   - **State bucket**: Warning.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type: the `ListAttachedGroupPolicies` and `ListGroupPolicies` walks the no-op check already makes, read once per session and shared with the group's members, then each document through the session's policy document cache (`GetPolicy` + `GetPolicyVersion` once per managed policy, `GetGroupPolicy` once per inline policy). A list or a document that cannot be read marks the group not inspected with the refused call, and raises neither this signal nor the one below.
+
+- **Signal**: the policies the group holds, read together as above, grant a known privilege-escalation action combination, and the group is not an administrator.
+  - **State bucket**: Broken.
+  - **How obtained**: the same Wave 2 reads as the administrator signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-- OUT OF SCOPE: `ListAttachedGroupPolicies` per group (admin-access + blast radius) — used by the related panel for the `policy` pivot, not for attention scoring. Detecting `AdministratorAccess` attachment or wildcard-policy blast radius on groups is deferred.
+- OUT OF SCOPE: wildcard-policy blast radius on groups (how many members each grant reaches).
 
 ## 4. Issue Visualization
 
@@ -85,7 +89,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | no members, or members but no attached or inline policies | 2 | Warning | `~` | S2, S3, S4, S5 | `no members or no policies` |
-| `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| the group's policies together allow every action on every resource (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| the group's policies together grant a known privilege-escalation action combination | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `policy allows privilege escalation` |
 
 ## 4.1 UX review (two sentences)
 
@@ -124,7 +129,8 @@ iam-group — SECURITY & IAM. Status key: `state` — the column naming it is th
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | iam-group.orphan-or-noop | no members or no policies | warn | wave2 | This group grants nothing to nobody: it either has no members or carries no policies, so it only adds noise to access reviews. Delete it, or attach the policy and members it was created for. |
-| iam-group.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
+| iam-group.admin-attached | has an administrator policy | warn | wave2 | A policy that applies to this principal allows every action on every resource, so anything it can be used for it can be used for everything. Replace that policy with a scoped policy covering only the actions this principal needs. |
+| iam-group.privilege-escalation | policy allows privilege escalation | broken | wave2 | The policies attached to this group and inline in it, read together, grant a combination of actions that lets a member grant itself full administrator. Replace an AWS-managed policy among them with a narrower one, and remove the escalation actions from the policies the account owns, or scope them to resources that cannot be used to escalate. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

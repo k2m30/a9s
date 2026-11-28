@@ -25,7 +25,7 @@ import (
 // iamGetRoleFakeWithNilRole implements IAMAPI returning GetRoleOutput with
 // Role=nil for the named role, simulating an empty but non-error response.
 type iamGetRoleFakeWithNilRole struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	nilRoleName string
 }
 
@@ -55,7 +55,7 @@ var _ awsclient.IAMAPI = (*iamGetRoleFakeWithNilRole)(nil)
 // iamBareAPI implements IAMAPI but does NOT implement IAMGetRoleAPI (no GetRole).
 // Used to exercise the !ok type-assertion branch in EnrichIAMRoleLastUsed.
 type iamBareAPI struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 }
 
 var _ awsclient.IAMAPI = (*iamBareAPI)(nil)
@@ -143,7 +143,7 @@ func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *te
 
 // iamGetRoleFakeCombo handles both error-for-a-role and nil-last-used-for-a-role cases.
 type iamGetRoleFakeCombo struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	errForRole     string
 	nilLastUsedFor map[string]bool
 }
@@ -340,7 +340,7 @@ func TestEnrichIAMPolicy_EmptyARNSkipped(t *testing.T) {
 
 // iamGroupErrorFake is like iamGroupFake but can return errors per group name.
 type iamGroupErrorFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 
 	usersByGroup            map[string][]iamtypes.User
 	attachedPoliciesByGroup map[string][]iamtypes.AttachedPolicy

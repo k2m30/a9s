@@ -42,7 +42,7 @@ func TestT3BDev_PolicyWitnessesAfterTheSweep(t *testing.T) {
 		"sns":          {13, 1},
 		"ecr":          {14, 3},
 		"codeartifact": {5, 1},
-		"role":         {56, 5},
+		"role":         {56, 6},
 		"opensearch":   {15, 12},
 		"secrets":      {39, 21},
 		"vpce":         {13, 9},

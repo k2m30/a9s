@@ -72,11 +72,15 @@ func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ..
 		}
 	}
 	ruleCount := 3
+	defaultAction := &wafv2types.DefaultAction{Allow: &wafv2types.AllowAction{}}
 	switch *input.Name {
 	case "acme-staging-waf":
 		ruleCount = 1
 	case fixtures.WAFNoRules:
 		ruleCount = 0
+	case fixtures.WAFNoRulesBlocking:
+		ruleCount = 0
+		defaultAction = &wafv2types.DefaultAction{Block: &wafv2types.BlockAction{}}
 	}
 	rules := make([]wafv2types.Rule, ruleCount)
 	for i := range rules {
@@ -84,9 +88,10 @@ func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ..
 	}
 	return &wafv2.GetWebACLOutput{
 		WebACL: &wafv2types.WebACL{
-			Id:    input.Id,
-			Name:  input.Name,
-			Rules: rules,
+			Id:            input.Id,
+			Name:          input.Name,
+			Rules:         rules,
+			DefaultAction: defaultAction,
 			// The console names an ACL's metric after the ACL.
 			VisibilityConfig: &wafv2types.VisibilityConfig{
 				MetricName: input.Name, CloudWatchMetricsEnabled: true, SampledRequestsEnabled: true,

@@ -25,7 +25,7 @@ const (
 // w4GroupFake serves the three calls the group enricher makes, keyed by
 // group name.
 type w4GroupFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	members map[string][]string
 	// attached maps group name → attached policy name → ARN.
 	attached map[string]map[string]string

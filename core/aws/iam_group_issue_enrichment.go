@@ -19,6 +19,7 @@ import (
 const (
 	iamGroupCodeOrphanOrNoop  domain.FindingCode = "iam-group.orphan-or-noop"
 	iamGroupCodeAdminAttached domain.FindingCode = "iam-group.admin-attached"
+	iamGroupCodePrivEsc       domain.FindingCode = "iam-group.privilege-escalation"
 )
 
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
@@ -36,12 +37,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 	if clients.IAM == nil {
 		return result, nil
 	}
-	getGroupAPI, ok1 := clients.IAM.(IAMGetGroupAPI)
-	attachedPoliciesAPI, ok2 := clients.IAM.(IAMListAttachedGroupPoliciesAPI)
-	inlinePoliciesAPI, ok3 := clients.IAM.(IAMListGroupPoliciesAPI)
-	if !ok1 || !ok2 || !ok3 {
-		return result, nil
-	}
+	getGroupAPI := clients.IAM
 
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
@@ -58,9 +54,12 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 
 		allUsers, membersComplete, memberErr := iamGroupUsers(ctx, getGroupAPI, groupName)
-		allAttached, attachedComplete, attachedErr := iamGroupAttachedPolicies(ctx, attachedPoliciesAPI, groupName)
-		allInline, inlineComplete, inlineErr := iamGroupInlinePolicies(ctx, inlinePoliciesAPI, groupName)
+		lists := groupPolicies(ctx, clients, groupName)
+		allAttached, attachedComplete, attachedErr := lists.attached, lists.attachedComplete, lists.attachedErr
+		allInline, inlineComplete, inlineErr := lists.inline, lists.inlineComplete, lists.inlineErr
 		memberTruncated, attachedTruncated, inlineTruncated := !membersComplete, !attachedComplete, !inlineComplete
+		verdict := principalPolicyVerdict(ctx, clients, []policySet{{kind: holderGroup, holder: groupName, attached: allAttached, inline: allInline}}, "",
+			attachedErr != nil || inlineErr != nil || attachedTruncated || inlineTruncated)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -68,7 +67,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		// Each walk answers its own question: a failed one leaves only the
 		// signals that read it unevaluated, through its truncated flag, since
 		// PageAll reports an errored walk incomplete.
-		for _, err := range []error{memberErr, attachedErr, inlineErr} {
+		for _, err := range append([]error{memberErr, attachedErr, inlineErr}, verdict.errs...) {
 			if err != nil {
 				MarkSkipped(&result, r.ID, &failures, err)
 			}
@@ -77,10 +76,9 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		// pages read did not already decide it: one member rules out an
 		// orphan, one policy rules out a no-op group, and an administrator
 		// policy seen is the admin finding.
-		adminPolicy := adminAttachedPolicyName(allAttached)
 		membersOpen := memberTruncated && len(allUsers) == 0
 		policiesOpen := (attachedTruncated || inlineTruncated) && len(allAttached) == 0 && len(allInline) == 0
-		adminOpen := attachedTruncated && adminPolicy == ""
+		adminOpen := (attachedTruncated || inlineTruncated) && verdict.admin == nil
 		if membersOpen || policiesOpen || adminOpen {
 			markUninspected(&result, r.ID, CheckCap)
 		}
@@ -119,8 +117,11 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			})
 		}
 
-		if adminPolicy != "" {
-			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, adminAttachedRows(adminPolicy))
+		if verdict.admin != nil {
+			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, verdict.adminRows())
+		}
+		if len(verdict.privEsc) > 0 {
+			setWave2Finding(&result, r.ID, iamGroupCodePrivEsc, verdict.privEscRows())
 		}
 
 		if len(rows) == 0 {

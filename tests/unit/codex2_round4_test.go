@@ -51,7 +51,7 @@ func TestMarkSkipped_AVanishedResourceIsUninspectedNotAFailure(t *testing.T) {
 // codex2VanishFake is w4RoleAdminFake's GetRole with one role deleted between
 // the list call and this one, and one refused.
 type codex2VanishFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	gone   map[string]bool
 	denied map[string]bool
 }

@@ -194,7 +194,7 @@ func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 			arn: {ResourceArns: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/x/y"}},
 		},
 		getACLOutput: &wafv2svc.GetWebACLOutput{
-			WebACL: &wafv2types.WebACL{Rules: []wafv2types.Rule{}},
+			WebACL: &wafv2types.WebACL{Rules: []wafv2types.Rule{}, DefaultAction: &wafv2types.DefaultAction{Allow: &wafv2types.AllowAction{}}},
 		},
 	}
 	wrapped := &scopeCaptureFake{wafFullFake: fake, scopeCapture: &getACLCalled}

@@ -220,8 +220,10 @@ func sgDefaultAllowsTraffic(sg ec2types.SecurityGroup) bool {
 	return len(sg.IpPermissions) > 0 || !isAWSDefaultEgress(sg.IpPermissionsEgress)
 }
 
-// isAWSDefaultEgress reports whether perms is exactly the egress rule AWS
-// creates with every security group: all protocols to 0.0.0.0/0, nothing else.
+// isAWSDefaultEgress reports whether perms is exactly the egress AWS creates
+// with every security group: all protocols to 0.0.0.0/0, and to ::/0 as well
+// in a VPC with an IPv6 block, nothing else. DescribeSecurityGroups returns
+// both ranges in one permission.
 func isAWSDefaultEgress(perms []ec2types.IpPermission) bool {
 	if len(perms) == 0 {
 		return true
@@ -232,7 +234,8 @@ func isAWSDefaultEgress(perms []ec2types.IpPermission) bool {
 	p := perms[0]
 	return aws.ToString(p.IpProtocol) == "-1" &&
 		len(p.IpRanges) == 1 && aws.ToString(p.IpRanges[0].CidrIp) == "0.0.0.0/0" &&
-		len(p.Ipv6Ranges) == 0 && len(p.UserIdGroupPairs) == 0 && len(p.PrefixListIds) == 0
+		(len(p.Ipv6Ranges) == 0 || len(p.Ipv6Ranges) == 1 && aws.ToString(p.Ipv6Ranges[0].CidrIpv6) == "::/0") &&
+		len(p.UserIdGroupPairs) == 0 && len(p.PrefixListIds) == 0
 }
 
 // FetchSecurityGroupsPage calls the EC2 DescribeSecurityGroups API and returns

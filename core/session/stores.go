@@ -26,6 +26,13 @@ var clientStores = []struct {
 		wire:        func(s *Session, c *awsclient.ServiceClients) { c.SetIAMPolicies(s.IAMPolicies) },
 	},
 	{
+		// Policy documents: read for a policy's detail and for the verdict on
+		// every role, user and group that holds the policy.
+		refreshedBy: []string{"policy", "role", "role_policies", "iam-user", "iam-group"},
+		reset:       func(s *Session) { s.PolicyDocCache = &awsclient.PolicyDocumentCache{} },
+		wire:        func(s *Session, c *awsclient.ServiceClients) { c.SetPolicyDocs(s.PolicyDocCache) },
+	},
+	{
 		// The caller's account ID, which no resource refresh changes.
 		reset: func(s *Session) { s.IdentityStore = NewIdentityStore() },
 		wire:  func(s *Session, c *awsclient.ServiceClients) { c.SetIdentityStore(s.IdentityStore) },

@@ -206,8 +206,7 @@ func TestT577Dev_RefusedDescribeNeverDropsAListedRow(t *testing.T) {
 }
 
 var t577PageCapFailureKept = map[string]string{
-	"iam_roles.go": "unreachable: ListRolePolicies answers 100 names a page and a role's inline policies share a 10,240-character size quota, so a role cannot hold ten pages of them",
-	"kms.go":       "the ListAliases failure is what marks the kms list a lower bound for alias references (RowsHeld); the cap needs a field-level lower bound before it can drop the failure",
+	"kms.go": "the ListAliases failure is what marks the kms list a lower bound for alias references (RowsHeld); the cap needs a field-level lower bound before it can drop the failure",
 }
 
 // a9s's own page cap is a lower bound on what was read, never a failed AWS

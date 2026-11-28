@@ -26,7 +26,7 @@ import (
 // Each call to GetGroup advances an internal call counter per group name,
 // returning the corresponding page from the pages map.
 type iamGroupPaginatedFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 
 	// getGroupPages maps groupName → ordered pages of GetGroupOutput.
 	// Each successive GetGroup call (matching by Marker) returns the next page.

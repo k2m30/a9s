@@ -249,10 +249,10 @@ func w4bAssertOperatorText(t *testing.T, id, where, text string) {
 	}
 }
 
-// TestW4bRoleWave1SupportingRowsSurviveTheFetcher pins the confused-deputy
-// and inline-privilege-escalation supporting rows at the point the fetcher
-// emits them.
-func TestW4bRoleWave1SupportingRowsSurviveTheFetcher(t *testing.T) {
+// TestW4bRoleSupportingRowsReachTheRow pins the confused-deputy supporting
+// rows at the point the fetcher emits them, and the inline
+// privilege-escalation rows once the Wave 2 pass has folded onto the row.
+func TestW4bRoleSupportingRowsReachTheRow(t *testing.T) {
 	clients := demo.NewServiceClients()
 	rows := DrainPages(t, "role", func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchIAMRolesPage(context.Background(), clients.IAM, token)
@@ -262,7 +262,8 @@ func TestW4bRoleWave1SupportingRowsSurviveTheFetcher(t *testing.T) {
 	w4AssertRows(t, deputy.AttentionDetails, "role.trust.confused-deputy",
 		[]domain.DetailRow{{Label: "Services", Value: "lambda"}})
 
-	privEsc := w4bRow(t, rows, fixtures.RoleInlinePrivEsc)
+	folded, _ := w4bBench(t, "role")
+	privEsc := w4bRow(t, folded, fixtures.RoleInlinePrivEsc)
 	ad, ok := privEsc.AttentionDetails["role.inline-privilege-escalation"]
 	if !ok || len(ad.Rows) != 2 {
 		t.Fatalf("inline privilege-escalation rows = %+v, want Policy and Combo", ad.Rows)
@@ -324,7 +325,7 @@ func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 		}
 	}
 
-	const wantWitnessed = 18
+	const wantWitnessed = 22
 	if singles != wantWitnessed {
 		t.Errorf("%d witness-backed wave-2 codes on the bench, want %d — a witness was added or lost "+
 			"without this count moving with it; codes seen: %v", singles, wantWitnessed, codes)

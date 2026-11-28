@@ -30,10 +30,10 @@ func TestDemoPolicyAttachmentCountMatchesItsPrincipals(t *testing.T) {
 			t.Errorf("%s: AttachmentCount=%d, but %d principals attach it",
 				aws.ToString(p.PolicyName), got, principals)
 		}
-		if principals == 0 && p.IsAttachable {
+		if principals == 0 && p.IsAttachable && aws.ToInt32(p.PermissionsBoundaryUsageCount) == 0 {
 			orphans++
 			if name := aws.ToString(p.PolicyName); name != "orphan-unattached-policy" {
-				t.Errorf("%s is attachable and nothing attaches it, so it carries "+
+				t.Errorf("%s is attachable and nothing attaches it or uses it as a boundary, so it carries "+
 					"iam-policy.orphan-unattached beside the row that exists to carry it", name)
 			}
 		}

@@ -19,7 +19,7 @@ import (
 // The results map is keyed by RoleName so the fake can serve different
 // responses per resource.
 type iamGetRoleFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	// results maps RoleName → Role.
 	results map[string]*iamtypes.Role
 	// errByName maps RoleName → error; overrides results when set.

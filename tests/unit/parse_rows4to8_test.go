@@ -201,35 +201,34 @@ func TestMWAAS3_BucketNameIsUnchangedAndEveryPartitionResolves(t *testing.T) {
 	}
 }
 
-// TestAdminAttachedPolicy_IsRecognisedInEveryPartition pins the admin-policy
-// match through the IAM role enricher. The attached policy ARN is AWS's, so
-// in China it reads arn:aws-cn:iam::aws:policy/AdministratorAccess and a
-// literal list of commercial ARNs silently reports the role unprivileged.
+// TestAdminAttachedPolicy_IsRecognisedInEveryPartition pins the admin verdict
+// through the IAM role enricher. AWS publishes AdministratorAccess in every
+// partition under that partition's ARN with the same Allow * on * document;
+// PowerUserAccess withholds IAM, Organizations and Account; a customer policy
+// is judged by its own document whatever it is called.
 func TestAdminAttachedPolicy_IsRecognisedInEveryPartition(t *testing.T) {
 	tests := []struct {
 		name        string
 		policyARN   string
+		doc         string
 		wantFinding bool
 	}{
-		{name: "commercial AdministratorAccess", policyARN: "arn:aws:iam::aws:policy/AdministratorAccess", wantFinding: true},
-		{name: "China AdministratorAccess", policyARN: "arn:aws-cn:iam::aws:policy/AdministratorAccess", wantFinding: true},
-		{name: "GovCloud AdministratorAccess", policyARN: "arn:aws-us-gov:iam::aws:policy/AdministratorAccess", wantFinding: true},
-		// PowerUserAccess is not in the set: AWS's PowerUserAccess allows every
-		// action EXCEPT IAM, Organizations and Account, so its holder can neither
-		// grant itself permissions nor touch the account. It is not
-		// administrator-equivalent.
-		{name: "PowerUserAccess is not administrator-equivalent", policyARN: "arn:aws-us-gov:iam::aws:policy/PowerUserAccess", wantFinding: false},
-		{name: "a customer policy of the same name is not the AWS one", policyARN: "arn:aws:iam::123456789012:policy/AdministratorAccess", wantFinding: false},
-		{name: "a read-only AWS policy", policyARN: "arn:aws:iam::aws:policy/ReadOnlyAccess", wantFinding: false},
+		{name: "commercial AdministratorAccess", policyARN: "arn:aws:iam::aws:policy/AdministratorAccess", doc: t5AdminDoc, wantFinding: true},
+		{name: "China AdministratorAccess", policyARN: "arn:aws-cn:iam::aws:policy/AdministratorAccess", doc: t5AdminDoc, wantFinding: true},
+		{name: "GovCloud AdministratorAccess", policyARN: "arn:aws-us-gov:iam::aws:policy/AdministratorAccess", doc: t5AdminDoc, wantFinding: true},
+		{name: "PowerUserAccess is not administrator-equivalent", policyARN: "arn:aws-us-gov:iam::aws:policy/PowerUserAccess", doc: t5PowerUserDoc, wantFinding: false},
+		{name: "a scoped customer policy named AdministratorAccess", policyARN: "arn:aws:iam::123456789012:policy/AdministratorAccess", doc: t5ScopedDoc, wantFinding: false},
+		{name: "a read-only AWS policy", policyARN: "arn:aws:iam::aws:policy/ReadOnlyAccess", doc: t5ReadOnlyDoc, wantFinding: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := awsclient.AdminAttachedPolicyNameForTest([]iamtypes.AttachedPolicy{{
-				PolicyArn:  aws.String(tc.policyARN),
-				PolicyName: aws.String("AdministratorAccess"),
-			}})
-			if (got != "") != tc.wantFinding {
-				t.Errorf("AdminAttachedPolicyName(%q) = %q, want match = %v", tc.policyARN, got, tc.wantFinding)
+			f := newT5IAM()
+			f.docs[tc.policyARN] = tc.doc
+			f.roles = []string{"acme-deploy-role"}
+			f.attached["role/acme-deploy-role"] = []string{tc.policyARN}
+			v := t5Run(t, f, "role")
+			if got := t5Has(v.findings["acme-deploy-role"], t5RoleAdmin); got != tc.wantFinding {
+				t.Errorf("%s attached: %s = %v, want %v; findings=%+v", tc.policyARN, t5RoleAdmin, got, tc.wantFinding, v.findings["acme-deploy-role"])
 			}
 		})
 	}

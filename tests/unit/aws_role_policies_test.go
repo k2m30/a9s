@@ -317,87 +317,25 @@ func TestFetchRolePolicies_NilFields(t *testing.T) {
 }
 
 func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
-	attachedMock := &mockIAMListAttachedRolePoliciesClient{
-		outputs: []*iam.ListAttachedRolePoliciesOutput{
-			{
-				AttachedPolicies: []iamtypes.AttachedPolicy{
-					{
-						PolicyName: aws.String("AdministratorAccess"),
-						PolicyArn:  aws.String("arn:aws:iam::aws:policy/AdministratorAccess"),
-					},
-				},
-				IsTruncated: false,
-			},
-		},
+	r := codex2FetchRolePolicy(t, "AdministratorAccess", "arn:aws:iam::aws:policy/AdministratorAccess")
+	if len(r.Findings) != 1 || r.Findings[0].Code != awsclient.CodeRolePolicyAdministrator || r.Findings[0].Phrase != "administrator access" {
+		t.Errorf("AdministratorAccess Findings: expected one %q finding phrased %q, got %+v", awsclient.CodeRolePolicyAdministrator, "administrator access", r.Findings)
 	}
-	inlineMock := &mockIAMListRolePoliciesClient{
-		outputs: []*iam.ListRolePoliciesOutput{
-			{PolicyNames: []string{}, IsTruncated: false},
-		},
-	}
-
-	parentCtx := map[string]string{"role_name": "admin-role"}
-	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	resources := result.Resources
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-	if len(resources[0].Findings) != 1 || resources[0].Findings[0].Code != awsclient.CodeRolePolicyAdministrator || resources[0].Findings[0].Phrase != "administrator access" {
-		t.Errorf("AdministratorAccess Findings: expected one %q finding phrased %q, got %+v", awsclient.CodeRolePolicyAdministrator, "administrator access", resources[0].Findings)
-	}
-	td := resource.GetChildType("role_policies")
-	if td == nil {
-		t.Fatal("role_policies child type not registered")
-	}
-	if got := td.ResolveColor(resources[0]); got != resource.ColorBroken {
-		t.Errorf("AdministratorAccess ResolveColor: expected ColorBroken, got %v (Findings=%+v)", got, resources[0].Findings)
+	if got := resource.GetChildType("role_policies").ResolveColor(r); got != resource.ColorBroken {
+		t.Errorf("AdministratorAccess ResolveColor: expected ColorBroken, got %v (Findings=%+v)", got, r.Findings)
 	}
 }
 
 func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
-	attachedMock := &mockIAMListAttachedRolePoliciesClient{
-		outputs: []*iam.ListAttachedRolePoliciesOutput{
-			{
-				AttachedPolicies: []iamtypes.AttachedPolicy{
-					{
-						PolicyName: aws.String("PowerUserAccess"),
-						PolicyArn:  aws.String("arn:aws:iam::aws:policy/PowerUserAccess"),
-					},
-				},
-				IsTruncated: false,
-			},
-		},
+	r := codex2FetchRolePolicy(t, "PowerUserAccess", "arn:aws:iam::aws:policy/PowerUserAccess")
+	if len(r.Findings) != 1 {
+		t.Fatalf("PowerUserAccess Findings: expected one %q finding, got %+v", awsclient.CodeRolePolicyBroadPower, r.Findings)
 	}
-	inlineMock := &mockIAMListRolePoliciesClient{
-		outputs: []*iam.ListRolePoliciesOutput{
-			{PolicyNames: []string{}, IsTruncated: false},
-		},
+	if f := r.Findings[0]; f.Code != awsclient.CodeRolePolicyBroadPower || f.Phrase != "broad power access" || f.Severity != domain.SevBroken {
+		t.Errorf("PowerUserAccess finding = {%q, %q, %v}, want {%q, %q, %v}", f.Code, f.Phrase, f.Severity, awsclient.CodeRolePolicyBroadPower, "broad power access", domain.SevBroken)
 	}
-
-	parentCtx := map[string]string{"role_name": "power-role"}
-	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	resources := result.Resources
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-	if len(resources[0].Findings) != 1 || resources[0].Findings[0].Code != awsclient.CodeRolePolicyBroadPower || resources[0].Findings[0].Phrase != "broad power access" {
-		t.Errorf("PowerUserAccess Findings: expected one %q finding phrased %q, got %+v", awsclient.CodeRolePolicyBroadPower, "broad power access", resources[0].Findings)
-	}
-	if resources[0].Findings[0].Severity != domain.SevBroken {
-		t.Errorf("PowerUserAccess severity: expected %v (the administrator row's), got %v", domain.SevBroken, resources[0].Findings[0].Severity)
-	}
-	td := resource.GetChildType("role_policies")
-	if td == nil {
-		t.Fatal("role_policies child type not registered")
-	}
-	if got := td.ResolveColor(resources[0]); got != resource.ColorBroken {
-		t.Errorf("PowerUserAccess ResolveColor: expected ColorBroken, got %v (Findings=%+v)", got, resources[0].Findings)
+	if got := resource.GetChildType("role_policies").ResolveColor(r); got != resource.ColorBroken {
+		t.Errorf("PowerUserAccess ResolveColor: expected ColorBroken, got %v (Findings=%+v)", got, r.Findings)
 	}
 }
 

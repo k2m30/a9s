@@ -76,6 +76,11 @@ const (
 	// prod and default VPCs, which have no log at any scope, are the rows
 	// that do.
 	VPCSubnetScopedFlowLog = "vpc-0f10a1b2c3d4e5f60"
+	// VPCSharedFromOwner is owned by the network account 210987654321 and
+	// shared into this one through AWS RAM; the Redis cluster runs in it.
+	// Only its owner can create a flow log on it, so it carries no
+	// vpc.no-flow-logs although none is visible.
+	VPCSharedFromOwner = ProdRedisVpcID
 	// vpcSubnetScopedFlowLogSubnet is that VPC's one subnet, and the resource
 	// the flow log names.
 	vpcSubnetScopedFlowLogSubnet = "subnet-0f10a1b2c3d4e5f60"
@@ -203,6 +208,10 @@ const (
 	// SGDefaultWithRules is the only demo group named "default" that still
 	// carries rules.
 	SGDefaultWithRules = "sg-0default000000001"
+	// SGDefaultUntouched is the staging VPC's default group with only the
+	// egress AWS creates in a dual-stack VPC, to 0.0.0.0/0 and ::/0: the
+	// healthy counterpart of sg.default-with-rules.
+	SGDefaultUntouched = "sg-0default000000002"
 	// SGUnused is the only demo group no network interface references.
 	SGUnused = "sg-0unused0000000001"
 	// SubnetAutoPublicIP is the only demo subnet that auto-assigns public IPs.
@@ -984,6 +993,15 @@ func buildVpcs() []ec2types.Vpc {
 			InstanceTenancy: ec2types.TenancyDefault,
 			DhcpOptionsId:   aws.String("dopt-0def456789abc123d"),
 			OwnerId:         aws.String("123456789012"),
+			Ipv6CidrBlockAssociationSet: []ec2types.VpcIpv6CidrBlockAssociation{
+				{
+					AssociationId:      aws.String("vpc-cidr-assoc-ipv6-02"),
+					Ipv6CidrBlock:      aws.String("2600:1f18:4a3b:c200::/56"),
+					Ipv6Pool:           aws.String("Amazon"),
+					NetworkBorderGroup: aws.String("us-east-1"),
+					Ipv6CidrBlockState: &ec2types.VpcCidrBlockState{State: ec2types.VpcCidrBlockStateCodeAssociated},
+				},
+			},
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-staging")},
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
@@ -1042,13 +1060,13 @@ func buildVpcs() []ec2types.Vpc {
 		},
 		// Redis prod VPC — required for redis→vpc related-panel pivot.
 		{
-			VpcId:           aws.String(ProdRedisVpcID),
+			VpcId:           aws.String(VPCSharedFromOwner),
 			CidrBlock:       aws.String("10.10.0.0/16"),
 			State:           ec2types.VpcStateAvailable,
 			IsDefault:       aws.Bool(false),
 			InstanceTenancy: ec2types.TenancyDefault,
 			DhcpOptionsId:   aws.String("dopt-0redis0000000001"),
-			OwnerId:         aws.String("123456789012"),
+			OwnerId:         aws.String("210987654321"),
 			CidrBlockAssociationSet: []ec2types.VpcCidrBlockAssociation{
 				{
 					AssociationId: aws.String("vpc-cidr-assoc-redis-01"),
@@ -1601,8 +1619,6 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 
 	// The prod VPC's default group, still carrying the self-referencing
 	// ingress rule AWS creates it with, raising sgCodeDefaultWithRules.
-	// sgCodeDefaultWithRules. It is the only demo group named "default", so
-	// every other row is healthy for that condition by construction.
 	sgs = append(sgs, ec2types.SecurityGroup{
 		GroupId:          aws.String(SGDefaultWithRules),
 		GroupName:        aws.String("default"),
@@ -1619,11 +1635,27 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			},
 		},
 		IpPermissionsEgress: []ec2types.IpPermission{
-			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}, Ipv6Ranges: []ec2types.Ipv6Range{{CidrIpv6: aws.String("::/0")}}},
 		},
 		Tags: []ec2types.Tag{
 			{Key: aws.String("Name"), Value: aws.String("default")},
 			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+
+	sgs = append(sgs, ec2types.SecurityGroup{
+		GroupId:          aws.String(SGDefaultUntouched),
+		GroupName:        aws.String("default"),
+		VpcId:            aws.String(fixtStagingVPCID),
+		Description:      aws.String("default VPC security group"),
+		OwnerId:          aws.String("123456789012"),
+		SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + SGDefaultUntouched),
+		IpPermissionsEgress: []ec2types.IpPermission{
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}, Ipv6Ranges: []ec2types.Ipv6Range{{CidrIpv6: aws.String("::/0")}}},
+		},
+		Tags: []ec2types.Tag{
+			{Key: aws.String("Name"), Value: aws.String("default")},
+			{Key: aws.String("Environment"), Value: aws.String("staging")},
 		},
 	})
 
@@ -3976,7 +4008,7 @@ func init() {
 	Register(Pin{ShortName: "igw", Rows: 5, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "nat", Rows: 6, Issues: 3})
 	Register(Pin{ShortName: "rtb", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "sg", Rows: 45, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sg", Rows: 46, Issues: 6, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "subnet", Rows: 38, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "tgw", Rows: 8, Issues: 5})
 	Register(Pin{ShortName: "vpc", Rows: 9, Issues: 2, CoverageGaps: []string{"broken", "dim"}})

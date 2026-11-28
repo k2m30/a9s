@@ -37,8 +37,6 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 		{"eb", awsclient.EnrichEBEnvironmentHealth},
 		{"ecs", awsclient.EnrichECSClusters},
 		{"elb", awsclient.EnrichELBAttributes},
-		{"iam-group", awsclient.EnrichIAMGroup},
-		{"role", awsclient.EnrichIAMRoleLastUsed},
 		{"logs", awsclient.EnrichLogsMetricFilters},
 		{"vpc", awsclient.EnrichVPCFlowLogs},
 		{"waf", awsclient.EnrichWAFLogging},
@@ -104,6 +102,8 @@ func brokenEmittingEnricherCases() []tildeOnlyEnricherCase {
 		{"sns", awsclient.EnrichSNSSubscriptions},
 		{"sqs", awsclient.EnrichSQSAttributes},
 		{"r53", awsclient.EnrichRoute53Zone},
+		{"iam-group", awsclient.EnrichIAMGroup},
+		{"role", awsclient.EnrichIAMRoleLastUsed},
 	}
 }
 

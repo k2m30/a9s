@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// policy_findings.go owns the vocabulary every policy-derived finding shares:
-// the one definition of "an AWS-managed policy that hands out
-// administrator-equivalent power" (so the role, user and group
-// ListAttached*Policies sweeps can never disagree), and the one reader of a
-// policy attached to a resource: its parse, its evaluation, and the findings,
-// marks, verdict words and rows it yields.
+// policy_findings.go owns the vocabulary every policy-derived finding shares,
+// and the one reader of a policy attached to a resource: its parse, its
+// evaluation, and the findings, marks, verdict words and rows it yields.
 package aws
 
 import (
@@ -23,48 +20,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 )
-
-// adminManagedPolicyResources are the AWS-managed policies whose attachment
-// makes the principal effectively an account administrator, i.e. whose
-// document allows every action on every resource.
-// They are named by their resource path rather than their full ARN: AWS
-// returns the ARN in the partition the session is connected to, so a literal
-// commercial ARN reports every China and GovCloud administrator unprivileged.
-//
-// AdministratorAccess is the only member. PowerUserAccess is deliberately not
-// one: AWS's document allows "*" on "*" only with a NotAction that excludes
-// IAM, Organizations and Account, so its holder can neither grant itself
-// permissions nor touch the account.
-var adminManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
-	"policy/AdministratorAccess",
-}
-
-// broadPowerManagedPolicyResources are the AWS-managed policies that grant
-// far more than any one job needs without amounting to administrator. They
-// are worth showing where the operator is reading a principal's policy list,
-// but they are NOT administrator-equivalent and never feed the admin-attached
-// finding.
-var broadPowerManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
-	"policy/PowerUserAccess",
-}
-
-// awsManagedPolicyIn reports whether policyARN names an AWS-managed policy
-// belonging to one of the given sets. It is the only test of that question:
-// the ARN is parsed, so a customer-managed policy an operator happened to
-// name "AdministratorAccess" is not one of AWS's, and every partition's
-// spelling of AWS's own is.
-func awsManagedPolicyIn(policyARN string, sets ...[]string) bool {
-	a, awsOwned := awsManagedPolicy(policyARN)
-	if !awsOwned {
-		return false
-	}
-	for _, set := range sets {
-		if slices.Contains(set, a.Resource) {
-			return true
-		}
-	}
-	return false
-}
 
 // iamNextMarker is the token of the next IAM list page: IAM marks a page
 // followed by another with IsTruncated, and its Marker is meaningful only then.
@@ -105,39 +60,9 @@ func listAttachedUserPolicies(ctx context.Context, api IAMListAttachedUserPolici
 	})
 }
 
-// AdminAttachedPolicyNameForTest is an exported test-only wrapper for the
-// unexported adminAttachedPolicyName — production code does not call it.
-// Lives outside _test.go because tests in tests/unit/ are package unit and
-// can't see same-package test helpers.
-func AdminAttachedPolicyNameForTest(attached []iamtypes.AttachedPolicy) string {
-	return adminAttachedPolicyName(attached)
-}
-
-// adminAttachedPolicyName returns the name of the first admin-equivalent
-// managed policy in the attachment list, or "" when none is attached.
-func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
-	for _, p := range attached {
-		if awsManagedPolicyIn(aws.ToString(p.PolicyArn), adminManagedPolicyResources) {
-			name := aws.ToString(p.PolicyName)
-			if name == "" {
-				name = aws.ToString(p.PolicyArn)
-			}
-			return name
-		}
-	}
-	return ""
-}
-
 // adminAttachedPhrase is the cause for every admin-attached finding. It
-// names the class rather than one policy, so the set can grow without the
-// phrase becoming a lie; the Policy row says which one is attached.
+// names the class rather than one policy; the Policy row says which one.
 const adminAttachedPhrase = "has an administrator policy"
-
-// adminAttachedRows is the supporting Attention row shared by the role, user
-// and group admin-attached findings.
-func adminAttachedRows(policyName string) []domain.DetailRow {
-	return []domain.DetailRow{{Label: "Policy", Value: policyName, Tier: "~"}}
-}
 
 // parsePolicy is the one parse of a policy document in core/aws. A policy
 // attached to a resource is read through readPolicy; an identity policy, read
@@ -146,6 +71,62 @@ func adminAttachedRows(policyName string) []domain.DetailRow {
 // parse gets the same error.
 func parsePolicy(document string) (iampolicy.Document, error) {
 	return iampolicy.Parse(document)
+}
+
+// identityPolicies is the set of identity policies IAM evaluates together
+// for one principal: their statements joined into one document, where an
+// explicit Deny in any of them wins, with the policy each statement came from.
+type identityPolicies struct {
+	union   iampolicy.Document
+	sources []heldPolicy
+}
+
+func (p *identityPolicies) add(h heldPolicy, doc iampolicy.Document) {
+	p.union.Statement = append(p.union.Statement, doc.Statement...)
+	for range doc.Statement {
+		p.sources = append(p.sources, h)
+	}
+}
+
+func (p identityPolicies) adminSource() *heldPolicy {
+	if !p.union.IsAdmin() {
+		return nil
+	}
+	for i, st := range p.union.Statement {
+		if (iampolicy.Document{Statement: []iampolicy.Statement{st}}).IsAdmin() {
+			return &p.sources[i]
+		}
+	}
+	return nil
+}
+
+func (p identityPolicies) escalation() []string { return p.union.PrivilegeEscalation() }
+
+func (p identityPolicies) withoutInline() identityPolicies {
+	var out identityPolicies
+	for i, st := range p.union.Statement {
+		if !p.sources[i].inline {
+			out.union.Statement = append(out.union.Statement, st)
+			out.sources = append(out.sources, p.sources[i])
+		}
+	}
+	return out
+}
+
+func (p identityPolicies) grantedBy(combos []string) []heldPolicy {
+	var out []heldPolicy
+	for i, st := range p.union.Statement {
+		if st.Effect != "Allow" || slices.Contains(out, p.sources[i]) {
+			continue
+		}
+		one := iampolicy.Document{Statement: []iampolicy.Statement{st}}
+		if slices.ContainsFunc(combos, func(c string) bool {
+			return slices.ContainsFunc(iampolicy.EscalationActions(c), one.AllowsAction)
+		}) {
+			out = append(out, p.sources[i])
+		}
+	}
+	return out
 }
 
 // ownAccountOf is the account a policy attached to a resource is judged

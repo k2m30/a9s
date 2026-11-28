@@ -18,7 +18,7 @@ import (
 // It embeds IAMAPI and overrides GetGroup, ListAttachedGroupPolicies, ListGroupPolicies.
 // All maps are keyed by GroupName.
 type iamGroupFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 
 	// usersByGroup maps GroupName → slice of User returned by GetGroup.
 	usersByGroup map[string][]iamtypes.User

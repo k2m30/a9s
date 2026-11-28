@@ -66,7 +66,7 @@ import (
 // ServiceClients holds AWS service clients for all supported services.
 //
 // Per-Session capability stores (IAMPolicies, IdentityStore, RuleSets,
-// RegionLists, ExposureSettings) are stored as unexported fields guarded by sync.RWMutex and
+// RegionLists, ExposureSettings, PolicyDocs) are stored as unexported fields guarded by sync.RWMutex and
 // accessed via thread-safe getter/setter methods. Direct field access would race under
 // `-race` because:
 //
@@ -86,6 +86,7 @@ type ServiceClients struct {
 	ruleSets      ruleSetStore
 	regionLists   *RegionListStore
 	exposure      *ExposureSettingsStore
+	policyDocs    *PolicyDocumentCache
 
 	// cfg is the session config CreateServiceClients was called with, kept so
 	// a client for another Region can be built from it on demand. Zero value
@@ -465,6 +466,31 @@ func (c *ServiceClients) SetExposureSettings(s *ExposureSettingsStore) {
 	o.storesMu.Lock()
 	defer o.storesMu.Unlock()
 	o.exposure = s
+}
+
+// PolicyDocs returns the session-scoped cache of decoded IAM policy
+// documents. A set no session has wired keeps one of its own.
+// Concurrency-safe.
+func (c *ServiceClients) PolicyDocs() *PolicyDocumentCache {
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	if o.policyDocs == nil {
+		o.policyDocs = &PolicyDocumentCache{}
+	}
+	return o.policyDocs
+}
+
+// SetPolicyDocs replaces the session-scoped policy document cache; a read in
+// flight keeps writing to the cache it captured.
+func (c *ServiceClients) SetPolicyDocs(s *PolicyDocumentCache) {
+	if c == nil {
+		return
+	}
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	o.policyDocs = s
 }
 
 // errClientMissing is domain.ErrClientMissing, the one signal that a read's

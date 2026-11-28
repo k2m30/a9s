@@ -6,26 +6,42 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// rolePolicyFindings returns the wave1 findings for one attached managed
-// policy.
-//
-// The ARN decides, not the name: a customer-managed policy may be named
-// AdministratorAccess while carrying whatever its own document allows, and
-// AWS's own policies sit in the partition the session is connected to.
-func rolePolicyFindings(policyARN string) []domain.Finding {
-	if awsManagedPolicyIn(policyARN, adminManagedPolicyResources) {
-		return []domain.Finding{wave1Finding(CodeRolePolicyAdministrator)}
+// JudgeRolePolicies adds to each row of a role's policy list the verdict of
+// its own document, from principalPolicyVerdict over that one policy:
+// administrator access when it allows everything, broad power when it grants a
+// privilege-escalation combination. The documents are the session cache's,
+// the same the role row and the policy detail read. A document that could not
+// be read is a failure of the list, since a row has no not-inspected mark.
+func JudgeRolePolicies(ctx context.Context, clients *ServiceClients, res resource.FetchResult) (resource.FetchResult, error) {
+	var failures []Failure
+	for i, r := range res.Resources {
+		row, _ := assertStruct[RolePolicyRow](r.RawStruct)
+		set := policySet{kind: holderRole, holder: r.Fields["role_name"]}
+		if row.PolicyType == "Inline" {
+			set.inline = []string{row.PolicyName}
+		} else {
+			set.attached = []iamtypes.AttachedPolicy{{PolicyName: aws.String(row.PolicyName), PolicyArn: aws.String(row.PolicyArn)}}
+		}
+		v := principalPolicyVerdict(ctx, clients, []policySet{set}, "", false)
+		for _, err := range v.errs {
+			failures = append(failures, FailedCall(r.ID, err))
+		}
+		switch {
+		case v.admin != nil:
+			res.Resources[i] = withWave1(r, wave1Finding(CodeRolePolicyAdministrator))
+		case len(v.privEsc) > 0:
+			res.Resources[i] = withWave1(r, wave1Finding(CodeRolePolicyBroadPower))
+		}
 	}
-	if awsManagedPolicyIn(policyARN, broadPowerManagedPolicyResources) {
-		return []domain.Finding{wave1Finding(CodeRolePolicyBroadPower)}
-	}
-	return nil
+	return res, AggregateFailures("role policy documents", failures, len(res.Resources))
 }
 
 // inlineRolePolicyFindings returns the wave1 finding for an inline role
@@ -90,7 +106,7 @@ func FetchRolePolicies(
 				PolicyArn:  policyArn,
 				PolicyType: "Managed",
 			},
-		}, rolePolicyFindings(policyArn)...))
+		}))
 	}
 
 	inlineOutput, err := inlineAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{

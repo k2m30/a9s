@@ -19,7 +19,7 @@ import (
 // It embeds IAMAPI and overrides GetLoginProfile, ListMFADevices, ListAccessKeys.
 // All maps are keyed by UserName.
 type iamUserMFAFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 
 	// loginProfileErr maps UserName → error from GetLoginProfile.
 	// A nil error value means success (profile exists).

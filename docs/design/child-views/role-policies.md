@@ -68,9 +68,9 @@ Row coloring:
 - Managed policies with `aws:policy/` in ARN (AWS-managed): PLAIN `#c0caf5`
 - Managed policies with customer-managed ARNs: PLAIN `#c0caf5`
 - Inline policies: DIM `#565f89` (to visually distinguish them)
-- AWS-managed `AdministratorAccess` or `PowerUserAccess`: RED `#f7768e` (security risk highlight)
+- A policy whose document allows every action on every resource, or grants a known privilege-escalation combination: RED `#f7768e` (security risk highlight)
 
-The dangerous set is the one `core/aws/policy_findings.go` declares — `adminManagedPolicyResources` (administrator-equivalent) plus `broadPowerManagedPolicyResources` (broad power, not administrator) — and a policy qualifies by its AWS-owned ARN (`arn:<partition>:iam::aws:policy/...`), never by its bare name. A customer-managed policy an operator happened to call `AdministratorAccess` carries whatever its own account gave it and is not highlighted; AWS's own is, in every partition.
+A row is judged from the policy's document, read through the session's policy document cache, by the same verdict that judges the role (`principalPolicyVerdict`), never by the policy's name or owner. `AdministratorAccess` is RED because its document is `Allow * on *`, and `PowerUserAccess` because its document grants `lambda:UpdateFunctionCode`, one of the escalation combinations. A customer-managed policy with the same document is RED too; one an operator called `AdministratorAccess` with a scoped document is not.
 
 The red highlighting for overprivileged policies is a deliberate design choice. During a security audit or incident investigation ("why does this role have admin access?"), instantly spotting the dangerous policy saves precious time. This is not a status per se, but a risk signal — consistent with the design philosophy of coloring rows by operational significance.
 

@@ -386,14 +386,16 @@ type Session struct {
 	// entirely by Rotate().
 	PendingDetailRefresh map[string]domain.Gen
 
-	// Feature-specific session caches, kept out of *ServiceClients so the
-	// AWS-transport/session-state boundary stays clean; passed to detail
-	// enrichers via DetailEnrichmentCtx.
+	// PolicyDocCache holds the decoded IAM policy documents of the session:
+	// passed to detail enrichers via DetailEnrichmentCtx, and wired into
+	// *ServiceClients as one of the clientStores, where the role, user and
+	// group verdicts read through it.
 	PolicyDocCache *awsclient.PolicyDocumentCache
 
 	// DetailDocCache is the session-scoped cache for on-demand detail
-	// documents (SFN definitions, CFN templates). Same rotation rationale as
-	// PolicyDocCache.
+	// documents (SFN definitions, CFN templates). Kept out of
+	// *ServiceClients; Rotate rebuilds it so a previous account's documents
+	// are not returned to the next.
 	DetailDocCache *awsclient.DetailDocCache
 
 	// IAMPolicies is the per-session cache for IAM policy resources, keyed by
@@ -474,7 +476,6 @@ func New() *Session {
 		AvailabilityGen:        1,
 		DetailOpGen:            1,
 		PendingDetailRefresh:   make(map[string]domain.Gen),
-		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		DetailDocCache:         &awsclient.DetailDocCache{},
 	}
 	s.resetClientStores()
@@ -999,10 +1000,6 @@ func (s *Session) Rotate() {
 	s.probeStatusMu.Lock()
 	s.ProbeStatus = nil
 	s.probeStatusMu.Unlock()
-
-	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
-	// documents fetched in the previous account cannot leak into the next.
-	s.PolicyDocCache = &awsclient.PolicyDocumentCache{}
 
 	// DetailDocCache: same rationale — SFN/CFN detail documents fetched in
 	// the previous account cannot leak into the next.

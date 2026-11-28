@@ -13,6 +13,11 @@ import (
 // least one rule.
 const WAFNoRules = "acme-empty-waf"
 
+// WAFNoRulesBlocking is the healthy counterpart of waf.no-rules: it has no
+// rules either, and its default action Block stops every request. It is the
+// one demo ACL whose default action is not Allow.
+const WAFNoRulesBlocking = "acme-maintenance-waf"
+
 // WAFOrphan is the Web ACL raising waf.orphan: it has rules and a logging
 // configuration, and is attached to nothing. Every other demo ACL appears in
 // ResourcesByWebACL with at least one associated resource.
@@ -72,6 +77,13 @@ var sharedWAFFixtures = shared(func() *WAFFixtures {
 				LockToken:   aws.String("lock-token-444"),
 			},
 			{
+				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-666666666666"),
+				Name:        aws.String(WAFNoRulesBlocking),
+				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRulesBlocking + "/a1b2c3d4-5678-90ab-cdef-666666666666"),
+				Description: aws.String("Web ACL that closes an API stage during maintenance"),
+				LockToken:   aws.String("lock-token-666"),
+			},
+			{
 				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-555555555555"),
 				Name:        aws.String(WAFOrphan),
 				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFOrphan + "/a1b2c3d4-5678-90ab-cdef-555555555555"),
@@ -108,6 +120,9 @@ var sharedWAFFixtures = shared(func() *WAFFixtures {
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-staging-waf/a1b2c3d4-5678-90ab-cdef-333333333333": {
 				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-web-alb/5555555555aaaaaa",
 			},
+			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRulesBlocking + "/a1b2c3d4-5678-90ab-cdef-666666666666": {
+				"arn:aws:apigateway:us-east-1::/restapis/" + APIGWRESTNoAccessLogs + "/stages/" + APIGWRESTStageSecretStage,
+			},
 			// Associated, so the empty ACL carries the no-rules finding
 			// alone rather than also reading as an orphan.
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRules + "/a1b2c3d4-5678-90ab-cdef-444444444444": {
@@ -125,5 +140,5 @@ func NewWAFFixtures() *WAFFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "waf", Rows: 5, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "waf", Rows: 6, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
 }

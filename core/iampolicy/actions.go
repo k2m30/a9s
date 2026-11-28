@@ -142,6 +142,12 @@ func (d Document) PrivilegeEscalation() []string {
 	return out
 }
 
+// EscalationActions returns the actions the named privilege-escalation
+// combination requires, nil for a name PrivilegeEscalation never returns.
+func EscalationActions(combo string) []string {
+	return slices.Clone(privEscCombos[combo])
+}
+
 // IsAdmin reports an unconditioned Allow of every action on every resource
 // that no unconditional Deny narrows: a Deny that takes any action away
 // leaves less than every action.

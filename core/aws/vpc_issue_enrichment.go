@@ -38,6 +38,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 	}
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
+	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	var failures []Failure
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
@@ -89,13 +90,26 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		flowLogsVal := "yes"
 		if !covered {
 			flowLogsVal = "no"
-			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, rows)
+			if !vpcSharedFromAnotherAccount(r, ownAccount) {
+				setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, rows)
+			}
 		}
 		result.FieldUpdates[vpcID] = map[string]string{
 			"flow_logs": flowLogsVal,
 		}
 	})
 	return result, errors.Join(loopErr, AggregateFailures("DescribeFlowLogs", failures, n))
+}
+
+// vpcSharedFromAnotherAccount reports whether the VPC is owned by another
+// account and shared into this one through AWS RAM: only the owner can create
+// a flow log on it, so its flow logs are not this account's to fix. A VPC
+// whose owner or whose session account is unknown is judged as the
+// account's own.
+func vpcSharedFromAnotherAccount(r resource.Resource, ownAccount string) bool {
+	vpc, _ := assertStruct[ec2types.Vpc](r.RawStruct)
+	owner := aws.ToString(vpc.OwnerId)
+	return owner != "" && ownAccount != "" && owner != ownAccount
 }
 
 // vpcFlowLogCoverage reports whether the VPC's traffic is logged: by a

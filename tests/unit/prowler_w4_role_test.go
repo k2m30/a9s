@@ -16,12 +16,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 const (
@@ -97,8 +99,6 @@ const w4InlinePrivEscDoc = `{"Version":"2012-10-17","Statement":[` +
 const w4InlineBenignDoc = `{"Version":"2012-10-17","Statement":[` +
 	`{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":"arn:aws:s3:::acme-reports/*"}]}`
 
-// w4RoleListFake serves ListRoles plus the two optional inline-policy
-// interfaces FetchIAMRolesPage type-asserts on.
 type w4RoleListFake struct {
 	awsclient.IAMAPI
 	roles []iamtypes.Role
@@ -106,6 +106,40 @@ type w4RoleListFake struct {
 	inline map[string]map[string]string
 	// listErr, when set for a role name, fails ListRolePolicies for it.
 	listErr map[string]error
+	getErr  map[string]error
+}
+
+func (f *w4RoleListFake) GetRole(
+	_ context.Context, in *iam.GetRoleInput, _ ...func(*iam.Options),
+) (*iam.GetRoleOutput, error) {
+	for _, r := range f.roles {
+		if aws.ToString(r.RoleName) == aws.ToString(in.RoleName) {
+			r.RoleLastUsed = &iamtypes.RoleLastUsed{LastUsedDate: aws.Time(time.Now().Add(-time.Hour)), Region: aws.String("us-east-1")}
+			return &iam.GetRoleOutput{Role: &r}, nil
+		}
+	}
+	return nil, &smithy.OperationError{ServiceID: "IAM", OperationName: "GetRole", Err: &iamtypes.NoSuchEntityException{
+		Message: aws.String("The role with name " + aws.ToString(in.RoleName) + " cannot be found."),
+	}}
+}
+
+func (f *w4RoleListFake) ListAttachedRolePolicies(
+	_ context.Context, _ *iam.ListAttachedRolePoliciesInput, _ ...func(*iam.Options),
+) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{}, nil
+}
+
+// w4EnrichRoles runs the role list and then the Wave 2 role pass over its
+// rows, the pass that judges a role's policies.
+func w4EnrichRoles(t *testing.T, fake *w4RoleListFake) (awsclient.IssueEnricherResult, error) {
+	t.Helper()
+	page, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
+	if err != nil {
+		t.Fatalf("FetchIAMRolesPage: %v", err)
+	}
+	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
+	session.New().WireStores(clients)
+	return awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, page.Resources, nil)
 }
 
 func (f *w4RoleListFake) ListRoles(
@@ -131,6 +165,9 @@ func (f *w4RoleListFake) ListRolePolicies(
 func (f *w4RoleListFake) GetRolePolicy(
 	_ context.Context, in *iam.GetRolePolicyInput, _ ...func(*iam.Options),
 ) (*iam.GetRolePolicyOutput, error) {
+	if err, ok := f.getErr[aws.ToString(in.PolicyName)]; ok {
+		return nil, err
+	}
 	doc, ok := f.inline[aws.ToString(in.RoleName)][aws.ToString(in.PolicyName)]
 	if !ok {
 		return nil, errors.New("NoSuchEntity: inline policy not found")
@@ -415,13 +452,16 @@ func TestW4RoleInlinePrivilegeEscalation(t *testing.T) {
 			"acme-inline-escalate-role": {"acme-break-glass": w4InlinePrivEscDoc},
 		},
 	}
-	r := w4FetchRole(t, fake, "acme-inline-escalate-role")
+	res, err := w4EnrichRoles(t, fake)
+	if err != nil {
+		t.Fatalf("EnrichIAMRoleLastUsed: %v", err)
+	}
 
 	// The combo is in the Combo rows, one per escalation combination, not in
 	// the phrase.
-	w4AssertFinding(t, r.Findings, w4CodeRoleInlinePrivEsc,
-		catalog.Phrase(w4CodeRoleInlinePrivEsc), domain.SevBroken, "wave1")
-	w4AssertRows(t, r.AttentionDetails, w4CodeRoleInlinePrivEsc, []domain.DetailRow{
+	w4AssertFinding(t, res.Findings["acme-inline-escalate-role"], w4CodeRoleInlinePrivEsc,
+		catalog.Phrase(w4CodeRoleInlinePrivEsc), domain.SevBroken, w4SourceRoleWave2)
+	w4AssertRows(t, res.AttentionDetails["acme-inline-escalate-role"], w4CodeRoleInlinePrivEsc, []domain.DetailRow{
 		{Label: "Policy", Value: "acme-break-glass"},
 		{Label: "Combo", Value: "iam:CreateLoginProfile"},
 	})
@@ -432,47 +472,49 @@ func TestW4RoleInlinePrivilegeEscalation(t *testing.T) {
 // all.
 func TestW4RoleInlinePrivEscNegatives(t *testing.T) {
 	t.Run("benign_inline_policy", func(t *testing.T) {
-		fake := &w4RoleListFake{
+		res, _ := w4EnrichRoles(t, &w4RoleListFake{
 			roles: []iamtypes.Role{w4Role("acme-reader-role", "/", w4TrustEC2Only)},
 			inline: map[string]map[string]string{
 				"acme-reader-role": {"acme-read-reports": w4InlineBenignDoc},
 			},
+		})
+		w4AssertNoCode(t, res.Findings["acme-reader-role"], w4CodeRoleInlinePrivEsc)
+		if check, ok := res.TruncatedIDs["acme-reader-role"]; ok {
+			t.Errorf("acme-reader-role not inspected (%q), want inspected", check)
 		}
-		r := w4FetchRole(t, fake, "acme-reader-role")
-		w4AssertNoCode(t, r.Findings, w4CodeRoleInlinePrivEsc)
 	})
 
 	t.Run("no_inline_policies", func(t *testing.T) {
-		fake := &w4RoleListFake{roles: []iamtypes.Role{w4Role("acme-bare-role", "/", w4TrustEC2Only)}}
-		r := w4FetchRole(t, fake, "acme-bare-role")
-		w4AssertNoCode(t, r.Findings, w4CodeRoleInlinePrivEsc)
+		res, _ := w4EnrichRoles(t, &w4RoleListFake{roles: []iamtypes.Role{w4Role("acme-bare-role", "/", w4TrustEC2Only)}})
+		w4AssertNoCode(t, res.Findings["acme-bare-role"], w4CodeRoleInlinePrivEsc)
+		if check, ok := res.TruncatedIDs["acme-bare-role"]; ok {
+			t.Errorf("acme-bare-role not inspected (%q), want inspected", check)
+		}
 	})
 
 	// A role whose inline policies cannot be listed is unknown, not clean and
-	// not flagged: an API failure must never read as a verdict.
-	//
-	// Not w4FetchRole, which fatals on any error: the page carries the failure
-	// on its own lane and the role's policy-derived facts read "?".
+	// not flagged: an API failure must never read as a verdict. The escalating
+	// inline policy the list would have named stays unread.
 	t.Run("list_inline_policies_fails", func(t *testing.T) {
-		fake := &w4RoleListFake{
+		res, err := w4EnrichRoles(t, &w4RoleListFake{
 			roles:   []iamtypes.Role{w4Role("acme-denied-role", "/", w4TrustEC2Only)},
-			listErr: map[string]error{"acme-denied-role": errors.New("AccessDenied")},
-		}
-		res, err := BindPage("role")(awsclient.FetchIAMRolesPage(context.Background(), fake, ""))
+			inline:  map[string]map[string]string{"acme-denied-role": {"acme-break-glass": w4InlinePrivEscDoc}},
+			listErr: map[string]error{"acme-denied-role": t5Denied("ListRolePolicies")},
+		})
 		if err == nil {
-			t.Fatal("FetchIAMRolesPage returned no error for a refused ListRolePolicies")
+			t.Error("EnrichIAMRoleLastUsed returned no error for a refused ListRolePolicies")
 		}
-		if len(res.Resources) != 1 {
-			t.Fatalf("got %d rows, want the role to survive the partial failure", len(res.Resources))
+		if check := res.TruncatedIDs["acme-denied-role"]; check != "ListRolePolicies" {
+			t.Errorf("acme-denied-role not-inspected check = %q, want %q", check, "ListRolePolicies")
 		}
-		w4AssertNoCode(t, res.Resources[0].Findings, w4CodeRoleInlinePrivEsc)
+		w4AssertNoCode(t, res.Findings["acme-denied-role"], w4CodeRoleInlinePrivEsc)
 	})
 }
 
 // w4RoleAdminFake serves the role enricher: GetRole for the dormancy check
 // and ListAttachedRolePolicies for the admin check.
 type w4RoleAdminFake struct {
-	awsclient.IAMAPI
+	t5EmptyIAM
 	// attached maps RoleName → attached policy name → policy ARN.
 	attached map[string]map[string]string
 	// attachErr maps RoleName → error for ListAttachedRolePolicies.

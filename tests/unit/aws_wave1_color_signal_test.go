@@ -14,7 +14,6 @@ import (
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -404,17 +403,7 @@ func fetchRolePoliciesForColor(t *testing.T, managed []string, inline []string) 
 			PolicyArn:  aws.String("arn:aws:iam::aws:policy/" + name),
 		})
 	}
-	attachedMock := &mockIAMListAttachedRolePoliciesClient{
-		outputs: []*iam.ListAttachedRolePoliciesOutput{{AttachedPolicies: attached}},
-	}
-	inlineMock := &mockIAMListRolePoliciesClient{
-		outputs: []*iam.ListRolePoliciesOutput{{PolicyNames: inline}},
-	}
-	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, map[string]string{"role_name": "r"}, "")
-	if err != nil {
-		t.Fatalf("FetchRolePolicies: %v", err)
-	}
-	return result.Resources
+	return codex2DrillRolePolicies(t, &codex2RolePolicyFake{attached: attached, inline: inline})
 }
 
 func TestRolePolicies_ColorSignal(t *testing.T) {

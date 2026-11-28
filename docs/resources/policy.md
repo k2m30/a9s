@@ -59,16 +59,16 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `p
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `AttachmentCount==0` AND not AWS-managed → Warning (orphan — customer-managed policy attached to nothing, dead weight during IAM cleanup).
+- **Signal**: `AttachmentCount==0` AND `PermissionsBoundaryUsageCount==0` AND not AWS-managed → Warning (orphan — customer-managed policy attached to nothing and bounding nobody, dead weight during IAM cleanup). A policy used only as a permissions boundary is in use: `AttachmentCount` counts attachments, `PermissionsBoundaryUsageCount` the principals it bounds.
   - **State bucket**: Warning.
-  - **How obtained**: `AttachmentCount` field on the `ListPolicies` response. "Not AWS-managed" is derived from the `Arn` — AWS-managed policies live under `arn:aws:iam::aws:policy/...` (the literal account id `aws`); customer-managed policies live under `arn:aws:iam::<account-id>:policy/...`. Orphan detection runs only on the customer-managed subset.
+  - **How obtained**: the `AttachmentCount` and `PermissionsBoundaryUsageCount` fields on the `ListPolicies` response. "Not AWS-managed" is derived from the `Arn` — AWS-managed policies live under `arn:aws:iam::aws:policy/...` (the literal account id `aws`); customer-managed policies live under `arn:aws:iam::<account-id>:policy/...`. Orphan detection runs only on the customer-managed subset.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: Policy document (default version) contains an `"Effect":"Allow","Action":"*","Resource":"*"` statement → Broken (wildcard admin — the policy is effectively administrator access, regardless of name).
   - **Explicit Deny**: an unconditional Deny that takes any action away (a Deny `Action`, or a Deny `NotAction` that does not except `*`) leaves less than every action, so the policy is not admin; its escalation combos are then read as below.
   - **State bucket**: Broken.
-  - **API call**: `GetPolicyVersion(PolicyArn, VersionId=<DefaultVersionId>)` — one call per policy. The `Document` field is URL-encoded JSON per SDK docs — decode, parse, then scan the `Statement[]` array for any entry with `Effect==Allow`, `Action` containing `*`, and `Resource` containing `*` (accounting for the field being either a string or a list). An answer without the default version id or the document marks the row not inspected, naming the call and the missing field.
+  - **API call**: `GetPolicyVersion(PolicyArn, VersionId=<DefaultVersionId>)` — one call per policy. The `Document` field is URL-encoded JSON per SDK docs — decode, parse, then scan the `Statement[]` array for any entry with `Effect==Allow`, `Action` containing `*`, and `Resource` containing `*` (accounting for the field being either a string or a list). An answer without the default version id or the document marks the row not inspected, naming the call and the missing field. The document is read through the session's policy document cache, the same read the role, user and group lists judge it from, so the policy row and the principals that hold it cannot disagree.
   - **Cost shape**: per-resource.
 
 - **Signal**: Document grants a known privilege-escalation action combination (and is not already reported as admin).
@@ -92,7 +92,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `AttachmentCount == 0` on a customer-managed policy | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unattached, no roles/users/groups use it` |
+| `AttachmentCount == 0` and `PermissionsBoundaryUsageCount == 0` on a customer-managed policy | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unattached, no roles/users/groups use it` |
 | Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `admin star (allows * on *)` |
 | Document grants a known privilege-escalation action combination (and is not already reported as admin) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `allows privilege escalation` |
 
@@ -120,7 +120,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `policy` is a registered a9s resource type — `docs/related-resources.md` § Per-type contract row `policy`.
 - Expected related targets `ct-events`, `iam-group`, `iam-user`, `role` — `docs/related-resources.md` § `policy` (line "`policy` | [API_Policy] | `ct-events`, `iam-group`, `iam-user`, `role`").
 - Reasoning for each target pivot — `docs/related-resources.md` § `policy`.
-- Wave 1 signal `AttachmentCount==0 AND not AWS-managed → Warning (orphan)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
+- Wave 1 signal `AttachmentCount==0 AND PermissionsBoundaryUsageCount==0 AND not AWS-managed → Warning (orphan)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
 - Wave 2 signal `GetPolicyVersion` document contains `"Effect":"Allow","Action":"*","Resource":"*" → Broken (wildcard admin)` — `docs/attention-signals.md § Signals § SECURITY & IAM` row `policy`.
 - Wave 3 IAM Access Advisor unused-permission analysis — `docs/attention-signals.md § Not yet implemented`.
 - Read-only invariant (§5) — `docs/architecture.md` § "What is a9s?".
@@ -141,7 +141,7 @@ policy — SECURITY & IAM. Status key: `risk` — the key the status cell reads,
 | --- | --- | --- | --- | --- |
 | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 | The policy is attached to nothing, so it grants nobody anything today — but it stays available to attach, and a permissive orphan is an easy mistake to make later. Delete it, or record why it is kept. |
 | iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 | This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the "*" action and resource with the specific ones its holders need. |
-| policy.privilege-escalation | allows privilege escalation | broken | wave2 | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions. |
+| policy.privilege-escalation | allows privilege escalation | broken | wave2 | This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Remove the escalation actions, or scope them to resources that cannot be used to escalate. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -557,16 +557,19 @@ func TestFindingRowCap_RoleInlinePrivEscRowsAreCapped(t *testing.T) {
 		t.Fatalf("fixture defect: %d combos does not exceed the cap of %d", len(combos), awsclient.FindingRowCap)
 	}
 
-	r := w4FetchRole(t, &w4RoleListFake{
+	res, err := w4EnrichRoles(t, &w4RoleListFake{
 		roles: []iamtypes.Role{w4Role(roleName, "/", w4TrustEC2Only)},
 		inline: map[string]map[string]string{
 			roleName: {"acme-break-glass": doc},
 		},
-	}, roleName)
+	})
+	if err != nil {
+		t.Fatalf("EnrichIAMRoleLastUsed: %v", err)
+	}
 
-	ad, ok := r.AttentionDetails[w4CodeRoleInlinePrivEsc]
+	ad, ok := res.AttentionDetails[roleName][w4CodeRoleInlinePrivEsc]
 	if !ok {
-		t.Fatalf("role %q carries no inline privilege-escalation rows; AttentionDetails=%+v", roleName, r.AttentionDetails)
+		t.Fatalf("role %q carries no inline privilege-escalation rows; AttentionDetails=%+v", roleName, res.AttentionDetails[roleName])
 	}
 	// One Policy row precedes the combos, so the list the cap sees is one
 	// longer than the combo count.

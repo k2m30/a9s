@@ -73,7 +73,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `Rules==[]` (no-op ACL).
+- **Signal**: `Rules==[]` AND `DefaultAction.Allow` set: the default action applies to every request no rule matches, so this ACL lets every request through. An ACL with no rules and `DefaultAction.Block` blocks every request and raises nothing.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -102,7 +102,7 @@ One row per signal from §3 that has operator-readable surface text:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S2, S3, S4, S5 | `web ACL has no rules` |
+| `Rules==[]` with `DefaultAction.Allow` (lets every request through) | 2 | Warning | `~` | S2, S3, S4, S5 | `web ACL has no rules` |
 | `GetLoggingConfiguration` reports no destination for this web ACL under any `LogScope` | 2 | Warning | `~` | S2, S3, S4, S5 | `no logging configuration` |
 | the web ACL protects nothing (`ListResourcesForWebACL` for `REGIONAL`, `ListDistributionsByWebACLId` for `CLOUDFRONT`) | 2 | Warning | `~` | S2, S3, S4, S5 | `not associated with any resource` |
 
@@ -130,7 +130,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `apigw` / `elb` discovery via `ListResourcesForWebACL` per ACL (`ResourceType=API_GATEWAY` | `APPLICATION_LOAD_BALANCER`, Regional scope) — a9s-devops (2026-04-20): possible=yes, worth=yes. This is the only WAF-side API that enumerates protected regional resources; cost is one call per ACL per resource type, bounded and cheap.
 - `cf` discovery via `cloudfront:ListDistributionsByWebACLId` for `Scope=CLOUDFRONT` ACLs (REGIONAL ACLs resolve to 0 without a call) — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListResourcesForWebACL` does not cover the CloudFront scope, so the association is enumerated from the CloudFront side; bounded pages per ACL.
 - `logs` discovery via `GetLoggingConfiguration` per ACL, filtering `LogDestinationConfigs[]` ARNs that begin with `arn:aws:logs:` — a9s-devops (2026-04-20): possible=yes, worth=yes. WAF logging also supports Kinesis Firehose and S3 sinks; only CW Logs destinations bind to the `logs` panel target.
-- `~` severity for `Rules==[]`: an empty ACL is a config hygiene concern, not an active security regression — the ACL simply does nothing — a9s-devops (2026-04-20): possible=yes, worth=yes. The allow-all default with zero rules is a separate condition, recorded under `docs/attention-signals.md § Not yet implemented`.
+- `~` severity for `Rules==[]`: an empty ACL is a config hygiene concern, not an active security regression — the ACL simply does nothing — a9s-devops (2026-04-20): possible=yes, worth=yes. The signal is raised only with the allow-all default: zero rules under `DefaultAction.Block` stop every request, which is not an absence of protection.
 - List text and detail text wording for both Wave 2 signals — generated per the output-template §4 rules (≤40 char S4, no jargon, state + cause).
 
 <!-- BEGIN GENERATED: header -->
@@ -142,7 +142,7 @@ waf — SECURITY & IAM. Status key: `state` — the column naming it is the stat
 | --- | --- | --- | --- | --- |
 | waf.orphan | not associated with any resource | warn | wave2 | This web ACL is not attached to any resource it can protect — a load balancer, gateway stage, GraphQL endpoint, user pool, App Runner service, Verified Access instance or distribution — so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it. |
 | waf.no-logging | no logging configuration | warn | wave2 | This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group. |
-| waf.no-rules | web ACL has no rules | warn | wave2 | This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
+| waf.no-rules | web ACL has no rules | warn | wave2 | This web ACL contains no rules and its default action is Allow, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

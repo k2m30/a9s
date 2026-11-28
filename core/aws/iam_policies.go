@@ -17,14 +17,22 @@ import (
 )
 
 // iamPolicyCodeOrphanUnattached is the canonical FindingCode for a
-// customer-managed policy that is attachable but currently attached to
-// nothing (AttachmentCount == 0) — dead permission surface worth pruning.
+// customer-managed policy that is attachable but used by nothing — dead
+// permission surface worth pruning.
 const iamPolicyCodeOrphanUnattached domain.FindingCode = "iam-policy.orphan-unattached"
 
-// orphanUnattachedPolicyFinding returns the wave1 Finding for an attachable
-// policy with zero attachments, or nil when the policy doesn't match.
-func orphanUnattachedPolicyFinding(attachmentCount string, isAttachable bool) []domain.Finding {
-	if attachmentCount == "0" && isAttachable {
+// policyUnused reports whether an attachable policy is used by nothing.
+// AttachmentCount counts the principals it is attached to and
+// PermissionsBoundaryUsageCount those it bounds; a boundary is in use with no
+// attachment at all.
+func policyUnused(p iamtypes.Policy) bool {
+	return p.IsAttachable && aws.ToInt32(p.AttachmentCount) == 0 && aws.ToInt32(p.PermissionsBoundaryUsageCount) == 0
+}
+
+// orphanUnattachedPolicyFinding returns the wave1 Finding for an unused
+// policy, or nil when the policy is in use.
+func orphanUnattachedPolicyFinding(p iamtypes.Policy) []domain.Finding {
+	if policyUnused(p) {
 		return []domain.Finding{wave1Finding(iamPolicyCodeOrphanUnattached)}
 	}
 	return nil
@@ -139,7 +147,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 			"arn":              arn,
 		},
 		RawStruct: policy,
-	}, orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable)...)
+	}, orphanUnattachedPolicyFinding(policy)...)
 }
 
 // awsManagedPolicyPathPrefixes are the ARN path prefixes AWS-managed policies

@@ -76,13 +76,17 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `AdministratorAccess` attached. `PowerUserAccess` does not count: it withholds IAM, Organizations and Account, so its holder cannot grant itself permissions.
+- **Signal**: the policies that apply to the user, read together as IAM reads them, allow every action on every resource, and its permissions boundary, when it has one, does too. The policies are its own attached (AWS-managed or customer-managed) and inline policies and the attached and inline policies of every group it is in; their statements are joined into one document, so an unconditional Deny in any of them leaves less than every action. The document decides, not the policy's name: `AdministratorAccess` counts because its document is `Allow * on *`; `PowerUserAccess` does not, because its document withholds IAM, Organizations and Account.
   - **State bucket**: Warning.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type: `GetUser` (whose answer carries the permissions boundary), `ListAttachedUserPolicies`, `ListUserPolicies`, `ListGroupsForUser`, and per group `ListAttachedGroupPolicies` and `ListGroupPolicies`, read once per session for the group and all its members; then each document and the boundary's through the session's policy document cache (`GetPolicy` + `GetPolicyVersion` once per managed policy, `GetUserPolicy` / `GetGroupPolicy` once per inline policy). A list, a document or a boundary that cannot be read marks the user not inspected with the refused call, and raises neither this signal nor the one below. The Group row names the group a policy is held through.
+
+- **Signal**: the policies that apply to the user, read together as above, grant a known privilege-escalation action combination, the boundary allows every action of it too, and the user is not an administrator. A combination split across the user's own policy and a group's counts.
+  - **State bucket**: Broken.
+  - **How obtained**: the same Wave 2 reads as the administrator signal.
 
 - **Signal**: `GetLoginProfile(UserName)` returns a profile (console login enabled) AND `ListMFADevices(UserName)` returns `MFADevices==[]` → console login without MFA.
   - **State bucket**: Broken.
-  - **API call**: `GetLoginProfile(UserName)` — one per user; `ListMFADevices(UserName)` — one per user. Two calls per user total (short-circuit: skip `ListMFADevices` if `GetLoginProfile` throws `NoSuchEntity`). A `GetLoginProfile` that fails marks the user not inspected; its MFA devices, access keys and attached policies are still read, and their findings still raised.
+  - **API call**: `GetLoginProfile(UserName)` — one per user; `ListMFADevices(UserName)` — one per user. Two calls per user total (short-circuit: skip `ListMFADevices` if `GetLoginProfile` throws `NoSuchEntity`). A `GetLoginProfile` that fails marks the user not inspected; its MFA devices, access keys and policies are still read, and their findings still raised.
   - **Cost shape**: per-resource.
 
 - **Signal**: an access key created more than 90 days ago.
@@ -109,7 +113,8 @@ One row per signal from §3:
 | Console password present AND `PasswordLastUsed` >90d ago | 2 | Warning | `~` | S2, S3, S4, S5 | `console sign-in unused for <N day(s)>` |
 | Active key unused >90d, or never used and itself >90d old | 2 | Warning | `~` | S2, S3, S4, S5 | `access key unused` |
 | Two Active access keys | 2 | Warning | `~` | S2, S3, S4, S5 | `two active access keys` |
-| `AdministratorAccess` attached (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| the user's policies together, its own and its groups', within its boundary, allow every action on every resource (`PowerUserAccess` excluded — it withholds IAM, Organizations and Account) | 2 | Warning | `~` | S2, S3, S4, S5 | `has an administrator policy` |
+| the user's policies together, its own and its groups', within its boundary, grant a known privilege-escalation action combination | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `policy allows privilege escalation` |
 | Console login without MFA | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `console user without MFA` |
 | an access key created more than 90 days ago | 2 | Warning | `~` | S2, S3, S4, S5 | `access key past rotation` |
 
@@ -156,7 +161,8 @@ iam-user — SECURITY & IAM. Status key: `risk` — the key the status cell read
 | --- | --- | --- | --- | --- |
 | iam-user.no-mfa | console user without MFA | broken | wave2 | This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access. |
 | iam-user.old-key | access key past rotation | warn | wave2 | This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one. |
-| iam-user.admin-attached | has an administrator policy | warn | wave2 | This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs. |
+| iam-user.admin-attached | has an administrator policy | warn | wave2 | A policy that applies to this principal allows every action on every resource, so anything it can be used for it can be used for everything. Replace that policy with a scoped policy covering only the actions this principal needs. |
+| iam-user.privilege-escalation | policy allows privilege escalation | broken | wave2 | The policies that apply to this user, its own and its groups', read together within its permissions boundary, grant a combination of actions that lets the user grant itself full administrator. Replace an AWS-managed policy among them with a narrower one, and remove the escalation actions from the policies the account owns, or scope them to resources that cannot be used to escalate. |
 | iam-user.console-never-used | console password never used | warn | wave2 | This user has a console password that has never been used since the account was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave the user with programmatic access only. |
 | iam-user.console-dormant | console sign-in unused for <N day(s)> | warn | wave2 | Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not. |
 | iam-user.access-key-unused | access key unused | warn | wave2 | This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it. |
